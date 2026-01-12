@@ -12,12 +12,12 @@ host: localhost
 # Database Configuration
 database:
   # Type: mysql, postgresql, sqlite
-  type: mysql
-  host: localhost
-  port: 3306
-  name: supertokens
-  user: root
-  password: ""
+  type: postgresql
+  host: 200.45.208.239
+  port: 5432
+  name: postgres
+  user: postgres
+  password: '@Password21'
   ssl: false
 
 # JWT Configuration

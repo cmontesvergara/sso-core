@@ -12,10 +12,13 @@ class ConfigManager {
   async load(): Promise<void> {
     try {
       const configPath = path.join(process.cwd(), 'config.yaml');
+      // console.log(`Loading configuration from ${configPath}`);
 
       if (fs.existsSync(configPath)) {
         const fileContent = fs.readFileSync(configPath, 'utf-8');
+        // console.log('Configuration file content:', fileContent);
         this.config = yaml.parse(fileContent) || {};
+        // console.log('Parsed configuration:', this.config);
       }
 
       // Override with environment variables

@@ -1,91 +1,63 @@
+import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
-import { Repository } from '../database/types';
-import { Session } from '../types';
+import { Config } from '../config';
+import { initPg } from '../database/pg';
+import {
+  findRefreshTokenByHash,
+  initRefreshTokensTable,
+  revokeAllRefreshTokensForUser,
+  revokeRefreshTokenById,
+  saveRefreshToken
+} from '../repositories/refreshTokenRepo';
+import { JWT } from './jwt';
 
-/**
- * Session Service for session management
- */
-export class SessionService {
-  private static instance: SessionService;
+const PEPPER = process.env.REFRESH_TOKEN_PEPPER || 'change-me-pepper';
 
-  private sessionRepository: Repository<Session>;
-
-  private constructor(sessionRepository: Repository<Session>) {
-    this.sessionRepository = sessionRepository;
-  }
-
-  static getInstance(sessionRepository: Repository<Session>): SessionService {
-    if (!SessionService.instance) {
-      SessionService.instance = new SessionService(sessionRepository);
-    }
-    return SessionService.instance;
-  }
-
-  /**
-   * Create a new session
-   */
-  async createSession(
-    userId: string,
-    accessToken: string,
-    refreshToken: string,
-    expiresAt: Date,
-    tenantId?: string
-  ): Promise<Session> {
-    const session: Session = {
-      sessionId: uuidv4(),
-      userId,
-      tenantId,
-      accessToken,
-      refreshToken,
-      expiresAt,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    return this.sessionRepository.create(session);
-  }
-
-  /**
-   * Get session by ID
-   */
-  async getSessionById(sessionId: string): Promise<Session | null> {
-    return this.sessionRepository.findById(sessionId);
-  }
-
-  /**
-   * Get session by user ID
-   */
-  async getSessionByUserId(userId: string): Promise<Session | null> {
-    return this.sessionRepository.findOne({ userId } as Partial<Session>);
-  }
-
-  /**
-   * Verify session is valid and not expired
-   */
-  async verifySession(sessionId: string): Promise<boolean> {
-    const session = await this.getSessionById(sessionId);
-    if (!session) return false;
-    return session.expiresAt > new Date();
-  }
-
-  /**
-   * Revoke session
-   */
-  async revokeSession(sessionId: string): Promise<void> {
-    return this.sessionRepository.delete(sessionId);
-  }
-
-  /**
-   * Refresh session
-   */
-  async refreshSession(sessionId: string, newAccessToken: string, newRefreshToken: string): Promise<Session> {
-    const session = await this.getSessionById(sessionId);
-    if (!session) throw new Error('Session not found');
-
-    return this.sessionRepository.update(sessionId, {
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken,
-      updatedAt: new Date(),
-    } as Partial<Session>);
-  }
+function hashToken(token: string) {
+  return crypto.createHmac('sha256', PEPPER).update(token).digest('hex');
 }
+
+export async function initSessionSubsystem() {
+  await initPg();
+  await initRefreshTokensTable();
+}
+
+export async function generateRefreshToken(userId: string | null, clientId?: string | null, meta?: { ip?: string; ua?: string }) {
+  const token = uuidv4();
+  const hash = hashToken(token);
+  const validitySeconds = Config.get('refresh_token_validity', parseInt(process.env.REFRESH_TOKEN_VALIDITY || '2592000', 10));
+  const expiresAt = new Date(Date.now() + validitySeconds * 1000);
+  const row = await saveRefreshToken({ user_id: userId, token_hash: hash, client_id: clientId || null, expires_at: expiresAt, ip: meta?.ip || null, user_agent: meta?.ua || null });
+  return { token, row };
+}
+
+export class SessionError extends Error {}
+
+export async function rotateRefreshToken(refreshTokenPlain: string) {
+  const hash = hashToken(refreshTokenPlain);
+  const row = await findRefreshTokenByHash(hash);
+  if (!row) throw new SessionError('INVALID_REFRESH_TOKEN');
+  if (row.revoked) {
+    // possible reuse attack: revoke all user tokens
+    if (row.user_id) await revokeAllRefreshTokensForUser(row.user_id);
+    throw new SessionError('REFRESH_TOKEN_REUSED');
+  }
+  if (new Date(row.expires_at) < new Date()) {
+    throw new SessionError('REFRESH_TOKEN_EXPIRED');
+  }
+
+  // Revoke current token and create a new one
+  await revokeRefreshTokenById(row.id);
+  const newTokenPlain = uuidv4();
+  const newHash = hashToken(newTokenPlain);
+  const validitySeconds = Config.get('refresh_token_validity', parseInt(process.env.REFRESH_TOKEN_VALIDITY || '2592000', 10));
+  const expiresAt = new Date(Date.now() + validitySeconds * 1000);
+  await saveRefreshToken({ user_id: row.user_id || null, token_hash: newHash, client_id: row.client_id || null, expires_at: expiresAt, previous_token_id: row.id, ip: row.ip || null, user_agent: row.user_agent || null });
+
+  // Issue access token
+  const accessValidity = Config.get('access_token_validity', parseInt(process.env.ACCESS_TOKEN_VALIDITY || '900', 10));
+  const accessToken = JWT.generateToken({ sub: row.user_id }, accessValidity);
+
+  return { accessToken, refreshToken: newTokenPlain, expiresIn: accessValidity };
+}
+

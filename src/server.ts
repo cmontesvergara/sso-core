@@ -15,6 +15,7 @@ import sessionRoutes from './routes/session';
 import tenantRoutes from './routes/tenant';
 import userRoutes from './routes/user';
 import { JWT } from './services/jwt';
+import { initSessionSubsystem } from './services/session';
 
 export async function createServer(): Promise<Express> {
   const app = express();
@@ -109,6 +110,12 @@ export async function createServer(): Promise<Express> {
   // Initialize JWT keys before returning server (non-blocking if already initialized)
   try {
     await JWT.initKeys();
+    // initialize session subsystem (DB tables, etc.)
+    try {
+      await initSessionSubsystem();
+    } catch (err) {
+      console.warn('Session subsystem failed to init; continue without sessions for now.', err);
+    }
   } catch (err) {
     console.error('Failed to initialize JWT keystore:', err);
     throw err;
