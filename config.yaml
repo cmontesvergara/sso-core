@@ -62,9 +62,25 @@ cors:
     - PATCH
 
 # API Rate Limiting
+# Legacy global rate limit (kept for compatibility)
 rate_limit:
   window_ms: 900000
   max_requests: 100
+
+# Per-endpoint rate limit configuration (used by the app)
+rateLimit:
+  signup:
+    windowMs: 3600000  # 1 hour
+    max: 5
+  signin:
+    windowMs: 900000  # 15 minutes
+    max: 10
+  refresh:
+    windowMs: 60000   # 1 minute
+    max: 30
+  signout:
+    windowMs: 60000   # 1 minute
+    max: 60
 
 # Logging Configuration
 logging:

@@ -6,15 +6,16 @@ import helmet from 'helmet';
 import { Config } from './config';
 import { errorHandler } from './middleware/errorHandler';
 import { loggingMiddleware } from './middleware/logging';
-import authRoutes from './routes/auth';
 import docsRoutes from './routes/docs';
 import emailVerificationRoutes from './routes/emailVerification';
 import metadataRoutes from './routes/metadata';
+import otpRoutes from './routes/otp';
 import roleRoutes from './routes/role';
 import sessionRoutes from './routes/session';
 import tenantRoutes from './routes/tenant';
 import userRoutes from './routes/user';
 import { JWT } from './services/jwt';
+import { initPrisma } from './services/prisma';
 import { initSessionSubsystem } from './services/session';
 
 export async function createServer(): Promise<Express> {
@@ -84,12 +85,16 @@ export async function createServer(): Promise<Express> {
   // API v1 routes
   const apiV1 = express.Router();
 
+  // import auth routes after config is loaded (so route-level config like rate limits can read Config)
+  const authModule = await import('./routes/auth');
+  const authRoutes = authModule.default;
   apiV1.use('/auth', authRoutes);
   apiV1.use('/docs', docsRoutes);
   apiV1.use('/session', sessionRoutes);
   apiV1.use('/user', userRoutes);
   apiV1.use('/tenant', tenantRoutes);
   apiV1.use('/role', roleRoutes);
+  apiV1.use('/otp', otpRoutes);
   apiV1.use('/email-verification', emailVerificationRoutes);
   apiV1.use('/metadata', metadataRoutes);
 
@@ -110,7 +115,13 @@ export async function createServer(): Promise<Express> {
   // Initialize JWT keys before returning server (non-blocking if already initialized)
   try {
     await JWT.initKeys();
-    // initialize session subsystem (DB tables, etc.)
+    // Initialize Prisma client
+    try {
+      await initPrisma();
+    } catch (err) {
+      console.warn('Prisma initialization failed; continuing...', err);
+    }
+    // initialize session subsystem
     try {
       await initSessionSubsystem();
     } catch (err) {

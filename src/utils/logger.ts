@@ -33,3 +33,6 @@ export class Logger {
     this.log('ERROR', message, error);
   }
 }
+
+// Singleton instance for convenience
+export const logger = Logger;
