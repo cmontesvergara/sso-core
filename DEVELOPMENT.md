@@ -1,53 +1,73 @@
-# SuperTokens Core - Node.js Implementation
+# Backend Setup Guide - SSO v2
 
-Versión equivalente del SuperTokens Core original (Java) implementada en Node.js con Express.
+## Quick Start (5 minutes)
 
-## Inicio Rápido
+### Prerequisites
+- Node.js 18+
+- PostgreSQL 14+
+- Git
 
-### 1. Instalación de dependencias
+### Installation
 
 ```bash
-cd supertokens-core-node
+# 1. Clone repository
+cd /Users/cmontes/EmpireSoft/Projects/Single\ Sign\ On/new_sso_backend
+
+# 2. Install dependencies
 npm install
-```
 
-### 2. Configuración
-
-Copia el archivo de configuración:
-```bash
+# 3. Setup environment
 cp .env.example .env
+# Edit .env con tus credenciales PostgreSQL
+
+# 4. Run migrations
+npm run migrate:up
+
+# 5. Generate Prisma client
+npm run prisma:generate
+
+# 6. Start dev server
+npm run dev
 ```
 
-Edita `.env` con tus valores:
-```env
-PORT=3567
-HOST=localhost
-DB_TYPE=mysql
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=
-DB_NAME=supertokens
-JWT_SECRET=tu-llave-secreta
-```
+**Server estará en**: http://localhost:3000
 
-### 3. Base de Datos
+---
 
-Para MySQL:
-```sql
-CREATE DATABASE supertokens;
-```
+## Development
 
-### 4. Ejecución
+### Common Commands
 
-Desarrollo:
 ```bash
-npm run dev:watch
-```
+# Development with auto-reload
+npm run dev
 
-Producción:
-```bash
+# Compile TypeScript
 npm run build
-npm start
+
+# Format code
+npm run format
+
+# Lint code
+npm run lint
+
+# Create new migration
+npm run migrate:create -- add_my_feature
+
+# Revert last migration
+npm run migrate:down
+
+# Generate Prisma types
+npm run prisma:generate
+
+# View Prisma schema
+npm run prisma:format
+
+# Run tests
+npm test
+
+# Watch tests
+npm test -- --watch
 ```
 
 ## Estructura de Carpetas
