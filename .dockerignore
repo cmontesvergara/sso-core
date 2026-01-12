@@ -1,0 +1,12 @@
+**/.env
+**/.env.local
+**/node_modules
+**/dist
+**/coverage
+**/.git
+**/.idea
+**/.vscode
+**/npm-debug.log
+**/*.swp
+**/Thumbs.db
+**/.DS_Store
