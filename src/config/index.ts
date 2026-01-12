@@ -70,6 +70,21 @@ class ConfigManager {
     if (process.env.JWT_ALGORITHM) {
       this.config.jwt.algorithm = process.env.JWT_ALGORITHM;
     }
+    if (process.env.JWT_ISS) {
+      this.config.jwt.iss = process.env.JWT_ISS;
+    }
+    if (process.env.JWT_AUD) {
+      this.config.jwt.aud = process.env.JWT_AUD;
+    }
+    if (process.env.JWT_KID) {
+      this.config.jwt.kid = process.env.JWT_KID;
+    }
+    if (process.env.PRIVATE_KEY_PATH) {
+      this.config.jwt.private_key_path = process.env.PRIVATE_KEY_PATH;
+    }
+    if (process.env.PUBLIC_KEY_PATH) {
+      this.config.jwt.public_key_path = process.env.PUBLIC_KEY_PATH;
+    }
 
     // Token validity
     if (process.env.ACCESS_TOKEN_VALIDITY) {
@@ -92,6 +107,20 @@ class ConfigManager {
       }
       this.config.logging.level = process.env.LOG_LEVEL;
     }
+
+    // CORS defaults
+    if (!this.config.cors) this.config.cors = {};
+    if (process.env.CORS_ORIGIN) this.config.cors.origin = process.env.CORS_ORIGIN;
+    if (process.env.CORS_CREDENTIALS) this.config.cors.credentials = process.env.CORS_CREDENTIALS === 'true';
+    if (process.env.CORS_METHODS) this.config.cors.methods = process.env.CORS_METHODS;
+
+    // Rate limit
+    if (!this.config.rateLimit) this.config.rateLimit = {};
+    if (process.env.RATE_LIMIT_WINDOW_MS) this.config.rateLimit.windowMs = parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10);
+    if (process.env.RATE_LIMIT_MAX) this.config.rateLimit.max = parseInt(process.env.RATE_LIMIT_MAX, 10);
+
+    // Database URL (convenience)
+    if (process.env.DATABASE_URL) this.config.database.url = process.env.DATABASE_URL;
   }
 
   get(key: string, defaultValue?: any): any {

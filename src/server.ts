@@ -1,6 +1,7 @@
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { Express, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { Config } from './config';
 import { errorHandler } from './middleware/errorHandler';
@@ -48,6 +49,26 @@ export async function createServer(): Promise<Express> {
   app.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
   });
+
+  // Readiness endpoint - verifies JWKS is available
+  app.get('/ready', (_req: Request, res: Response) => {
+    try {
+      const jwks: any = JWT.getJWKS();
+      if (!jwks || !Array.isArray(jwks.keys) || jwks.keys.length === 0) throw new Error('keystore empty');
+      res.json({ status: 'OK', timestamp: new Date().toISOString() });
+    } catch (err) {
+      res.status(503).json({ status: 'NOT_READY', message: 'Keystore not initialized' });
+    }
+  });
+
+  // Rate limiter (global)
+  const limiter = rateLimit({
+    windowMs: Config.get('rateLimit.windowMs', 60 * 1000), // default 1 minute
+    max: Config.get('rateLimit.max', 100), // default 100 requests per window
+    standardHeaders: true,
+    legacyHeaders: false
+  });
+  app.use(limiter);
 
   // JWKS endpoint
   app.get('/.well-known/jwks.json', (_req: Request, res: Response) => {
