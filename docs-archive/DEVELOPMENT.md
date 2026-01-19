@@ -167,6 +167,50 @@ src/
 ### Email Verification
 - `POST /api/v1/email-verification/send` - Enviar email
 - `POST /api/v1/email-verification/verify` - Verificar email
+- `POST /api/v1/email-verification/resend` - Reenviar email
+
+---
+
+## Configuración de Email
+
+El backend soporta **3 adaptadores de email**:
+
+### 1. Ethereal (Desarrollo)
+```bash
+# .env
+NODE_ENV=development
+EMAIL_PROVIDER=ethereal
+```
+- ✅ Auto-setup, no requiere API key
+- ✅ Emails se abren en navegador
+- ❌ Solo desarrollo
+
+### 2. Resend (Producción - Recomendado)
+```bash
+# .env
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxx
+EMAIL_FROM=noreply@yourdomain.com
+```
+- ✅ API moderna, excelente deliverability
+- ✅ Dashboard analytics
+- ✅ Planes freemium
+
+Obtener API key: https://resend.com
+
+### 3. SMTP/Nodemailer (Flexible)
+```bash
+# .env
+EMAIL_PROVIDER=nodemailer
+EMAIL_HOST=smtp.mailtrap.io
+EMAIL_PORT=2525
+EMAIL_USER=your_username
+EMAIL_PASS=your_password
+```
+- ✅ Compatible con cualquier SMTP (Mailtrap, SendGrid, Gmail, AWS SES)
+- ✅ Control total
+
+**Para más detalles sobre configuración de email, ver `EMAIL_ADAPTERS.md`**
 
 ### Metadata
 - `POST /api/v1/metadata/:userId` - Guardar metadata

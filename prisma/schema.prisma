@@ -13,28 +13,79 @@ datasource db {
 model User {
   id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email     String     @unique
-  passwordHash String   @map("password_hash")
-  firstName String?    @map("first_name")
-  lastName  String?    @map("last_name")
-  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  
-  refreshTokens RefreshToken[]
-  tenantMembers TenantMember[]
-  otpSecret OTPSecret?
+  firstName      String @map("first_name")
+  secondName     String? @map("second_name")
+  lastName       String @map("last_name")
+  secondLastName String @map("second_last_name")
+  phone          String
+  nuid            String? @unique // National ID
+  addresses          Address[]
+  // Additional Information
+  birthDate        DateTime? @map("birth_date") @db.Date
+  gender           String?
+  nationality      String?
+  birthPlace     String?   @map("place_of_birth")
+  placeOfResidence String?   @map("place_of_residence")
+  occupation       String?
+  maritalStatus    String?   @map("marital_status")
+  userStatus       String   @default("active") @map("user_status")
+
+  // Secure Information
+  passwordHash  String  @map("password_hash")
+  recoveryPhone String? @map("recovery_phone")
+  recoveryEmail String? @map("recovery_email")
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  refreshTokens      RefreshToken[]
+  tenantMembers      TenantMember[]
+  otpSecret          OTPSecret?
   emailVerifications EmailVerification[]
+  otherInformation   OtherInformation?
 
   @@map("users")
+}
+
+model Address {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  country    String
+  province   String
+  city       String
+  detail     String
+  postalCode String?  @map("postal_code")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+model OtherInformation {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @unique @map("user_id") @db.Uuid
+  data      Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("other_information")
 }
 
 model RefreshToken {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId          String    @map("user_id") @db.Uuid
   tokenHash       String    @unique @map("token_hash")
-  clientId        String?   @map("client_id")
+  clientId        String?    @map("client_id")
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   expiresAt       DateTime  @map("expires_at") @db.Timestamptz(6)
   revoked         Boolean   @default(false)
-  previousTokenId String?   @map("previous_token_id") @db.Uuid
+  previousTokenId String?    @map("previous_token_id") @db.Uuid
   ip              String?
   userAgent       String?   @map("user_agent")
 
@@ -88,7 +139,7 @@ model Role {
 }
 
 model Permission {
-  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   roleId    String     @map("role_id") @db.Uuid
   resource  String
   action    String
@@ -105,7 +156,7 @@ model OTPSecret {
   id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String     @unique @map("user_id") @db.Uuid
   secret    String
-  verified  Boolean    @default(false)
+  verifie  Boolean  @default(false)
   backupCodes String[]  @map("backup_codes")
   createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
 

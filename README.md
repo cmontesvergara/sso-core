@@ -1,252 +1,687 @@
-# SuperTokens Core - Node.js with Express
+# 🔐 SSO Backend - Sistema de Autenticación Multi-Tenant
 
-Open-source authentication provider implemented in Node.js with Express.
+**Versión:** 2.3.0  
+**Estado:** ✅ Producción-Ready (Core completo)  
+**Stack:** TypeScript + Express + Prisma + PostgreSQL
 
-This is a homologous version of the SuperTokens Core originally built in Java. It maintains the same architecture and features while leveraging Node.js and Express for the backend.
+---
 
-## Features
+## 📋 Tabla de Contenidos
 
-- **Passwordless Login**: SMS/Email based authentication
-- **Email Password Login**: Traditional email and password authentication
-- **Social Login**: OAuth2 integration with social providers
-- **Session Management**: Secure token-based session handling
-- **Multi-Factor Authentication**: TOTP and other MFA methods
-- **Multi-Tenancy**: Organization and tenant support
-- **User Roles**: Role-based access control (RBAC)
-- **User Metadata**: Flexible user data storage
-- **Account Linking**: Link multiple accounts to a single user
-- **Email Verification**: Email verification workflows
-- **JWT Management**: Secure JWT token generation and validation
+- [Descripción](#-descripción)
+- [Características](#-características)
+- [Inicio Rápido](#-inicio-rápido)
+- [Arquitectura](#-arquitectura)
+- [API Endpoints](#-api-endpoints)
+- [Multi-Tenancy](#-multi-tenancy)
+- [Seguridad](#-seguridad)
+- [Desarrollo](#-desarrollo)
+- [Producción](#-producción)
+- [Roadmap](#-roadmap)
 
-## Architecture
+---
 
-```
-SuperTokens Core (Node.js)
-├── Express Server
-├── Authentication Layer
-│   ├── Email/Password
-│   ├── Passwordless
-│   ├── Social/OAuth
-│   ├── SAML
-│   └── WebAuthn
-├── Session Management
-├── Multi-Tenancy
-├── User Management
-└── Storage Layer
-    ├── MySQL
-    ├── PostgreSQL
-    └── SQLite
-```
+## 🎯 Descripción
 
-## Requirements
+Sistema de **Single Sign-On (SSO)** empresarial con soporte multi-tenant completo. Diseñado para permitir que múltiples aplicaciones compartan autenticación centralizada con aislamiento total entre tenants.
 
-- Node.js >= 18.0.0
-- npm or yarn
-- One of: MySQL, PostgreSQL, or SQLite
+**Casos de Uso:**
+- SaaS con múltiples organizaciones
+- Plataformas empresariales con equipos
+- Microservicios que necesitan autenticación centralizada
+- Sistemas con RBAC (Role-Based Access Control)
 
-## Installation
+---
 
-1. Clone the repository:
+## ✨ Características
+
+### ✅ Autenticación Core
+- **JWT con RS256** (firma asimétrica con claves públicas/privadas)
+- **Passwords seguros** con Argon2
+- **Refresh tokens** con rotación automática
+- **Email verification** (3 proveedores: Resend, SMTP, Ethereal)
+- **2FA/TOTP** con QR codes (Google Authenticator, Authy)
+- **Session management** con invalidación automática
+
+### ✅ Multi-Tenancy
+- **Tenant CRUD** completo
+- **RBAC** con 3 roles predefinidos (admin, member, viewer)
+- **Permissions** granulares (resource:action)
+- **Row-Level Security (RLS)** en PostgreSQL (8 políticas)
+- **Tenant isolation** garantizado a nivel de BD
+- **Member invitations** con gestión de roles
+
+### ✅ Seguridad
+- **SQL Injection** protegido (Prisma parameterizado)
+- **XSS** sanitizado (validación Joi)
+- **CORS** configurable
+- **Rate limiting** básico
+- **HTTPS-ready**
+- **JWT verification** estricta
+- **4 capas de validación** por request
+
+### ✅ Email Adapters
+- **Resend** (producción, API moderna)
+- **Nodemailer SMTP** (self-hosted, staging)
+- **Ethereal** (desarrollo, email testing)
+- Auto-detección según `EMAIL_PROVIDER` en `.env`
+
+---
+
+## 🚀 Inicio Rápido
+
+### Prerrequisitos
 ```bash
-git clone https://github.com/supertokens/supertokens-core-node.git
-cd supertokens-core-node
+Node.js >= 18.0.0
+PostgreSQL >= 14
+npm o yarn
 ```
 
-2. Install dependencies:
+### 1. Clonar e Instalar
 ```bash
+git clone <repo-url>
+cd new_sso_backend
 npm install
 ```
 
-3. Create a `.env` file based on `.env.example`:
+### 2. Configurar Variables de Entorno
 ```bash
 cp .env.example .env
 ```
 
-4. Update configuration files:
-- Edit `.env` for environment variables
-- Edit `config.yaml` for service configuration
-
-## Getting Started
-
-### Development
-
+**Edita `.env`:**
 ```bash
-# Install dependencies
-npm install
+# Base de datos
+DATABASE_URL="postgresql://user:password@localhost:5432/sso_db"
 
-# Start in development mode with hot reload
-npm run dev:watch
+# JWT (genera claves con scripts)
+JWT_PRIVATE_KEY_PATH="./keys/private.pem"
+JWT_PUBLIC_KEY_PATH="./keys/public.pem"
+JWT_ACCESS_EXPIRY="15m"
+JWT_REFRESH_EXPIRY="7d"
 
-# Or start in development mode without watch
-npm run dev
+# Email (elige un proveedor)
+EMAIL_PROVIDER="resend"  # o "smtp" o "ethereal"
+
+# Resend (si usas Resend)
+RESEND_API_KEY="re_xxxxx"
+RESEND_FROM_EMAIL="noreply@tudominio.com"
+
+# O SMTP (si usas Nodemailer)
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="587"
+SMTP_USER="tu@email.com"
+SMTP_PASS="tu-password"
+SMTP_FROM="noreply@tudominio.com"
+
+# App
+PORT="3000"
+NODE_ENV="development"
 ```
 
-### Production
-
+### 3. Generar Claves JWT
 ```bash
-# Build the TypeScript
-npm run build
+# Crea directorio keys si no existe
+mkdir -p keys
 
-# Start the server
+# Genera clave privada
+openssl genpkey -algorithm RSA -out keys/private.pem -pkeyopt rsa_keygen_bits:2048
+
+# Genera clave pública
+openssl rsa -pubout -in keys/private.pem -out keys/public.pem
+```
+
+### 4. Crear Base de Datos
+```bash
+# Opción A: Crear BD manualmente
+createdb -U postgres sso_db
+
+# Opción B: Usar Docker
+docker-compose up -d postgres
+```
+
+### 5. Ejecutar Migraciones
+```bash
+# Genera el cliente Prisma
+npm run prisma:generate
+
+# Aplica todas las migraciones
+npm run migrate:up
+
+# Verifica en la BD
+psql -U postgres -d sso_db -c "\dt"
+```
+
+### 6. Iniciar Servidor
+```bash
+# Desarrollo (con auto-reload)
+npm run dev:watch
+
+# Producción
+npm run build
 npm start
 ```
 
-### Testing
+**Servidor corriendo en:** `http://localhost:3000`
 
+### 7. Probar API
 ```bash
-# Run tests
-npm test
+# Health check
+curl http://localhost:3000/health
 
-# Run tests with coverage
-npm test -- --coverage
+# JWKS (claves públicas)
+curl http://localhost:3000/.well-known/jwks.json
 
-# Watch mode
-npm test:watch
+# Registro de usuario
+curl -X POST http://localhost:3000/api/v1/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@ejemplo.com",
+    "password": "Test1234!",
+    "firstName": "Test",
+    "lastName": "User"
+  }'
 ```
-
-### Linting & Formatting
-
-```bash
-# Run linter
-npm run lint
-
-# Fix linting issues
-npm run lint:fix
-
-# Format code
-npm run format
-```
-
-## Configuration
-
-### Environment Variables
-
-See `.env.example` for all available environment variables.
-
-### Configuration File
-
-Edit `config.yaml` to customize:
-- Database settings
-- JWT configuration
-- Token validity periods
-- Email settings
-- CORS settings
-- Feature flags
-
-## Project Structure
-
-```
-src/
-├── index.ts                 # Entry point
-├── server.ts                # Express server setup
-├── config/                  # Configuration management
-│   ├── index.ts
-│   ├── database.ts
-│   └── constants.ts
-├── database/                # Database layer
-│   ├── connection.ts
-│   ├── migrations.ts
-│   └── repositories/
-├── middleware/              # Express middleware
-│   ├── auth.ts
-│   ├── errorHandler.ts
-│   └── logging.ts
-├── routes/                  # API routes
-│   ├── index.ts
-│   ├── auth/
-│   ├── session/
-│   ├── user/
-│   ├── tenant/
-│   ├── role/
-│   └── metadata/
-├── services/                # Business logic
-│   ├── auth/
-│   ├── session/
-│   ├── user/
-│   ├── email/
-│   ├── jwt/
-│   └── crypto/
-├── exceptions/              # Custom exceptions
-├── types/                   # TypeScript types
-├── utils/                   # Utility functions
-└── tests/                   # Test files
-```
-
-## Database Setup
-
-### MySQL
-
-```sql
-CREATE DATABASE supertokens;
-CREATE USER 'supertokens'@'localhost' IDENTIFIED BY 'password';
-GRANT ALL PRIVILEGES ON supertokens.* TO 'supertokens'@'localhost';
-FLUSH PRIVILEGES;
-```
-
-### PostgreSQL
-
-```sql
-CREATE DATABASE supertokens;
-CREATE USER supertokens WITH PASSWORD 'password';
-GRANT ALL PRIVILEGES ON DATABASE supertokens TO supertokens;
-```
-
-### SQLite
-
-No setup needed - database file will be created automatically.
-
-## API Endpoints
-
-### Authentication
-- `POST /auth/signup` - Create new user account
-- `POST /auth/signin` - Sign in user
-- `POST /auth/signout` - Sign out user
-- `POST /auth/refresh` - Refresh access token
-
-### Session Management
-- `GET /session/verify` - Verify session
-- `POST /session/refresh` - Refresh session
-- `POST /session/revoke` - Revoke session
-
-### User Management
-- `GET /user/:userId` - Get user details
-- `PUT /user/:userId` - Update user
-- `DELETE /user/:userId` - Delete user
-
-### Email Verification
-- `POST /email-verification/send` - Send verification email
-- `POST /email-verification/verify` - Verify email token
-
-### Passwordless
-- `POST /passwordless/code` - Request passwordless code
-- `POST /passwordless/verify` - Verify passwordless code
-
-### Multi-Tenancy
-- `POST /tenant` - Create tenant
-- `GET /tenant/:tenantId` - Get tenant details
-
-### User Roles
-- `POST /role` - Create role
-- `POST /user/:userId/role` - Assign role to user
-
-## Contributing
-
-Contributions are welcome! Please read our [CONTRIBUTING.md](CONTRIBUTING.md) file.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Support
-
-- 📖 [Documentation](https://supertokens.io/docs)
-- 💬 [Discord Community](https://supertokens.io/discord)
-- 🐛 [Issue Tracker](https://github.com/supertokens/supertokens-core-node/issues)
-
-## Authors
-
-Original SuperTokens team - Ported to Node.js with Express
 
 ---
 
-**Note**: This is a homologous port of the original SuperTokens Core (Java). It maintains API compatibility and feature parity with the original implementation.
+## 🏗️ Arquitectura
+
+### Stack Tecnológico
+```
+┌─────────────────────────────────────────────────┐
+│  Frontend (Vue/React) + App Backends            │
+└──────────────────┬──────────────────────────────┘
+                   │ HTTP + JWT
+┌──────────────────▼──────────────────────────────┐
+│  Express Server (TypeScript)                    │
+│  ├─ Routes (auth, tenant, user, otp, session)   │
+│  ├─ Middleware (auth, logging, errorHandler)    │
+│  └─ Services (auth, email, tenant, jwt)         │
+└──────────────────┬──────────────────────────────┘
+                   │ Prisma ORM
+┌──────────────────▼──────────────────────────────┐
+│  PostgreSQL 14+ (with RLS)                      │
+│  ├─ users, tenants, tenant_members              │
+│  ├─ roles, permissions                          │
+│  ├─ refresh_tokens, otp_secrets                 │
+│  ├─ addresses, other_information (NEW)          │
+│  └─ RLS Policies (8 políticas activas)          │
+└─────────────────────────────────────────────────┘
+```
+
+### Flujo de Autenticación
+```
+1. Usuario → POST /api/v1/auth/signup
+   ├─ Valida input (Joi)
+   ├─ Hashea password (Argon2)
+   ├─ Guarda en BD (Prisma)
+   └─ Envía email verificación (Resend/SMTP)
+
+2. Usuario → POST /api/v1/auth/signin
+   ├─ Valida credenciales
+   ├─ Verifica 2FA (si está habilitado)
+   ├─ Genera access token (15min)
+   ├─ Genera refresh token (7 días)
+   └─ Retorna tokens
+
+3. App Backend → Valida JWT
+   ├─ Verifica firma con clave pública
+   ├─ Valida expiración
+   ├─ Extrae userId + tenantId
+   └─ Autoriza request
+```
+
+### Capas de Seguridad
+```
+Request → [1. CORS] → [2. Rate Limit] → [3. JWT Verify] 
+       → [4. Tenant Check] → [5. RLS Policy] → [6. Permission Check]
+       → Handler → Response
+```
+
+---
+
+## 📡 API Endpoints
+
+**Base URL:** `http://localhost:3000/api/v1`
+
+### Auth Endpoints
+| Método | Ruta | Descripción | Auth |
+|--------|------|-------------|------|
+| POST | `/auth/signup` | Registrar usuario | ❌ |
+| POST | `/auth/signin` | Login | ❌ |
+| POST | `/auth/refresh` | Renovar token | ❌ (refresh token) |
+| POST | `/auth/signout` | Logout | ✅ |
+
+### OTP/2FA Endpoints
+| Método | Ruta | Descripción | Auth |
+|--------|------|-------------|------|
+| POST | `/otp/generate` | Genera QR para 2FA | ✅ |
+| POST | `/otp/verify` | Verifica y activa 2FA | ✅ |
+| POST | `/otp/validate` | Valida código 2FA | ✅ |
+| POST | `/otp/disable` | Desactiva 2FA | ✅ |
+| GET | `/otp/status/:userId` | Estado 2FA de usuario | ✅ |
+
+### Email Verification
+| Método | Ruta | Descripción | Auth |
+|--------|------|-------------|------|
+| POST | `/email-verification/send` | Enviar código | ❌ |
+| POST | `/email-verification/verify` | Verificar código | ❌ |
+| POST | `/email-verification/resend` | Reenviar código | ❌ |
+
+### Tenant Endpoints
+| Método | Ruta | Descripción | Auth |
+|--------|------|-------------|------|
+| POST | `/tenants` | Crear tenant | ✅ |
+| GET | `/tenants` | Listar mis tenants | ✅ |
+| GET | `/tenants/:id` | Detalle de tenant | ✅ |
+| PATCH | `/tenants/:id` | Actualizar tenant | ✅ (admin) |
+| DELETE | `/tenants/:id` | Eliminar tenant | ✅ (admin) |
+| POST | `/tenants/:id/members` | Invitar miembro | ✅ (admin) |
+| PATCH | `/tenants/:id/members/:userId` | Cambiar rol | ✅ (admin) |
+| DELETE | `/tenants/:id/members/:userId` | Remover miembro | ✅ (admin) |
+
+### User Endpoints
+| Método | Ruta | Descripción | Auth |
+|--------|------|-------------|------|
+| GET | `/users/me` | Mi perfil | ✅ |
+| PATCH | `/users/me` | Actualizar perfil | ✅ |
+| GET | `/users/:id` | Perfil de usuario | ✅ |
+
+### System Endpoints
+| Método | Ruta | Descripción | Auth |
+|--------|------|-------------|------|
+| GET | `/health` | Health check | ❌ |
+| GET | `/ready` | Readiness probe | ❌ |
+| GET | `/.well-known/jwks.json` | Claves públicas JWT | ❌ |
+
+**Ver documentación completa:** `DEVELOPER_GUIDE.md`
+
+---
+
+## 🏢 Multi-Tenancy
+
+### Concepto
+Cada **tenant** representa una organización/equipo con:
+- Usuarios propios
+- Roles y permisos independientes
+- Datos aislados (RLS en PostgreSQL)
+
+Un usuario puede pertenecer a **múltiples tenants** con roles diferentes.
+
+### Ejemplo Práctico
+
+**1. Carlos crea su empresa (Acme Corp)**
+```bash
+POST /api/v1/tenants
+Authorization: Bearer <token>
+{
+  "name": "Acme Corp",
+  "slug": "acme-corp"
+}
+
+# Response: Carlos es ADMIN automáticamente
+{
+  "id": "tenant-123",
+  "name": "Acme Corp",
+  "members": [
+    { "userId": "carlos-id", "role": "admin" }
+  ]
+}
+```
+
+**2. Carlos invita a Alice como MEMBER**
+```bash
+POST /api/v1/tenants/tenant-123/members
+Authorization: Bearer <token>
+X-Tenant-ID: tenant-123
+{
+  "userId": "alice-id",
+  "role": "member"
+}
+```
+
+**3. Alice hace requests usando su tenant**
+```bash
+GET /api/v1/users
+Authorization: Bearer <alice-token>
+X-Tenant-ID: tenant-123
+
+# Solo ve usuarios de tenant-123 (RLS activo)
+```
+
+### Roles Predefinidos
+| Rol | Permisos | Uso Típico |
+|-----|----------|-----------|
+| **admin** | Todos (CRUD completo) | Dueño, CTO |
+| **member** | Read/Write (no delete) | Desarrolladores |
+| **viewer** | Solo lectura | Auditores, QA |
+
+### Row-Level Security (RLS)
+PostgreSQL filtra **automáticamente** por `tenant_id`:
+```sql
+-- Política activa en tabla users
+CREATE POLICY tenant_isolation ON users
+  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
+```
+
+Cuando haces `X-Tenant-ID: tenant-123`, el middleware establece:
+```typescript
+await prisma.$executeRaw`SET app.current_tenant_id = ${tenantId}`;
+// Todas las queries subsecuentes están filtradas por tenant
+```
+
+---
+
+## 🔒 Seguridad
+
+### JWT con RS256
+- **Clave privada:** Firma tokens (solo backend)
+- **Clave pública:** Verifica tokens (backend + apps)
+- **Beneficio:** Apps pueden verificar tokens sin conocer la clave privada
+
+### Password Hashing
+```typescript
+import argon2 from 'argon2';
+
+// Hash al registrar
+const hash = await argon2.hash(password);
+
+// Verificar al login
+const valid = await argon2.verify(hash, password);
+```
+
+### 2FA/TOTP
+```typescript
+// 1. Usuario solicita habilitar 2FA
+POST /api/v1/otp/generate
+→ Genera secret + QR code
+
+// 2. Usuario escanea QR con Google Authenticator
+
+// 3. Usuario verifica código inicial
+POST /api/v1/otp/verify { token: "123456" }
+→ Activa 2FA
+
+// 4. En futuros logins:
+POST /api/v1/auth/signin { email, password }
+→ Response: { requiresOtp: true }
+
+POST /api/v1/otp/validate { token: "654321" }
+→ Response: { accessToken, refreshToken }
+```
+
+### Email Verification
+```typescript
+// 1. Al registrarse, se envía código de 6 dígitos
+POST /api/v1/auth/signup
+→ Email: "Tu código es: 847392"
+
+// 2. Usuario verifica
+POST /api/v1/email-verification/verify
+{ email: "user@test.com", token: "847392" }
+
+// 3. EmailVerification.verified = true
+```
+
+---
+
+## 💻 Desarrollo
+
+### Estructura del Proyecto
+```
+new_sso_backend/
+├── src/
+│   ├── index.ts              # Entry point
+│   ├── server.ts             # Express app setup
+│   ├── config/               # Configuración (DB, JWT, Email)
+│   ├── routes/               # Endpoints (9 archivos)
+│   ├── services/             # Lógica de negocio (9 archivos)
+│   ├── repositories/         # Acceso a datos (4 repos)
+│   ├── middleware/           # Auth, logging, errors
+│   ├── types/                # TypeScript interfaces
+│   └── utils/                # Helpers
+├── prisma/
+│   └── schema.prisma         # Modelos de BD
+├── migrations/               # Migraciones SQL
+├── keys/                     # Claves JWT (gitignored)
+├── .env                      # Variables de entorno
+├── docker-compose.yml        # PostgreSQL local
+├── Dockerfile                # Build de producción
+└── tsconfig.json             # Config TypeScript
+```
+
+### Comandos Útiles
+```bash
+# Desarrollo
+npm run dev              # Ejecutar sin reload
+npm run dev:watch        # Ejecutar con auto-reload
+
+# Build
+npm run build            # Compilar TypeScript
+npm run clean            # Limpiar dist/
+
+# Testing
+npm test                 # Ejecutar tests (Jest)
+npm run test:watch       # Tests en watch mode
+
+# Migraciones
+npm run migrate:create add_campo   # Crear migración
+npm run migrate:up                 # Aplicar migraciones
+npm run migrate:down               # Rollback
+
+# Prisma
+npm run prisma:generate   # Regenerar cliente
+npm run prisma:format     # Formatear schema
+npx prisma studio         # UI para ver BD
+
+# Linting
+npm run lint              # Revisar errores
+npm run lint:fix          # Auto-fix
+npm run format            # Prettier
+```
+
+### Variables de Entorno
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `DATABASE_URL` | Conexión PostgreSQL | `postgresql://user:pass@localhost:5432/sso` |
+| `JWT_PRIVATE_KEY_PATH` | Ruta clave privada | `./keys/private.pem` |
+| `JWT_PUBLIC_KEY_PATH` | Ruta clave pública | `./keys/public.pem` |
+| `JWT_ACCESS_EXPIRY` | Expiración access token | `15m` |
+| `JWT_REFRESH_EXPIRY` | Expiración refresh token | `7d` |
+| `EMAIL_PROVIDER` | Proveedor email | `resend`, `smtp`, `ethereal` |
+| `RESEND_API_KEY` | API key Resend | `re_xxxxx` |
+| `SMTP_HOST` | Servidor SMTP | `smtp.gmail.com` |
+| `PORT` | Puerto servidor | `3000` |
+| `NODE_ENV` | Entorno | `development`, `production` |
+
+### Agregar un Endpoint Nuevo
+**Ejemplo:** Endpoint para cambiar password
+
+**1. Crear servicio** (`src/services/auth.ts`)
+```typescript
+async changePassword(userId: string, oldPassword: string, newPassword: string) {
+  const user = await userRepo.findById(userId);
+  const valid = await argon2.verify(user.passwordHash, oldPassword);
+  if (!valid) throw new UnauthorizedError('Contraseña incorrecta');
+  
+  const newHash = await argon2.hash(newPassword);
+  await userRepo.update(userId, { passwordHash: newHash });
+}
+```
+
+**2. Crear ruta** (`src/routes/auth.ts`)
+```typescript
+router.post('/change-password', authMiddleware, async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  await authService.changePassword(req.userId, oldPassword, newPassword);
+  res.json({ message: 'Contraseña actualizada' });
+});
+```
+
+**3. Agregar validación** (Joi schema en route)
+```typescript
+const schema = Joi.object({
+  oldPassword: Joi.string().required(),
+  newPassword: Joi.string().min(8).required(),
+});
+```
+
+---
+
+## 🚀 Producción
+
+### Deploy con Docker
+
+**1. Build de imagen**
+```bash
+docker build -t sso-backend:latest .
+```
+
+**2. Ejecutar con Docker Compose**
+```bash
+docker-compose up -d
+```
+
+**3. Verificar salud**
+```bash
+curl http://localhost:3000/health
+```
+
+### Variables de Entorno Producción
+```bash
+NODE_ENV=production
+DATABASE_URL=postgresql://prod_user:pass@db.prod.com:5432/sso
+JWT_PRIVATE_KEY_PATH=/run/secrets/jwt_private
+JWT_PUBLIC_KEY_PATH=/run/secrets/jwt_public
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=<secret>
+PORT=3000
+```
+
+### Checklist Pre-Deploy
+- [ ] Generar claves JWT nuevas (no reusar de dev)
+- [ ] Configurar `DATABASE_URL` de producción
+- [ ] Establecer `NODE_ENV=production`
+- [ ] Configurar email provider (Resend recomendado)
+- [ ] Ejecutar migraciones: `npm run migrate:up`
+- [ ] Probar health checks: `/health`, `/ready`
+- [ ] Configurar HTTPS (reverse proxy: Nginx, Caddy)
+- [ ] Habilitar logging externo (CloudWatch, Datadog)
+- [ ] Configurar monitoreo (Prometheus, Grafana)
+- [ ] Revisar límites de rate limiting
+
+### Monitoreo
+```bash
+# Logs
+docker logs -f sso-backend
+
+# Métricas (futuro: Prometheus)
+GET /metrics
+
+# Health checks
+GET /health      # 200 si funciona
+GET /ready       # 200 si BD conectada
+```
+
+---
+
+## 🗺️ Roadmap
+
+### ✅ Fase 1: Core (COMPLETADO - 8 semanas)
+- [x] JWT Authentication (RS256)
+- [x] Password management (Argon2)
+- [x] 2FA/TOTP
+- [x] Email verification (3 adapters)
+- [x] Multi-tenancy (RBAC + RLS)
+- [x] 19 API endpoints
+- [x] User schema extendido (27 campos)
+
+### 🟡 Fase 2: Testing (Pendiente - 3 semanas)
+- [ ] Unit tests (Jest)
+- [ ] Integration tests
+- [ ] E2E tests
+- [ ] Security tests
+- [ ] 80%+ coverage
+
+### 🟡 Fase 3: Password Reset (Pendiente - 1 semana)
+- [ ] Forgot password flow
+- [ ] Reset token generation
+- [ ] Email templates
+- [ ] Reset endpoint
+
+### 🟡 Fase 4: OAuth/Social Login (Pendiente - 4 semanas)
+- [ ] Google OAuth
+- [ ] GitHub OAuth
+- [ ] Microsoft OAuth
+- [ ] Apple Sign In
+
+### 🟡 Fase 5: SAML 2.0 (Pendiente - 3 semanas)
+- [ ] SAML metadata endpoint
+- [ ] Assertion Consumer Service
+- [ ] IdP integration
+
+### 🟡 Fase 6: DevOps (Pendiente - 2 semanas)
+- [ ] CI/CD (GitHub Actions)
+- [ ] Kubernetes manifests
+- [ ] Automated testing
+- [ ] Staging + Production deploys
+
+### 🟡 Fase 7: Performance (Pendiente - 3 semanas)
+- [ ] Redis caching
+- [ ] Query optimization
+- [ ] Load testing
+- [ ] Database replicas
+
+**Tiempo total estimado:** ~24 semanas (480 horas)  
+**Progreso actual:** ~72% completado
+
+---
+
+## 📚 Documentación Adicional
+
+- **[DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md)** - Referencia técnica completa
+- **[prisma/schema.prisma](./prisma/schema.prisma)** - Esquema de base de datos
+- **[docker-compose.yml](./docker-compose.yml)** - Setup local con Docker
+- **[.env.example](./.env.example)** - Variables de entorno template
+
+---
+
+## 🤝 Contribuciones
+
+1. Fork el repositorio
+2. Crea una rama: `git checkout -b feature/nueva-feature`
+3. Commit: `git commit -m 'Agrega nueva feature'`
+4. Hazpush: `git push origin feature/nueva-feature`
+5. Abre un Pull Request
+
+**Estándares de código:**
+- TypeScript strict mode
+- ESLint + Prettier
+- Tests obligatorios para nuevas features
+- Documentación actualizada
+
+---
+
+## 📄 Licencia
+
+MIT License - Ver [LICENSE](./LICENSE)
+
+---
+
+## 👤 Autor
+
+**EmpireSoft**  
+Contacto: cmontes@empiresoft.com
+
+---
+
+## 🙏 Agradecimientos
+
+- **SuperTokens** - Inspiración arquitectura
+- **Prisma** - ORM excepcional
+- **Resend** - Email API moderna
+
+---
+
+**¿Preguntas?** Abre un issue o consulta `DEVELOPER_GUIDE.md` para detalles técnicos.

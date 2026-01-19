@@ -1,9 +1,14 @@
 import nodemailer, { Transporter } from 'nodemailer';
+import { Resend } from 'resend';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger';
 import { getPrismaClient } from './prisma';
 
+export type EmailProvider = 'nodemailer' | 'resend' | 'ethereal';
+
 export interface EmailConfig {
+  provider: EmailProvider;
+  // Nodemailer / SMTP config
   host?: string;
   port?: number;
   secure?: boolean;
@@ -11,6 +16,9 @@ export interface EmailConfig {
     user?: string;
     pass?: string;
   };
+  // Resend config
+  apiKey?: string;
+  // Common
   from?: string;
 }
 
@@ -24,10 +32,13 @@ export interface SendEmailOptions {
 export class EmailService {
   private static instance: EmailService;
   private transporter: Transporter | null = null;
+  private resend: Resend | null = null;
   private config: EmailConfig;
+  private provider: EmailProvider;
 
   private constructor() {
     this.config = this.loadConfig();
+    this.provider = this.config.provider;
   }
 
   static getInstance(): EmailService {
@@ -39,14 +50,34 @@ export class EmailService {
 
   private loadConfig(): EmailConfig {
     const env = process.env.NODE_ENV || 'development';
+    const provider = (process.env.EMAIL_PROVIDER) as EmailProvider;
+
+    const baseConfig = {
+      provider,
+      from: process.env.EMAIL_FROM || 'noreply@bigso.co',
+    };
 
     if (env === 'development') {
       return {
-        from: 'noreply@sso.local',
+        ...baseConfig,
+        provider: 'resend',
+        apiKey: process.env.RESEND_API_KEY,
       };
     }
 
+    // Production config
+    if (provider === 'resend') {
+      return {
+        ...baseConfig,
+        provider: 'resend',
+        apiKey: process.env.RESEND_API_KEY,
+      };
+    }
+
+    // Default SMTP
     return {
+      ...baseConfig,
+      provider: 'nodemailer',
       host: process.env.EMAIL_HOST,
       port: parseInt(process.env.EMAIL_PORT || '587', 10),
       secure: process.env.EMAIL_SECURE === 'true',
@@ -54,43 +85,70 @@ export class EmailService {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
       },
-      from: process.env.EMAIL_FROM || 'noreply@sso.local',
     };
   }
 
   /**
-   * Initialize email transporter
+   * Initialize email service based on provider
    */
   async initialize(): Promise<void> {
-    const env = process.env.NODE_ENV || 'development';
+    logger.info(`Initializing email service with provider: ${this.provider}`);
 
-    if (env === 'development') {
-      try {
-        const testAccount = await nodemailer.createTestAccount();
-        this.transporter = nodemailer.createTransport({
-          host: testAccount.smtp.host,
-          port: testAccount.smtp.port,
-          secure: testAccount.smtp.secure,
-          auth: {
-            user: testAccount.user,
-            pass: testAccount.pass,
-          },
-        });
-        logger.info('Email service initialized with Ethereal test account');
-      } catch (error) {
-        logger.warn('Failed to initialize Ethereal account, using console transport:', error);
-        this.transporter = nodemailer.createTransport({ streamTransport: true });
-      }
+    if (this.provider === 'resend') {
+      this.initializeResend();
+    } else if (this.provider === 'ethereal') {
+      await this.initializeEthereal();
     } else {
-      this.transporter = nodemailer.createTransport({
-        host: this.config.host,
-        port: this.config.port,
-        secure: this.config.secure,
-        auth: this.config.auth,
-      });
-
-      logger.info(`Email service initialized with SMTP: ${this.config.host}`);
+      this.initializeNodemailer();
     }
+  }
+
+  /**
+   * Initialize Resend API client
+   */
+  private initializeResend(): void {
+    if (!this.config.apiKey) {
+      throw new Error('RESEND_API_KEY is required for Resend provider');
+    }
+
+    this.resend = new Resend(this.config.apiKey);
+    logger.info('Email service initialized with Resend API');
+  }
+
+  /**
+   * Initialize Ethereal test account (development)
+   */
+  private async initializeEthereal(): Promise<void> {
+    try {
+      const testAccount = await nodemailer.createTestAccount();
+      this.transporter = nodemailer.createTransport({
+        host: testAccount.smtp.host,
+        port: testAccount.smtp.port,
+        secure: testAccount.smtp.secure,
+        auth: {
+          user: testAccount.user,
+          pass: testAccount.pass,
+        },
+      });
+      logger.info('Email service initialized with Ethereal test account');
+    } catch (error) {
+      logger.warn('Failed to initialize Ethereal account, using console transport:', error);
+      this.transporter = nodemailer.createTransport({ streamTransport: true });
+    }
+  }
+
+  /**
+   * Initialize Nodemailer SMTP
+   */
+  private initializeNodemailer(): void {
+    this.transporter = nodemailer.createTransport({
+      host: this.config.host,
+      port: this.config.port,
+      secure: this.config.secure,
+      auth: this.config.auth,
+    });
+
+    logger.info(`Email service initialized with SMTP: ${this.config.host}`);
   }
 
   /**
@@ -218,28 +276,73 @@ export class EmailService {
   }
 
   /**
-   * Generic email sending
+   * Generic email sending (supports multiple providers)
    */
   async sendEmail(options: SendEmailOptions): Promise<void> {
     try {
-      if (!this.transporter) {
-        await this.initialize();
+      if (this.provider === 'resend') {
+        await this.sendViaResend(options);
+        console.log('Email sent via Resend');
+      } else {
+        await this.sendViaNodemailer(options);
       }
-
-      if (!this.transporter) {
-        throw new Error('Email transporter not initialized');
-      }
-
-      const result = await this.transporter.sendMail({
-        from: this.config.from,
-        ...options,
-      });
-
-      logger.info(`Email sent to ${options.to}:`, result);
     } catch (error) {
       logger.error(`Failed to send email to ${options.to}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Send email via Resend API
+   */
+  private async sendViaResend(options: SendEmailOptions): Promise<void> {
+    if (!this.resend) {
+      await this.initialize();
+    }
+
+    if (!this.resend) {
+      throw new Error('Resend client not initialized');
+    }
+
+    const result = await this.resend.emails.send({
+      from: this.config.from!,
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+      text: options.text,
+    });
+
+    if (result.error) {
+      throw new Error(`Resend API error: ${result.error.message}`);
+    }
+
+    logger.info(`Email sent via Resend to ${options.to}:`, {
+      id: result.data?.id,
+      provider: 'resend',
+    });
+  }
+
+  /**
+   * Send email via Nodemailer (SMTP or Ethereal)
+   */
+  private async sendViaNodemailer(options: SendEmailOptions): Promise<void> {
+    if (!this.transporter) {
+      await this.initialize();
+    }
+
+    if (!this.transporter) {
+      throw new Error('Email transporter not initialized');
+    }
+
+    const result = await this.transporter.sendMail({
+      from: this.config.from,
+      ...options,
+    });
+
+    logger.info(`Email sent via Nodemailer to ${options.to}:`, {
+      messageId: result.messageId,
+      provider: this.provider,
+    });
   }
 }
 
