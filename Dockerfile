@@ -36,7 +36,7 @@ RUN npm ci --only=production
 COPY --from=builder /app/dist ./dist
 
 # Copy key files from builder stage
-COPY --from=builder /app/keys ./keys
+COPY --from=builder /app/keys ./dist/keys
 
 # Copy config file
 COPY config.yaml ./
