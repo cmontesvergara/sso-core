@@ -11,9 +11,14 @@ COPY keys/ ./keys/
 # Install dependencies
 RUN npm ci
 
+# Copy Prisma schema
+COPY prisma ./prisma
+
+# Generate Prisma client
+RUN npx prisma generate
+
 # Copy source code
 COPY src ./src
-
 
 # Build TypeScript
 RUN npm run build
