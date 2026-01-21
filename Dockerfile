@@ -6,6 +6,7 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 COPY tsconfig.json ./
+COPY keys/ ./
 
 # Install dependencies
 RUN npm ci
@@ -34,8 +35,8 @@ RUN npm ci --only=production
 # Copy built application
 COPY --from=builder /app/dist ./dist
 
-# Copy key files
-COPY /app/dist/keys ./keys
+# Copy key files from builder stage
+COPY --from=builder /app/keys ./dist/keys
 
 # Copy config file
 COPY config.yaml ./
