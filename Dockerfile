@@ -3,6 +3,9 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl
+
 # Copy package files
 COPY package*.json ./
 COPY tsconfig.json ./
@@ -36,6 +39,10 @@ COPY package*.json ./
 
 # Install production dependencies only
 RUN npm ci --only=production
+
+# Copy Prisma schema and generate client
+COPY --from=builder /app/prisma ./prisma
+RUN npx prisma generate
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
