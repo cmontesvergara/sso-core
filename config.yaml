@@ -1,101 +1,218 @@
-# Config for SuperTokens Core service - Node.js with Express
-# Configuration parameters for the main service and database
+# ============================================================
+# SSO Backend Configuration
+# ============================================================
+# Sintaxis simplificada:
+#   variable: valor                    # Valor simple
+#   variable:
+#     _default: valor                  # Con default
+#   variable:
+#     _mandatory: true                 # Obligatorio (debe venir de .env)
+#   variable:
+#     _mandatory: true
+#     _default: valor                  # Obligatorio con fallback
+#
+# Prioridad: .env > _value > _default
+# ============================================================
 
 core_config_version: 0
 
-# (OPTIONAL | Default: 3567) Port for SuperTokens service
-port: 3567
+# ============================================================
+# Server Configuration
+# ============================================================
 
-# (OPTIONAL | Default: "localhost") Host for SuperTokens service
-host: localhost
+port:
+  _default: 3567
 
-# Database Configuration
+host:
+  _default: localhost
+
+# ============================================================
+# Database Configuration (ALL MANDATORY)
+# ============================================================
+# Override with: DB_TYPE, DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
+# ============================================================
+
 database:
-  # Type: mysql, postgresql, sqlite
-  type: postgresql
-  host: 200.45.208.239
-  port: 5432
-  name: postgres
-  user: postgres
-  password: '@Password21'
-  ssl: false
+  type:
+    _mandatory: true
+    _default: postgresql
+  
+  host:
+    _mandatory: true
+  
+  port:
+    _mandatory: true
+    _default: 5432
+  
+  name:
+    _mandatory: true
+  
+  user:
+    _mandatory: true
+  
+  password:
+    _mandatory: true
+  
+  ssl:
+    _default: false
 
+# ============================================================
 # JWT Configuration
+# ============================================================
+# JWT_SECRET is mandatory and should come from environment
+# ============================================================
+
 jwt:
-  algorithm: HS256
-  secret: your-super-secret-jwt-key
+  secret:
+    _mandatory: true
+  
+  algorithm:
+    _default: HS256
+  
+  iss: null
+  aud: null
+  kid: null
+  private_key_path: null
+  public_key_path: null
 
-# Access Token Configuration
-# (OPTIONAL | Default: 3600) Time in seconds for how long an access token is valid
-access_token_validity: 3600
+# ============================================================
+# Token Validity (in seconds)
+# ============================================================
 
-# Refresh Token Configuration
-# (OPTIONAL | Default: 604800) Time in seconds for how long a refresh token is valid
-refresh_token_validity: 604800
+access_token_validity:
+  _default: 3600
 
+refresh_token_validity:
+  _default: 604800
+
+# ============================================================
 # Session Configuration
-session:
-  expiry_time: 3600
-  refresh_threshold: 600
+# ============================================================
 
+session:
+  expiry_time:
+    _default: 3600
+  
+  refresh_threshold:
+    _default: 600
+
+# ============================================================
 # Email Configuration
+# ============================================================
+
 email:
-  provider: smtp
+  provider:
+    _default: smtp
+  
   smtp:
-    host: localhost
-    port: 1025
-    secure: false
+    host:
+      _default: localhost
+    port:
+      _default: 1025
+    secure:
+      _default: false
     user: ""
     password: ""
-  from: noreply@supertokens.com
+  
+  resend:
+    apikey:
+      _mandatory: false
+  from:
+    _default: noreply@supertokens.com
 
+# ============================================================
 # CORS Configuration
+# ============================================================
+
 cors:
-  enabled: true
-  origin: "http://localhost:3000"
-  credentials: true
+  enabled:
+    _default: true
+  
+  origin:
+    _default: "http://localhost:3000"
+  
+  credentials:
+    _default: true
+  
   methods:
-    - GET
-    - POST
-    - PUT
-    - DELETE
-    - PATCH
+    _default:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
 
+# ============================================================
+# Logging Configuration
+# ============================================================
+
+logging:
+  level:
+    _default: info
+  
+  format:
+    _default: json
+
+# ============================================================
 # API Rate Limiting
-# Legacy global rate limit (kept for compatibility)
-rate_limit:
-  window_ms: 900000
-  max_requests: 100
+# ============================================================
 
-# Per-endpoint rate limit configuration (used by the app)
 rateLimit:
   signup:
-    windowMs: 3600000  # 1 hour
-    max: 5
+    windowMs:
+      _default: 3600000  # 1 hour
+    max:
+      _default: 5
+  
   signin:
-    windowMs: 900000  # 15 minutes
-    max: 10
+    windowMs:
+      _default: 900000   # 15 minutes
+    max:
+      _default: 10
+  
   refresh:
-    windowMs: 60000   # 1 minute
-    max: 30
+    windowMs:
+      _default: 60000    # 1 minute
+    max:
+      _default: 30
+  
   signout:
-    windowMs: 60000   # 1 minute
-    max: 60
+    windowMs:
+      _default: 60000    # 1 minute
+    max:
+      _default: 60
 
-# Logging Configuration
-logging:
-  level: info
-  format: json
-
+# ============================================================
 # Features
+# ============================================================
+
 features:
-  email_verification: true
-  email_password_auth: true
-  passwordless: true
-  social_login: true
-  mfa: true
-  oauth: true
-  multitenancy: true
-  user_roles: true
-  user_metadata: true
-  account_linking: true
+  email_verification:
+    _default: true
+  
+  email_password_auth:
+    _default: true
+  
+  passwordless:
+    _default: true
+  
+  social_login:
+    _default: false
+  
+  mfa:
+    _default: true
+  
+  oauth:
+    _default: false
+  
+  multitenancy:
+    _default: true
+  
+  user_roles:
+    _default: true
+  
+  user_metadata:
+    _default: true
+  
+  account_linking:
+    _default: false

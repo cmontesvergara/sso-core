@@ -1,0 +1,205 @@
+# ============================================================
+# Ejemplos de Configuración - Sintaxis Simplificada
+# ============================================================
+
+# EJEMPLO 1: Valor simple (sin metadatos)
+simple_var: mi_valor
+
+# EJEMPLO 2: Variable con valor por defecto
+var_con_default:
+  _default: valor_por_defecto
+
+# EJEMPLO 3: Variable obligatoria (DEBE tener valor)
+var_obligatoria:
+  _mandatory: true
+
+# EJEMPLO 4: Variable obligatoria con default (más seguro)
+api_key:
+  _mandatory: true
+  _default: cambiar_en_produccion
+
+# EJEMPLO 5: Variable null explícita
+timeout: null
+
+# EJEMPLO 6: Configuración anidada
+database:
+  host:
+    _mandatory: true
+    _default: localhost
+  
+  port:
+    _mandatory: true
+    _default: 5432
+  
+  credentials:
+    username:
+      _mandatory: true
+    
+    password:
+      _mandatory: true  # Sin default = DEBE venir de .env
+
+# EJEMPLO 7: Arrays
+cors:
+  allowed_origins:
+    _default:
+      - http://localhost:3000
+      - http://localhost:8080
+
+# EJEMPLO 8: Objetos complejos
+email:
+  provider:
+    _default: smtp
+  
+  smtp:
+    host:
+      _default: localhost
+    port:
+      _default: 25
+    secure:
+      _default: false
+
+# EJEMPLO 9: Flags booleanos
+features:
+  email_verification:
+    _default: true
+  
+  mfa:
+    _default: false
+  
+  oauth:
+    _default: false
+
+# EJEMPLO 10: Valores literales (sin metadatos)
+environment: development
+app_name: "My SSO App"
+version: "1.0.0"
+
+# ============================================================
+# Casos de Uso Reales
+# ============================================================
+
+# CASO 1: Secreto obligatorio (NUNCA poner valor real aquí)
+jwt:
+  secret:
+    _mandatory: true  # DEBE venir de JWT_SECRET en .env
+  
+  algorithm:
+    _default: HS256
+
+# CASO 2: URLs sensibles al entorno
+api:
+  base_url:
+    _mandatory: true
+    _default: http://localhost:3567
+
+# CASO 3: Configuración de rate limiting
+rate_limit:
+  enabled:
+    _default: true
+  
+  window_ms:
+    _default: 900000
+  
+  max_requests:
+    _default: 100
+
+# CASO 4: Configuración multi-tenant
+multitenancy:
+  enabled:
+    _default: true
+  
+  default_tenant:
+    _default: public
+  
+  tenant_isolation:
+    _mandatory: true
+    _default: strict
+
+# ============================================================
+# Validación en Acción
+# ============================================================
+
+# ✅ VÁLIDO - Obligatorio con default
+config_valida_1:
+  _mandatory: true
+  _default: valor_default
+
+# ✅ VÁLIDO - Solo default
+config_valida_2:
+  _default: valor_default
+
+# ✅ VÁLIDO - Valor simple
+config_valida_3: mi_valor
+
+# ❌ INVÁLIDO - Obligatorio sin valor ni default
+# config_invalida:
+#   _mandatory: true
+# → Error: "Mandatory field 'config_invalida' is missing or empty"
+
+# ============================================================
+# Tips de Uso
+# ============================================================
+
+# TIP 1: Secretos siempre null + mandatory
+database_password:
+  _mandatory: true
+  _value: null  # Definir en DB_PASSWORD
+
+# TIP 2: Configuración por defecto razonable
+session_timeout:
+  _default: 3600
+  _value: 3600
+
+# TIP 3: Features flags con defaults
+experimental_feature:
+  _default: false
+  _value: false  # Activar manualmente cuando esté listo
+
+# TIP 4: Validación de tipos (lo hace el código)
+max_connections:
+# ============================================================
+# Tips de Uso - Sintaxis Simplificada
+# ============================================================
+
+# TIP 1: Secretos siempre _mandatory sin default
+database_password:
+  _mandatory: true
+
+# TIP 2: Configuración razonable con default
+session_timeout:
+  _default: 3600
+
+# TIP 3: Features flags
+experimental_feature:
+  _default: false
+
+# TIP 4: Valores literales simples
+max_connections: 10
+app_version: "1.0.0"
+debug_mode: false
+
+# TIP 5: Combinar mandatory + default (recomendado)
+critical_setting:
+  _mandatory: true
+  _default: safe_value
+
+# ============================================================
+# Patrones Recomendados
+# ============================================================
+
+# PATRÓN 1: Secreto sin default
+api_key:
+  _mandatory: true
+
+# PATRÓN 2: Config con default sensato
+timeout:
+  _default: 30000
+
+# PATRÓN 3: Feature flag desactivado
+feature_x:
+  _default: false
+
+# PATRÓN 4: Config obligatoria con fallback seguro
+security_mode:
+  _mandatory: true
+  _default: strict
