@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { createServer } from './server';
 import { Logger } from './utils/logger';
-const PORT = process.env.PORT || 3567;
+const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || 'localhost';
 
 async function bootstrap(): Promise<void> {
