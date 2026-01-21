@@ -69,9 +69,17 @@ jwt:
   algorithm:
     _default: HS256
   
-  iss: null
-  aud: null
-  kid: null
+  iss:
+    _mandatory: true
+    _default: bigso.co
+
+  aud:
+    _mandatory: false
+
+  kid:
+    _mandatory: true
+    _default: sso-key-2026
+
   private_key_path: null
   public_key_path: null
 
