@@ -5,24 +5,40 @@
     "lib": ["ES2020"],
     "outDir": "./dist",
     "rootDir": "./",
-    "strict": true,
+    
+    /* Type Checking */
+    "strict": true,                              // Enable all strict type-checking options
+    "noImplicitAny": true,                       // Error on expressions and declarations with an implied 'any' type
+    "strictNullChecks": true,                    // Enable strict null checks
+    "strictFunctionTypes": true,                 // Enable strict checking of function types
+    "strictBindCallApply": true,                 // Enable strict 'bind', 'call', and 'apply' methods on functions
+    "strictPropertyInitialization": true,        // Enable strict checking of property initialization in classes
+    "noImplicitThis": true,                      // Error when 'this' expression is implicitly 'any'
+    "alwaysStrict": true,                        // Parse in strict mode and emit "use strict"
+    
+    /* Additional Checks */
+    "noUnusedLocals": true,                      // Error on unused local variables
+    "noUnusedParameters": true,                  // Error on unused parameters
+    "noImplicitReturns": true,                   // Error when not all code paths return a value
+    "noFallthroughCasesInSwitch": true,          // Error on fallthrough cases in switch statement
+    "noUncheckedIndexedAccess": true,            // Add 'undefined' to index signature results
+    "noImplicitOverride": true,                  // Ensure overriding members are marked with 'override'
+    "noPropertyAccessFromIndexSignature": false, // Allow property access from index signature
+    
+    /* Module Resolution */
+    "moduleResolution": "node",
     "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
+    "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    
+    /* Emit */
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true,
-    "strictPropertyInitialization": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": false,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    
+    /* Decorators */
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true
   },

@@ -13,8 +13,6 @@ RUN npm ci
 # Copy source code
 COPY src ./src
 
-# Copy key files
-COPY keys ./keys
 
 # Build TypeScript
 RUN npm run build
@@ -35,6 +33,9 @@ RUN npm ci --only=production
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
+
+# Copy key files
+COPY /app/dist/keys ./keys
 
 # Copy config file
 COPY config.yaml ./
