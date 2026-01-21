@@ -13,6 +13,9 @@ RUN npm ci
 # Copy source code
 COPY src ./src
 
+# Copy key files
+COPY keys ./keys
+
 # Build TypeScript
 RUN npm run build
 
