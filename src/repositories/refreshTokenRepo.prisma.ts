@@ -67,6 +67,6 @@ export async function revokeAllRefreshTokensForUser(user_id: string): Promise<vo
 
 export function closePrisma(): void {
   if (prismaInstance) {
-    prismaInstance.$disconnect().catch(err => Logger.error('Error closing Prisma:', err));
+    prismaInstance.$disconnect().catch((err: unknown) => Logger.error('Error closing Prisma:', err));
   }
 }

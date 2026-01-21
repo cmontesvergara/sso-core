@@ -127,7 +127,7 @@ export class TenantService {
         },
       });
 
-      return tenants.map(t => ({
+      return tenants.map((t: any) => ({
         id: t.id,
         name: t.name,
         slug: t.slug,
@@ -359,7 +359,7 @@ export class TenantService {
         orderBy: { createdAt: 'desc' },
       });
 
-      return members.map(m => ({
+      return members.map((m: any) => ({
         userId: m.user.id,
         email: m.user.email,
         firstName: m.user.firstName,
@@ -442,10 +442,10 @@ export class TenantService {
         orderBy: { name: 'asc' },
       });
 
-      return roles.map(r => ({
+      return roles.map((r: any) => ({
         id: r.id,
         name: r.name,
-        permissions: r.permissions.map(p => `${p.resource}:${p.action}`),
+        permissions: r.permissions.map((p: any) => `${p.resource}:${p.action}`),
       }));
     } catch (error) {
       logger.error(`Failed to get tenant roles for ${tenantId}:`, error);

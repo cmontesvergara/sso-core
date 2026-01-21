@@ -99,6 +99,6 @@ export async function findUserById(id: string): Promise<UserRow | undefined> {
 
 export function closePrisma(): void {
   if (prismaInstance) {
-    prismaInstance.$disconnect().catch(err => Logger.error('Error closing Prisma:', err));
+    prismaInstance.$disconnect().catch((err: unknown) => Logger.error('Error closing Prisma:', err));
   }
 }

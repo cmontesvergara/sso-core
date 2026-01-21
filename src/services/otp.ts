@@ -163,7 +163,7 @@ export class OTPService {
       }
 
       // Remove used backup code
-      const updatedCodes = otpSecret.backupCodes.filter((_, i) => i !== codeIndex);
+      const updatedCodes = otpSecret.backupCodes.filter((_: string, i: number) => i !== codeIndex);
       await prisma.oTPSecret.update({
         where: { userId },
         data: { backupCodes: updatedCodes },
