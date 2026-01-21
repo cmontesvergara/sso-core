@@ -21,7 +21,7 @@ core_config_version: 0
 # ============================================================
 
 port:
-  _default: 80
+  _default: 3567
 
 host:
   _default: localhost
