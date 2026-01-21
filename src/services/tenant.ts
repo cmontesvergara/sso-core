@@ -172,6 +172,9 @@ export class TenantService {
           data: {
             email: input.email,
             passwordHash: '', // User must signup to set password
+            lastName: '',
+            secondLastName: '',
+            phone: '',
             firstName: '',
           },
         });

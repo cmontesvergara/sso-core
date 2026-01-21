@@ -42,8 +42,10 @@ export async function createUser(params: {
     data: {
       email: email.toLowerCase(),
       passwordHash,
-      firstName: firstName || null,
-      lastName: lastName || null,
+      firstName: firstName || '',
+      lastName: lastName || '',
+      secondLastName: '',
+      phone: '',
     },
   });
 
