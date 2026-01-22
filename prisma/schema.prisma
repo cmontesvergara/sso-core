@@ -16,9 +16,9 @@ model User {
   firstName        String    @map("first_name")
   secondName       String?   @map("second_name")
   lastName         String    @map("last_name")
-  secondLastName   String    @map("second_last_name")
+  secondLastName   String?   @map("second_last_name")
   phone            String
-  nuid             String?   @unique // National ID
+  nuid             String    @unique // National ID
   addresses        Address[]
   // Additional Information
   birthDate        DateTime? @map("birth_date") @db.Date

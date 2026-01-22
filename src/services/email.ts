@@ -1,33 +1,9 @@
 import nodemailer, { Transporter } from 'nodemailer';
 import { Resend } from 'resend';
 import { v4 as uuidv4 } from 'uuid';
+import { EmailConfig, EmailProvider, SendEmailOptions } from '../core/dtos';
 import { logger } from '../utils/logger';
 import { getPrismaClient } from './prisma';
-
-export type EmailProvider = 'nodemailer' | 'resend' | 'ethereal';
-
-export interface EmailConfig {
-  provider: EmailProvider;
-  // Nodemailer / SMTP config
-  host?: string;
-  port?: number;
-  secure?: boolean;
-  auth?: {
-    user?: string;
-    pass?: string;
-  };
-  // Resend config
-  apiKey?: string;
-  // Common
-  from?: string;
-}
-
-export interface SendEmailOptions {
-  to: string;
-  subject: string;
-  html: string;
-  text?: string;
-}
 
 export class EmailService {
   private static instance: EmailService;
@@ -50,7 +26,7 @@ export class EmailService {
 
   private loadConfig(): EmailConfig {
     const env = process.env.NODE_ENV || 'development';
-    const provider = (process.env.EMAIL_PROVIDER) as EmailProvider;
+    const provider = process.env.EMAIL_PROVIDER as EmailProvider;
 
     const baseConfig = {
       provider,

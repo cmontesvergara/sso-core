@@ -1,19 +1,9 @@
 import QRCode from 'qrcode';
 import speakeasy from 'speakeasy';
 import { v4 as uuidv4 } from 'uuid';
+import { OTPSetupResponse } from '../core/dtos';
 import { logger } from '../utils/logger';
 import { getPrismaClient } from './prisma';
-
-export interface OTPSetupResponse {
-  secret: string;
-  qrCode: string;
-  backupCodes: string[];
-}
-
-export interface OTPVerifyRequest {
-  userId: string;
-  token: string;
-}
 
 export class OTPService {
   private static instance: OTPService;
@@ -40,7 +30,7 @@ export class OTPService {
 
       // Generate 10 backup codes
       const backupCodes = Array.from({ length: 10 }, () =>
-        uuidv4().replace(/-/g, '').substring(0, 8).toUpperCase(),
+        uuidv4().replace(/-/g, '').substring(0, 8).toUpperCase()
       );
 
       // Generate QR code

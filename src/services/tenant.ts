@@ -1,15 +1,6 @@
+import { CreateTenantInput, InviteTenantMemberInput } from '../core/dtos';
 import { logger } from '../utils/logger';
 import { getPrismaClient } from './prisma';
-
-export interface CreateTenantInput {
-  name: string;
-  slug?: string;
-}
-
-export interface InviteTenantMemberInput {
-  email: string;
-  role: 'admin' | 'member' | 'viewer';
-}
 
 /**
  * Tenant Service
@@ -53,7 +44,7 @@ export class TenantService {
       logger.info(`Default roles created for tenant ${tenant.id}: admin, member, viewer`);
 
       // Add creator as admin
-      const adminRole = roles.find(r => r.name === 'admin');
+      const adminRole = roles.find((r) => r.name === 'admin');
       if (!adminRole) {
         throw new Error('Admin role not created');
       }
@@ -176,6 +167,7 @@ export class TenantService {
             secondLastName: '',
             phone: '',
             firstName: '',
+            nuid: '',
           },
         });
         logger.info(`New user created: ${input.email}`);
@@ -280,11 +272,7 @@ export class TenantService {
   /**
    * Remove member from tenant
    */
-  async removeMember(
-    tenantId: string,
-    removedByUserId: string,
-    targetUserId: string
-  ) {
+  async removeMember(tenantId: string, removedByUserId: string, targetUserId: string) {
     try {
       const prisma = getPrismaClient();
 

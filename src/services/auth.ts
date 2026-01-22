@@ -1,5 +1,18 @@
+import argon2 from 'argon2';
+import {
+  RefreshResult,
+  SigninInput,
+  SigninResult,
+  SignoutInput,
+  SignupInput,
+  SignupResult,
+} from '../core/dtos';
+import { AppError } from '../middleware/errorHandler';
+import { createUser, findUserByEmail } from '../repositories/userRepo.prisma';
+import { generateRefreshToken, revokeRefreshTokenPlain, rotateRefreshToken } from './session';
+
 /**
- * Authentication Service for signup, signin, etc.
+ * Authentication Service - Handles all authentication business logic
  */
 export class AuthenticationService {
   private static instance: AuthenticationService;
@@ -14,40 +27,100 @@ export class AuthenticationService {
   }
 
   /**
-   * Sign up a new user
+   * Register a new user
    */
-  async signup(email: string, password: string, tenantId?: string): Promise<any> {
-    // TODO: Implement signup logic
+  async signup(input: SignupInput): Promise<SignupResult> {
+    // Check if user already exists
+    const existingUser = await findUserByEmail(input.email);
+    if (existingUser) {
+      throw new AppError(409, 'User already exists', 'USER_EXISTS');
+    }
+
+    // Create new user
+    const user = await createUser({
+      email: input.email,
+      password: input.password,
+      firstName: input.firstName,
+      secondName: input.secondName,
+      lastName: input.lastName,
+      secondLastName: input.secondLastName,
+      phone: input.phone,
+      nuid: input.nuid,
+      birthDate: input.birthDate,
+      gender: input.gender,
+      nationality: input.nationality,
+      birthPlace: input.birthPlace,
+      placeOfResidence: input.placeOfResidence,
+      occupation: input.occupation,
+      maritalStatus: input.maritalStatus,
+      recoveryPhone: input.recoveryPhone,
+      recoveryEmail: input.recoveryEmail,
+    });
+
     return {
-      userId: 'user-id',
-      email,
+      userId: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      secondName: user.secondName,
+      lastName: user.lastName,
+      secondLastName: user.secondLastName,
+      phone: user.phone,
+      userStatus: user.userStatus,
     };
   }
 
   /**
-   * Sign in a user
+   * Authenticate user and generate tokens
    */
-  async signin(email: string, password: string, tenantId?: string): Promise<any> {
-    // TODO: Implement signin logic
+  async signin(input: SigninInput): Promise<SigninResult> {
+    const { email, password, ip, userAgent } = input;
+
+    // Find user by email
+    const user = await findUserByEmail(email);
+    if (!user) {
+      throw new AppError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
+    }
+
+    // Verify password
+    const isPasswordValid = await argon2.verify(user.passwordHash, password);
+    if (!isPasswordValid) {
+      throw new AppError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
+    }
+
+    // Generate refresh token
+    const { token: refreshToken } = await generateRefreshToken(user.id, null, {
+      ip: ip || '',
+      ua: userAgent || '',
+    });
+
+    // Rotate to get access token
+    const result = await rotateRefreshToken(refreshToken);
+
     return {
-      userId: 'user-id',
-      accessToken: 'token',
-      refreshToken: 'refresh-token',
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      expiresIn: result.expiresIn,
     };
   }
 
   /**
-   * Sign out a user
+   * Sign out user by revoking refresh token
    */
-  async signout(userId: string, sessionId: string): Promise<void> {
-    // TODO: Implement signout logic
+  async signout(input: SignoutInput): Promise<void> {
+    const { refreshToken, all = false } = input;
+    await revokeRefreshTokenPlain(refreshToken, all);
   }
 
   /**
-   * Verify password
+   * Refresh access token using refresh token
    */
-  async verifyPassword(password: string, hash: string): Promise<boolean> {
-    // TODO: Implement password verification
-    return true;
+  async refresh(refreshToken: string): Promise<RefreshResult> {
+    const result = await rotateRefreshToken(refreshToken);
+
+    return {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      expiresIn: result.expiresIn,
+    };
   }
 }

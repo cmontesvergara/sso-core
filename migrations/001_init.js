@@ -2,7 +2,7 @@
 
 /**
  * Migration 001: Complete Initial Schema
- * 
+ *
  * Creates all tables aligned with Prisma schema including:
  * - Users with all extended fields
  * - Addresses
@@ -25,103 +25,103 @@ exports.up = (pgm) => {
   // USERS TABLE - Complete with all fields
   // ============================================================
   pgm.createTable('users', {
-    id: { 
-      type: 'uuid', 
-      primaryKey: true, 
-      default: pgm.func('gen_random_uuid()') 
+    id: {
+      type: 'uuid',
+      primaryKey: true,
+      default: pgm.func('gen_random_uuid()'),
     },
-    email: { 
-      type: 'varchar(255)', 
-      notNull: true, 
-      unique: true 
+    email: {
+      type: 'varchar(255)',
+      notNull: true,
+      unique: true,
     },
-    password_hash: { 
-      type: 'text', 
-      notNull: true 
+    password_hash: {
+      type: 'text',
+      notNull: true,
     },
-    
+
     // Basic Information
-    first_name: { 
-      type: 'varchar(255)', 
-      notNull: true 
+    first_name: {
+      type: 'varchar(255)',
+      notNull: true,
     },
-    second_name: { 
-      type: 'varchar(255)', 
-      notNull: false 
+    second_name: {
+      type: 'varchar(255)',
+      notNull: false,
     },
-    last_name: { 
-      type: 'varchar(255)', 
-      notNull: true 
+    last_name: {
+      type: 'varchar(255)',
+      notNull: true,
     },
-    second_last_name: { 
-      type: 'varchar(255)', 
-      notNull: false 
+    second_last_name: {
+      type: 'varchar(255)',
+      notNull: false,
     },
-    phone: { 
-      type: 'varchar(20)', 
-      notNull: true 
+    phone: {
+      type: 'varchar(20)',
+      notNull: true,
     },
-    nuid: { 
-      type: 'varchar(255)', 
-      notNull: false, 
-      unique: true 
+    nuid: {
+      type: 'varchar(255)',
+      notNull: true,
+      unique: true,
     },
-    
+
     // Additional Information
-    birth_date: { 
-      type: 'date', 
-      notNull: false 
+    birth_date: {
+      type: 'date',
+      notNull: false,
     },
-    gender: { 
-      type: 'varchar(50)', 
-      notNull: false 
+    gender: {
+      type: 'varchar(50)',
+      notNull: false,
     },
-    nationality: { 
-      type: 'varchar(100)', 
-      notNull: false 
+    nationality: {
+      type: 'varchar(100)',
+      notNull: false,
     },
-    place_of_birth: { 
-      type: 'varchar(255)', 
-      notNull: false 
+    place_of_birth: {
+      type: 'varchar(255)',
+      notNull: false,
     },
-    place_of_residence: { 
-      type: 'varchar(255)', 
-      notNull: false 
+    place_of_residence: {
+      type: 'varchar(255)',
+      notNull: false,
     },
-    occupation: { 
-      type: 'varchar(255)', 
-      notNull: false 
+    occupation: {
+      type: 'varchar(255)',
+      notNull: false,
     },
-    marital_status: { 
-      type: 'varchar(50)', 
-      notNull: false 
+    marital_status: {
+      type: 'varchar(50)',
+      notNull: false,
     },
-    user_status: { 
-      type: 'varchar(50)', 
-      notNull: true, 
-      default: 'active' 
+    user_status: {
+      type: 'varchar(50)',
+      notNull: true,
+      default: 'active',
     },
-    
+
     // Recovery Information
-    recovery_phone: { 
-      type: 'varchar(20)', 
-      notNull: false 
+    recovery_phone: {
+      type: 'varchar(20)',
+      notNull: false,
     },
-    recovery_email: { 
-      type: 'varchar(255)', 
-      notNull: false 
+    recovery_email: {
+      type: 'varchar(255)',
+      notNull: false,
     },
-    
+
     // Timestamps
-    created_at: { 
-      type: 'timestamptz', 
-      notNull: true, 
-      default: pgm.func('now()') 
+    created_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
     },
-    updated_at: { 
-      type: 'timestamptz', 
-      notNull: true, 
-      default: pgm.func('now()') 
+    updated_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
     },
   });
 
@@ -133,41 +133,41 @@ exports.up = (pgm) => {
   // ADDRESSES TABLE
   // ============================================================
   pgm.createTable('addresses', {
-    id: { 
-      type: 'uuid', 
-      primaryKey: true, 
-      default: pgm.func('gen_random_uuid()') 
+    id: {
+      type: 'uuid',
+      primaryKey: true,
+      default: pgm.func('gen_random_uuid()'),
     },
-    user_id: { 
-      type: 'uuid', 
-      notNull: true, 
-      references: '"users"(id)', 
-      onDelete: 'CASCADE' 
+    user_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"users"(id)',
+      onDelete: 'CASCADE',
     },
-    country: { 
-      type: 'varchar(255)', 
-      notNull: true 
+    country: {
+      type: 'varchar(255)',
+      notNull: true,
     },
-    province: { 
-      type: 'varchar(255)', 
-      notNull: true 
+    province: {
+      type: 'varchar(255)',
+      notNull: true,
     },
-    city: { 
-      type: 'varchar(255)', 
-      notNull: true 
+    city: {
+      type: 'varchar(255)',
+      notNull: true,
     },
-    detail: { 
-      type: 'text', 
-      notNull: true 
+    detail: {
+      type: 'text',
+      notNull: true,
     },
-    postal_code: { 
-      type: 'varchar(20)', 
-      notNull: false 
+    postal_code: {
+      type: 'varchar(20)',
+      notNull: false,
     },
-    created_at: { 
-      type: 'timestamptz', 
-      notNull: true, 
-      default: pgm.func('now()') 
+    created_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
     },
   });
 
@@ -177,31 +177,31 @@ exports.up = (pgm) => {
   // OTHER INFORMATION TABLE
   // ============================================================
   pgm.createTable('other_information', {
-    id: { 
-      type: 'uuid', 
-      primaryKey: true, 
-      default: pgm.func('gen_random_uuid()') 
+    id: {
+      type: 'uuid',
+      primaryKey: true,
+      default: pgm.func('gen_random_uuid()'),
     },
-    user_id: { 
-      type: 'uuid', 
-      notNull: true, 
+    user_id: {
+      type: 'uuid',
+      notNull: true,
       unique: true,
-      references: '"users"(id)', 
-      onDelete: 'CASCADE' 
+      references: '"users"(id)',
+      onDelete: 'CASCADE',
     },
-    data: { 
-      type: 'jsonb', 
-      notNull: false 
+    data: {
+      type: 'jsonb',
+      notNull: false,
     },
-    created_at: { 
-      type: 'timestamptz', 
-      notNull: true, 
-      default: pgm.func('now()') 
+    created_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
     },
-    updated_at: { 
-      type: 'timestamptz', 
-      notNull: true, 
-      default: pgm.func('now()') 
+    updated_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
     },
   });
 
@@ -209,51 +209,51 @@ exports.up = (pgm) => {
   // REFRESH TOKENS TABLE
   // ============================================================
   pgm.createTable('refresh_tokens', {
-    id: { 
-      type: 'uuid', 
-      primaryKey: true, 
-      default: pgm.func('gen_random_uuid()') 
+    id: {
+      type: 'uuid',
+      primaryKey: true,
+      default: pgm.func('gen_random_uuid()'),
     },
-    user_id: { 
-      type: 'uuid', 
-      notNull: true, 
-      references: '"users"(id)', 
-      onDelete: 'CASCADE' 
+    user_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"users"(id)',
+      onDelete: 'CASCADE',
     },
-    token_hash: { 
-      type: 'text', 
-      notNull: true, 
-      unique: true 
+    token_hash: {
+      type: 'text',
+      notNull: true,
+      unique: true,
     },
-    client_id: { 
-      type: 'text', 
-      notNull: false 
+    client_id: {
+      type: 'text',
+      notNull: false,
     },
-    created_at: { 
-      type: 'timestamptz', 
-      notNull: true, 
-      default: pgm.func('now()') 
+    created_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
     },
-    expires_at: { 
-      type: 'timestamptz', 
-      notNull: true 
+    expires_at: {
+      type: 'timestamptz',
+      notNull: true,
     },
-    revoked: { 
-      type: 'boolean', 
-      notNull: true, 
-      default: false 
+    revoked: {
+      type: 'boolean',
+      notNull: true,
+      default: false,
     },
-    previous_token_id: { 
-      type: 'uuid', 
-      notNull: false 
+    previous_token_id: {
+      type: 'uuid',
+      notNull: false,
     },
-    ip: { 
-      type: 'text', 
-      notNull: false 
+    ip: {
+      type: 'text',
+      notNull: false,
     },
-    user_agent: { 
-      type: 'text', 
-      notNull: false 
+    user_agent: {
+      type: 'text',
+      notNull: false,
     },
   });
 
@@ -264,25 +264,25 @@ exports.up = (pgm) => {
   // TENANTS TABLE
   // ============================================================
   pgm.createTable('tenants', {
-    id: { 
-      type: 'uuid', 
-      primaryKey: true, 
-      default: pgm.func('gen_random_uuid()') 
+    id: {
+      type: 'uuid',
+      primaryKey: true,
+      default: pgm.func('gen_random_uuid()'),
     },
-    name: { 
-      type: 'text', 
-      notNull: true, 
-      unique: true 
+    name: {
+      type: 'text',
+      notNull: true,
+      unique: true,
     },
-    slug: { 
-      type: 'text', 
-      notNull: true, 
-      unique: true 
+    slug: {
+      type: 'text',
+      notNull: true,
+      unique: true,
     },
-    created_at: { 
-      type: 'timestamptz', 
-      notNull: true, 
-      default: pgm.func('now()') 
+    created_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
     },
   });
 
@@ -290,31 +290,31 @@ exports.up = (pgm) => {
   // TENANT MEMBERS TABLE
   // ============================================================
   pgm.createTable('tenant_members', {
-    id: { 
-      type: 'uuid', 
-      primaryKey: true, 
-      default: pgm.func('gen_random_uuid()') 
+    id: {
+      type: 'uuid',
+      primaryKey: true,
+      default: pgm.func('gen_random_uuid()'),
     },
-    tenant_id: { 
-      type: 'uuid', 
-      notNull: true, 
-      references: '"tenants"(id)', 
-      onDelete: 'CASCADE' 
+    tenant_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"tenants"(id)',
+      onDelete: 'CASCADE',
     },
-    user_id: { 
-      type: 'uuid', 
-      notNull: true, 
-      references: '"users"(id)', 
-      onDelete: 'CASCADE' 
+    user_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"users"(id)',
+      onDelete: 'CASCADE',
     },
-    role: { 
-      type: 'text', 
-      notNull: true 
+    role: {
+      type: 'text',
+      notNull: true,
     },
-    created_at: { 
-      type: 'timestamptz', 
-      notNull: true, 
-      default: pgm.func('now()') 
+    created_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
     },
   });
 
@@ -326,25 +326,25 @@ exports.up = (pgm) => {
   // ROLES TABLE
   // ============================================================
   pgm.createTable('roles', {
-    id: { 
-      type: 'uuid', 
-      primaryKey: true, 
-      default: pgm.func('gen_random_uuid()') 
+    id: {
+      type: 'uuid',
+      primaryKey: true,
+      default: pgm.func('gen_random_uuid()'),
     },
-    tenant_id: { 
-      type: 'uuid', 
-      notNull: true, 
-      references: '"tenants"(id)', 
-      onDelete: 'CASCADE' 
+    tenant_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"tenants"(id)',
+      onDelete: 'CASCADE',
     },
-    name: { 
-      type: 'text', 
-      notNull: true 
+    name: {
+      type: 'text',
+      notNull: true,
     },
-    created_at: { 
-      type: 'timestamptz', 
-      notNull: true, 
-      default: pgm.func('now()') 
+    created_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
     },
   });
 
@@ -355,29 +355,29 @@ exports.up = (pgm) => {
   // PERMISSIONS TABLE
   // ============================================================
   pgm.createTable('permissions', {
-    id: { 
-      type: 'uuid', 
-      primaryKey: true, 
-      default: pgm.func('gen_random_uuid()') 
+    id: {
+      type: 'uuid',
+      primaryKey: true,
+      default: pgm.func('gen_random_uuid()'),
     },
-    role_id: { 
-      type: 'uuid', 
-      notNull: true, 
-      references: '"roles"(id)', 
-      onDelete: 'CASCADE' 
+    role_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"roles"(id)',
+      onDelete: 'CASCADE',
     },
-    resource: { 
-      type: 'text', 
-      notNull: true 
+    resource: {
+      type: 'text',
+      notNull: true,
     },
-    action: { 
-      type: 'text', 
-      notNull: true 
+    action: {
+      type: 'text',
+      notNull: true,
     },
-    created_at: { 
-      type: 'timestamptz', 
-      notNull: true, 
-      default: pgm.func('now()') 
+    created_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
     },
   });
 
@@ -388,35 +388,35 @@ exports.up = (pgm) => {
   // OTP SECRETS TABLE
   // ============================================================
   pgm.createTable('otp_secrets', {
-    id: { 
-      type: 'uuid', 
-      primaryKey: true, 
-      default: pgm.func('gen_random_uuid()') 
+    id: {
+      type: 'uuid',
+      primaryKey: true,
+      default: pgm.func('gen_random_uuid()'),
     },
-    user_id: { 
-      type: 'uuid', 
-      notNull: true, 
+    user_id: {
+      type: 'uuid',
+      notNull: true,
       unique: true,
-      references: '"users"(id)', 
-      onDelete: 'CASCADE' 
+      references: '"users"(id)',
+      onDelete: 'CASCADE',
     },
-    secret: { 
-      type: 'text', 
-      notNull: true 
+    secret: {
+      type: 'text',
+      notNull: true,
     },
-    verified: { 
-      type: 'boolean', 
-      notNull: true, 
-      default: false 
+    verified: {
+      type: 'boolean',
+      notNull: true,
+      default: false,
     },
-    backup_codes: { 
-      type: 'text[]', 
-      notNull: true 
+    backup_codes: {
+      type: 'text[]',
+      notNull: true,
     },
-    created_at: { 
-      type: 'timestamptz', 
-      notNull: true, 
-      default: pgm.func('now()') 
+    created_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
     },
   });
 
@@ -424,39 +424,39 @@ exports.up = (pgm) => {
   // EMAIL VERIFICATIONS TABLE
   // ============================================================
   pgm.createTable('email_verifications', {
-    id: { 
-      type: 'uuid', 
-      primaryKey: true, 
-      default: pgm.func('gen_random_uuid()') 
+    id: {
+      type: 'uuid',
+      primaryKey: true,
+      default: pgm.func('gen_random_uuid()'),
     },
-    user_id: { 
-      type: 'uuid', 
-      notNull: true, 
-      references: '"users"(id)', 
-      onDelete: 'CASCADE' 
+    user_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"users"(id)',
+      onDelete: 'CASCADE',
     },
-    token: { 
-      type: 'text', 
-      notNull: true, 
-      unique: true 
+    token: {
+      type: 'text',
+      notNull: true,
+      unique: true,
     },
-    email: { 
-      type: 'varchar(255)', 
-      notNull: true 
+    email: {
+      type: 'varchar(255)',
+      notNull: true,
     },
-    verified: { 
-      type: 'boolean', 
-      notNull: true, 
-      default: false 
+    verified: {
+      type: 'boolean',
+      notNull: true,
+      default: false,
     },
-    expires_at: { 
-      type: 'timestamptz', 
-      notNull: true 
+    expires_at: {
+      type: 'timestamptz',
+      notNull: true,
     },
-    created_at: { 
-      type: 'timestamptz', 
-      notNull: true, 
-      default: pgm.func('now()') 
+    created_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
     },
   });
 
@@ -466,7 +466,7 @@ exports.up = (pgm) => {
   // ============================================================
   // TRIGGERS
   // ============================================================
-  
+
   // Trigger to auto-update updated_at on users table
   pgm.sql(`
     CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -495,7 +495,7 @@ exports.up = (pgm) => {
   // ============================================================
   // ROW LEVEL SECURITY (RLS)
   // ============================================================
-  
+
   pgm.sql('ALTER TABLE users ENABLE ROW LEVEL SECURITY');
   pgm.sql('ALTER TABLE refresh_tokens ENABLE ROW LEVEL SECURITY');
   pgm.sql('ALTER TABLE tenants ENABLE ROW LEVEL SECURITY');
@@ -575,10 +575,10 @@ exports.down = (pgm) => {
   pgm.dropTable('other_information');
   pgm.dropTable('addresses');
   pgm.dropTable('users');
-  
+
   // Drop functions
   pgm.sql('DROP FUNCTION IF EXISTS update_updated_at_column');
-  
+
   // Drop extensions
   pgm.sql('DROP EXTENSION IF EXISTS "uuid-ossp"');
   pgm.sql('DROP EXTENSION IF EXISTS pgcrypto');
