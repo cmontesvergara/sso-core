@@ -28,7 +28,7 @@ model User {
   placeOfResidence String?   @map("place_of_residence")
   occupation       String?
   maritalStatus    String?   @map("marital_status")
-  userStatus       String    @default("active") @map("user_status")
+  userStatus       String    @default("disabled") @map("user_status")
 
   // Secure Information
   passwordHash  String  @map("password_hash")

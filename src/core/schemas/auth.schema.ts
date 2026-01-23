@@ -8,8 +8,8 @@ import Joi from 'joi';
 export const signupSchema = Joi.object({
   firstName: Joi.string().trim().max(100).required(),
   lastName: Joi.string().trim().max(100).required(),
-  nuid: Joi.string().trim().max(10).required(),
-  phone: Joi.string().trim().max(10).required(),
+  nuid: Joi.string().trim().min(1).max(10).required(),
+  phone: Joi.string().trim().min(1).max(10).required(),
   email: Joi.string().email().trim().lowercase().required(),
   password: Joi.string().min(8).required(),
   secondName: Joi.string().trim().max(100).allow(null, '').optional(),

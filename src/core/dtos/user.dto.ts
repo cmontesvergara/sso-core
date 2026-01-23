@@ -47,9 +47,9 @@ export interface UserResponseDTO {
   firstName: string;
   secondName: string | null;
   lastName: string;
-  secondLastName: string;
+  secondLastName: string | null;
   phone: string;
-  nuid: string | null;
+  nuid: string;
   userStatus: string;
   createdAt: Date;
   updatedAt: Date;
