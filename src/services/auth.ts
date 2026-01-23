@@ -87,6 +87,11 @@ export class AuthenticationService {
       throw new AppError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
     }
 
+    // Check user status
+    if (user.userStatus !== 'active') {
+      throw new AppError(403, 'Account is not active', 'ACCOUNT_NOT_ACTIVE');
+    }
+
     // Generate refresh token
     const { token: refreshToken } = await generateRefreshToken(user.id, null, {
       ip: ip || '',
