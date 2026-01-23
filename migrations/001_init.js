@@ -99,7 +99,8 @@ exports.up = (pgm) => {
     user_status: {
       type: 'varchar(50)',
       notNull: true,
-      default: 'active',
+      default: "'disabled'",
+      check: "user_status IN ('disabled', 'blocked', 'active')",
     },
 
     // Recovery Information
