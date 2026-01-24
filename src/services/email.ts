@@ -155,6 +155,16 @@ export class EmailService {
         throw new Error(`Please wait ${timeLeft} minute(s) before requesting another verification email`);
       }
 
+      // Invalidate (delete) all previous unverified tokens for this user
+      await prisma.emailVerification.deleteMany({
+        where: {
+          userId,
+          verified: false,
+        },
+      });
+
+      logger.info(`Invalidated previous tokens for user ${userId}`);
+
       const token = uuidv4();
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 

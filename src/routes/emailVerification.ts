@@ -102,43 +102,4 @@ router.post('/verify', async (req: Request, res: Response, next: NextFunction): 
   }
 });
 
-/**
- * POST /api/v1/email-verification/resend
- * Resend verification email
- */
-router.post('/resend', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const { error, value } = sendVerificationSchema.validate(req.body);
-
-    if (error) {
-      res.status(400).json({
-        error: 'VALIDATION_ERROR',
-        message: error.details[0].message,
-        errors: error.details,
-        timestamp: new Date().toISOString(),
-      });
-      return;
-    }
-
-    const { userId, email } = value;
-
-    // Initialize email service if not done
-    await Email.initialize();
-
-    const appUrl = Config.get('appUrl') || 'http://localhost:3000';
-    const callbackUrl = `${appUrl}/verify-email`;
-
-    await Email.sendEmailVerification(userId, email, callbackUrl);
-
-    logger.info(`Email verification resent to ${email}`);
-
-    res.status(200).json({
-      success: true,
-      message: 'Verification email resent',
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
 export default router;
