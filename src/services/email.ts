@@ -207,6 +207,12 @@ export class EmailService {
         return null;
       }
 
+      // Check if token has already been verified
+      if (verification.verified) {
+        logger.warn(`Token ${token} has already been verified`);
+        return null;
+      }
+
       if (new Date() > verification.expiresAt) {
         await prisma.emailVerification.delete({ where: { token } });
         return null;
