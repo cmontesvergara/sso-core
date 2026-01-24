@@ -195,7 +195,23 @@ export class EmailService {
         data: { verified: true },
       });
 
-      logger.info(`Email verified for user ${verification.userId}`);
+      // Update user status to active if not already active
+      const user = await prisma.user.findUnique({
+        where: { id: verification.userId },
+        select: { userStatus: true },
+      });
+
+      if (user && user.userStatus !== 'active') {
+        await prisma.user.update({
+          where: { id: verification.userId },
+          data: { userStatus: 'active' },
+        });
+        logger.info(
+          `Email verified for user ${verification.userId} - User status updated to active`
+        );
+      } else {
+        logger.info(`Email verified for user ${verification.userId} - User already active`);
+      }
 
       return {
         userId: verification.userId,
