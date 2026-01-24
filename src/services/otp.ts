@@ -20,11 +20,11 @@ export class OTPService {
   /**
    * Generate OTP secret and QR code for setup
    */
-  async generateOTPSecret(userId: string, email: string): Promise<OTPSetupResponse> {
+  async generateOTPSecret(userId: string, userName: string): Promise<OTPSetupResponse> {
     try {
       const secret = speakeasy.generateSecret({
-        name: `SSO (${email})`,
-        issuer: 'EmpireSoft',
+        name: `SSO BIGSO | ${userName}`,
+        issuer: 'BIGSO.CO',
         length: 32,
       });
 

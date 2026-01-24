@@ -55,12 +55,44 @@ class JWTService {
       });
       return decoded;
     } catch (err) {
+      console.error('JWT verification failed:', err);
       throw err;
     }
   }
 
   decodeToken(token: string) {
     return jwt.decode(token) as Record<string, any> | null;
+  }
+
+  /**
+   * Generate temporary token for 2FA verification
+   * Short-lived (5 minutes) token used during 2FA flow
+   */
+  generateTwoFactorToken(userId: string): string {
+    const payload = {
+      userId,
+      purpose: '2fa-pending',
+    };
+    // 5 minutes expiration
+    return this.generateToken(payload, 5 * 60);
+  }
+
+  /**
+   * Verify and decode 2FA temporary token
+   */
+  verifyTwoFactorToken(token: string): { userId: string } | null {
+    try {
+      const decoded = this.verifyToken(token) as any;
+      
+      // Validate it's a 2FA token
+      if (decoded.purpose !== '2fa-pending') {
+        return null;
+      }
+      
+      return { userId: decoded.userId };
+    } catch (err) {
+      return null;
+    }
   }
 }
 

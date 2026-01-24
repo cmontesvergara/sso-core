@@ -1,6 +1,8 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import Joi from 'joi';
+import { JWT } from '../services/jwt';
 import { OTP } from '../services/otp';
+import { generateRefreshToken, rotateRefreshToken } from '../services/session';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -8,11 +10,16 @@ const router = Router();
 // Validation schemas
 const generateOTPSchema = Joi.object({
   userId: Joi.string().uuid().required(),
-  email: Joi.string().email().required().lowercase().trim(),
+  name: Joi.string().required().trim(),
 });
 
 const verifyOTPSchema = Joi.object({
   userId: Joi.string().uuid().required(),
+  token: Joi.string().length(6).required(),
+});
+
+const validateOTPWithTempTokenSchema = Joi.object({
+  tempToken: Joi.string().required(),
   token: Joi.string().length(6).required(),
 });
 
@@ -39,7 +46,7 @@ router.post('/generate', async (req: Request, res: Response, next: NextFunction)
       return;
     }
 
-    const { userId, email } = value;
+    const { userId, name } = value;
 
     // Check if user already has verified OTP
     const existing = await OTP.isOTPEnabled(userId);
@@ -52,7 +59,7 @@ router.post('/generate', async (req: Request, res: Response, next: NextFunction)
       return;
     }
 
-    const setup = await OTP.generateOTPSecret(userId, email);
+    const setup = await OTP.generateOTPSecret(userId, name);
 
     logger.info(`OTP setup initiated for user ${userId}`);
 
@@ -111,11 +118,11 @@ router.post('/verify', async (req: Request, res: Response, next: NextFunction): 
 
 /**
  * POST /api/v1/otp/validate
- * Validate OTP token during login
+ * Validate OTP token during login (with temporary token)
  */
 router.post('/validate', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { error, value } = verifyOTPSchema.validate(req.body);
+    const { error, value } = validateOTPWithTempTokenSchema.validate(req.body);
 
     if (error) {
       res.status(400).json({
@@ -127,8 +134,23 @@ router.post('/validate', async (req: Request, res: Response, next: NextFunction)
       return;
     }
 
-    const { userId, token } = value;
+    const { tempToken, token } = value;
 
+    // Verify temporary token
+    const decoded = JWT.verifyTwoFactorToken(tempToken);
+    
+    if (!decoded) {
+      res.status(401).json({
+        error: 'INVALID_TEMP_TOKEN',
+        message: 'Invalid or expired temporary token',
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
+    const { userId } = decoded;
+
+    // Validate OTP token
     const valid = await OTP.validateOTP(userId, token);
 
     if (!valid) {
@@ -140,11 +162,24 @@ router.post('/validate', async (req: Request, res: Response, next: NextFunction)
       return;
     }
 
-    logger.info(`OTP validated for user ${userId}`);
+    // Generate real tokens after successful 2FA
+    const { token: refreshToken } = await generateRefreshToken(userId, null, {
+      ip: req.ip || '',
+      ua: req.get('user-agent') || '',
+    });
+
+    const result = await rotateRefreshToken(refreshToken);
+
+    logger.info(`2FA validated and tokens generated for user ${userId}`);
 
     res.status(200).json({
       success: true,
-      message: 'OTP token is valid',
+      message: 'Two-factor authentication successful',
+      tokens: {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      },
+      expiresIn: result.expiresIn,
     });
   } catch (err) {
     next(err);

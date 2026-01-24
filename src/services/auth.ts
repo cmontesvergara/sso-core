@@ -9,6 +9,8 @@ import {
 } from '../core/dtos';
 import { AppError } from '../middleware/errorHandler';
 import { createUser, findUserByEmail, findUserByNuid } from '../repositories/userRepo.prisma';
+import { JWT } from './jwt';
+import { OTP } from './otp';
 import { generateRefreshToken, revokeRefreshTokenPlain, rotateRefreshToken } from './session';
 
 /**
@@ -98,6 +100,19 @@ export class AuthenticationService {
       // Encode userId in base64 for security
       const encodedUserId = Buffer.from(user.id).toString('base64');
       throw new AppError(403, 'Account is not active', 'ACCOUNT_NOT_ACTIVE', [{ userId: encodedUserId }]);
+    }
+
+    // Check if user has 2FA enabled
+    const has2FA = await OTP.isOTPEnabled(user.id);
+    
+    if (has2FA) {
+      // Generate temporary token for 2FA verification
+      const tempToken = JWT.generateTwoFactorToken(user.id);
+      
+      return {
+        requiresTwoFactor: true,
+        tempToken,
+      } as any;
     }
 
     // Generate refresh token

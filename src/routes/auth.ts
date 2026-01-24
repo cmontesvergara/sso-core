@@ -75,18 +75,30 @@ router.post('/signin', signinLimiter, async (req: Request, res: Response, next: 
     }
 
     // Delegate to service
-    const tokens = await authService.signin({
+    const result = await authService.signin({
       ...value,
       ip: req.ip,
       userAgent: req.get('user-agent'),
     });
 
+    // Check if 2FA is required
+    if ((result as any).requiresTwoFactor) {
+      res.json({
+        success: true,
+        message: 'Two-factor authentication required',
+        requiresTwoFactor: true,
+        tempToken: (result as any).tempToken,
+      });
+      return;
+    }
+
+    // Normal signin response
     res.json({
       success: true,
       message: 'Sign in successful',
       tokens: {
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
       },
     });
   } catch (error) {
