@@ -32,8 +32,12 @@ export const signupSchema = Joi.object({
 });
 
 export const signinSchema = Joi.object({
-  email: Joi.string().email().trim().lowercase().required(),
+  email: Joi.string().email().trim().lowercase(),
+  nuid: Joi.string().trim(),
   password: Joi.string().required(),
+}).xor('email', 'nuid').messages({
+  'object.xor': 'Either email or nuid must be provided',
+  'object.missing': 'Either email or nuid is required',
 });
 
 export const refreshSchema = Joi.object({

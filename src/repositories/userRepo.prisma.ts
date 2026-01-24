@@ -124,6 +124,31 @@ export async function findUserByEmail(email: string): Promise<UserRow | undefine
   };
 }
 
+export async function findUserByNuid(nuid: string): Promise<UserRow | undefined> {
+  const prisma = getPrisma();
+
+  const user = await prisma.user.findUnique({
+    where: { nuid },
+  });
+
+  if (!user) return undefined;
+
+  return {
+    id: user.id,
+    email: user.email,
+    passwordHash: user.passwordHash,
+    firstName: user.firstName,
+    secondName: user.secondName,
+    lastName: user.lastName,
+    secondLastName: user.secondLastName,
+    phone: user.phone,
+    nuid: user.nuid,
+    userStatus: user.userStatus,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+}
+
 export async function findUserById(id: string): Promise<UserRow | undefined> {
   const prisma = getPrisma();
 

@@ -133,6 +133,28 @@ export class EmailService {
   async sendEmailVerification(userId: string, email: string, callbackUrl: string): Promise<void> {
     try {
       const prisma = getPrismaClient();
+      
+      // Check if there's a recent verification email sent (within last 15 minutes)
+      const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+      const recentVerification = await prisma.emailVerification.findFirst({
+        where: {
+          userId,
+          email,
+          createdAt: {
+            gte: fifteenMinutesAgo,
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      if (recentVerification) {
+        const timeLeft = Math.ceil((recentVerification.createdAt.getTime() + 15 * 60 * 1000 - Date.now()) / 1000 / 60);
+        logger.warn(`Rate limit: Email verification for ${email} was sent recently`);
+        throw new Error(`Please wait ${timeLeft} minute(s) before requesting another verification email`);
+      }
+
       const token = uuidv4();
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
@@ -228,10 +250,32 @@ export class EmailService {
    */
   async sendPasswordReset(userId: string, email: string, callbackUrl: string): Promise<void> {
     try {
-      const token = uuidv4();
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-
       const prisma = getPrismaClient();
+      
+      // Check if there's a recent verification email sent (within last 15 minutes)
+      const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+      const recentVerification = await prisma.emailVerification.findFirst({
+        where: {
+          userId,
+          email,
+          createdAt: {
+            gte: fifteenMinutesAgo,
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      if (recentVerification) {
+        const timeLeft = Math.ceil((recentVerification.createdAt.getTime() + 15 * 60 * 1000 - Date.now()) / 1000 / 60);
+        logger.warn(`Rate limit: Email verification for ${email} was sent recently`);
+        throw new Error(`Please wait ${timeLeft} minute(s) before requesting another verification email`);
+      }
+
+      const token = uuidv4();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
       await prisma.emailVerification.create({
         data: {
           userId,

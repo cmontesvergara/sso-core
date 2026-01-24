@@ -8,7 +8,7 @@ import {
   SignupResult,
 } from '../core/dtos';
 import { AppError } from '../middleware/errorHandler';
-import { createUser, findUserByEmail } from '../repositories/userRepo.prisma';
+import { createUser, findUserByEmail, findUserByNuid } from '../repositories/userRepo.prisma';
 import { generateRefreshToken, revokeRefreshTokenPlain, rotateRefreshToken } from './session';
 
 /**
@@ -73,10 +73,16 @@ export class AuthenticationService {
    * Authenticate user and generate tokens
    */
   async signin(input: SigninInput): Promise<SigninResult> {
-    const { email, password, ip, userAgent } = input;
+    const { email, nuid, password, ip, userAgent } = input as any;
 
-    // Find user by email
-    const user = await findUserByEmail(email);
+    // Find user by email or nuid
+    let user;
+    if (email) {
+      user = await findUserByEmail(email);
+    } else if (nuid) {
+      user = await findUserByNuid(nuid);
+    }
+    
     if (!user) {
       throw new AppError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
     }
@@ -89,7 +95,9 @@ export class AuthenticationService {
 
     // Check user status
     if (user.userStatus !== 'active') {
-      throw new AppError(403, 'Account is not active', 'ACCOUNT_NOT_ACTIVE');
+      // Encode userId in base64 for security
+      const encodedUserId = Buffer.from(user.id).toString('base64');
+      throw new AppError(403, 'Account is not active', 'ACCOUNT_NOT_ACTIVE', [{ userId: encodedUserId }]);
     }
 
     // Generate refresh token

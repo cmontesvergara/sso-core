@@ -39,8 +39,8 @@ router.post('/send', async (req: Request, res: Response, next: NextFunction): Pr
     // Initialize email service if not done
     await Email.initialize();
 
-    const appUrl = Config.get('appUrl') || 'http://localhost:3000';
-    const callbackUrl = `${appUrl}/verify-email`;
+    const appUrl = Config.get('appUrl') || 'http://localhost:4200';
+    const callbackUrl = `${appUrl}/auth/verify-email`;
 
     await Email.sendEmailVerification(userId, email, callbackUrl);
 
