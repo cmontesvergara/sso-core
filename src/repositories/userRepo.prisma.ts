@@ -269,7 +269,7 @@ export async function listUsers(params: {
     where,
   });
 
-  return users.map((user) => ({
+  return users.map((user: any) => ({
     id: user.id,
     email: user.email,
     passwordHash: user.passwordHash,

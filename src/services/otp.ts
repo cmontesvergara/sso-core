@@ -23,7 +23,7 @@ export class OTPService {
   async generateOTPSecret(userId: string, userName: string): Promise<OTPSetupResponse> {
     try {
       const secret = speakeasy.generateSecret({
-        name: `SSO BIGSO | ${userName}`,
+        name: `SSO BIGSO | ${userName.toUpperCase()}`,
         issuer: 'BIGSO.CO',
         length: 32,
       });

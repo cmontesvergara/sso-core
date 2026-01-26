@@ -1,11 +1,11 @@
 import argon2 from 'argon2';
 import {
-  RefreshResult,
-  SigninInput,
-  SigninResult,
-  SignoutInput,
-  SignupInput,
-  SignupResult,
+    RefreshResult,
+    SigninInput,
+    SigninResult,
+    SignoutInput,
+    SignupInput,
+    SignupResult,
 } from '../core/dtos';
 import { AppError } from '../middleware/errorHandler';
 import { createUser, findUserByEmail, findUserByNuid } from '../repositories/userRepo.prisma';
@@ -128,6 +128,10 @@ export class AuthenticationService {
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
       expiresIn: result.expiresIn,
+      userId: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
     };
   }
 

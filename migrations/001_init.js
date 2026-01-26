@@ -465,6 +465,173 @@ exports.up = (pgm) => {
   pgm.createIndex('email_verifications', 'token');
 
   // ============================================================
+  // SSO SESSIONS TABLE (for SSO portal cookie management)
+  // ============================================================
+  pgm.createTable('sso_sessions', {
+    id: {
+      type: 'uuid',
+      primaryKey: true,
+      default: pgm.func('gen_random_uuid()'),
+    },
+    session_token: {
+      type: 'text',
+      notNull: true,
+      unique: true,
+    },
+    user_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"users"(id)',
+      onDelete: 'CASCADE',
+    },
+    ip: {
+      type: 'text',
+      notNull: false,
+    },
+    user_agent: {
+      type: 'text',
+      notNull: false,
+    },
+    expires_at: {
+      type: 'timestamptz',
+      notNull: true,
+    },
+    created_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
+    },
+    last_activity_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
+    },
+  });
+
+  pgm.createIndex('sso_sessions', 'session_token');
+  pgm.createIndex('sso_sessions', 'user_id');
+  pgm.createIndex('sso_sessions', ['expires_at']);
+
+  // ============================================================
+  // AUTH CODES TABLE (OAuth2 Authorization Code Flow)
+  // ============================================================
+  pgm.createTable('auth_codes', {
+    id: {
+      type: 'uuid',
+      primaryKey: true,
+      default: pgm.func('gen_random_uuid()'),
+    },
+    code: {
+      type: 'varchar(255)',
+      notNull: true,
+      unique: true,
+    },
+    user_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"users"(id)',
+      onDelete: 'CASCADE',
+    },
+    tenant_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"tenants"(id)',
+      onDelete: 'CASCADE',
+    },
+    app_id: {
+      type: 'varchar(100)',
+      notNull: true,
+    },
+    redirect_uri: {
+      type: 'text',
+      notNull: true,
+    },
+    used: {
+      type: 'boolean',
+      notNull: true,
+      default: false,
+    },
+    expires_at: {
+      type: 'timestamptz',
+      notNull: true,
+    },
+    created_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
+    },
+  });
+
+  pgm.createIndex('auth_codes', 'code');
+  pgm.createIndex('auth_codes', ['expires_at', 'used']);
+  pgm.createIndex('auth_codes', 'user_id');
+  pgm.createIndex('auth_codes', 'tenant_id');
+
+  // ============================================================
+  // APP SESSIONS TABLE (for app backend cookie sessions)
+  // ============================================================
+  pgm.createTable('app_sessions', {
+    id: {
+      type: 'uuid',
+      primaryKey: true,
+      default: pgm.func('gen_random_uuid()'),
+    },
+    session_token: {
+      type: 'text',
+      notNull: true,
+      unique: true,
+    },
+    app_id: {
+      type: 'varchar(100)',
+      notNull: true,
+    },
+    user_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"users"(id)',
+      onDelete: 'CASCADE',
+    },
+    tenant_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"tenants"(id)',
+      onDelete: 'CASCADE',
+    },
+    role: {
+      type: 'text',
+      notNull: true,
+    },
+    ip: {
+      type: 'text',
+      notNull: false,
+    },
+    user_agent: {
+      type: 'text',
+      notNull: false,
+    },
+    expires_at: {
+      type: 'timestamptz',
+      notNull: true,
+    },
+    created_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
+    },
+    last_activity_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
+    },
+  });
+
+  pgm.createIndex('app_sessions', 'session_token');
+  pgm.createIndex('app_sessions', ['app_id', 'user_id']);
+  pgm.createIndex('app_sessions', 'user_id');
+  pgm.createIndex('app_sessions', 'tenant_id');
+  pgm.createIndex('app_sessions', ['expires_at']);
+
+  // ============================================================
   // TRIGGERS
   // ============================================================
 
@@ -566,6 +733,9 @@ exports.up = (pgm) => {
 
 exports.down = (pgm) => {
   // Drop tables in reverse order (respecting foreign keys)
+  pgm.dropTable('app_sessions');
+  pgm.dropTable('auth_codes');
+  pgm.dropTable('sso_sessions');
   pgm.dropTable('email_verifications');
   pgm.dropTable('otp_secrets');
   pgm.dropTable('permissions');

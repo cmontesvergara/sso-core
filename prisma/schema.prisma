@@ -45,6 +45,9 @@ model User {
   otpSecret          OTPSecret?
   emailVerifications EmailVerification[]
   otherInformation   OtherInformation?
+  ssoSessions        SSOSession[]
+  authCodes          AuthCode[]
+  appSessions        AppSession[]
 
   @@map("users")
 }
@@ -102,8 +105,10 @@ model Tenant {
   slug      String   @unique
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  members TenantMember[]
-  roles   Role[]
+  members     TenantMember[]
+  roles       Role[]
+  authCodes   AuthCode[]
+  appSessions AppSession[]
 
   @@map("tenants")
 }
@@ -179,4 +184,67 @@ model EmailVerification {
   @@index([userId])
   @@index([token])
   @@map("email_verifications")
+}
+
+model SSOSession {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionToken   String   @unique @map("session_token")
+  userId         String   @map("user_id") @db.Uuid
+  ip             String?
+  userAgent      String?  @map("user_agent")
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastActivityAt DateTime @default(now()) @map("last_activity_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sessionToken])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sso_sessions")
+}
+
+model AuthCode {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String   @unique @db.VarChar(255)
+  userId      String   @map("user_id") @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  appId       String   @map("app_id") @db.VarChar(100)
+  redirectUri String   @map("redirect_uri")
+  used        Boolean  @default(false)
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([code])
+  @@index([expiresAt, used])
+  @@index([userId])
+  @@index([tenantId])
+  @@map("auth_codes")
+}
+
+model AppSession {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionToken   String   @unique @map("session_token")
+  appId          String   @map("app_id") @db.VarChar(100)
+  userId         String   @map("user_id") @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  role           String
+  ip             String?
+  userAgent      String?  @map("user_agent")
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastActivityAt DateTime @default(now()) @map("last_activity_at") @db.Timestamptz(6)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([sessionToken])
+  @@index([appId, userId])
+  @@index([userId])
+  @@index([tenantId])
+  @@index([expiresAt])
+  @@map("app_sessions")
 }

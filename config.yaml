@@ -36,23 +36,23 @@ database:
   type:
     _mandatory: true
     _default: postgresql
-  
+
   host:
     _mandatory: true
-  
+
   port:
     _mandatory: true
     _default: 5432
-  
+
   name:
     _mandatory: true
-  
+
   user:
     _mandatory: true
-  
+
   password:
     _mandatory: true
-  
+
   ssl:
     _default: false
 
@@ -65,10 +65,10 @@ database:
 jwt:
   secret:
     _mandatory: true
-  
+
   algorithm:
     _default: HS256
-  
+
   iss:
     _mandatory: true
     _default: bigso.co
@@ -100,7 +100,7 @@ refresh_token_validity:
 session:
   expiry_time:
     _default: 3600
-  
+
   refresh_threshold:
     _default: 600
 
@@ -111,7 +111,7 @@ session:
 email:
   provider:
     _default: smtp
-  
+
   smtp:
     host:
       _default: localhost
@@ -119,9 +119,9 @@ email:
       _default: 1025
     secure:
       _default: false
-    user: ""
-    password: ""
-  
+    user: ''
+    password: ''
+
   resend:
     apikey:
       _mandatory: false
@@ -135,13 +135,13 @@ email:
 cors:
   enabled:
     _default: true
-  
+
   origin:
-    _default: "http://localhost:3000"
-  
+    _default: 'http://localhost:4201'
+
   credentials:
     _default: true
-  
+
   methods:
     _default:
       - GET
@@ -157,7 +157,7 @@ cors:
 logging:
   level:
     _default: info
-  
+
   format:
     _default: json
 
@@ -168,25 +168,25 @@ logging:
 rateLimit:
   signup:
     windowMs:
-      _default: 3600000  # 1 hour
+      _default: 3600000 # 1 hour
     max:
       _default: 5
-  
+
   signin:
     windowMs:
-      _default: 900000   # 15 minutes
+      _default: 900000 # 15 minutes
     max:
       _default: 10
-  
+
   refresh:
     windowMs:
-      _default: 60000    # 1 minute
+      _default: 60000 # 1 minute
     max:
       _default: 30
-  
+
   signout:
     windowMs:
-      _default: 60000    # 1 minute
+      _default: 60000 # 1 minute
     max:
       _default: 60
 
@@ -197,30 +197,30 @@ rateLimit:
 features:
   email_verification:
     _default: true
-  
+
   email_password_auth:
     _default: true
-  
+
   passwordless:
     _default: true
-  
+
   social_login:
     _default: false
-  
+
   mfa:
     _default: true
-  
+
   oauth:
     _default: false
-  
+
   multitenancy:
     _default: true
-  
+
   user_roles:
     _default: true
-  
+
   user_metadata:
     _default: true
-  
+
   account_linking:
     _default: false

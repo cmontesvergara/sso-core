@@ -47,6 +47,10 @@ export interface SigninResult {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
+  userId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
 }
 
 export interface SignoutInput {

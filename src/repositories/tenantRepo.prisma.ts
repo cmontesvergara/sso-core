@@ -197,7 +197,7 @@ export async function listUserTenants(userId: string): Promise<TenantRow[]> {
     include: { tenant: true },
   });
 
-  return memberships.map((m) => m.tenant) as TenantRow[];
+  return memberships.map((m: any) => m.tenant) as TenantRow[];
 }
 
 /**
