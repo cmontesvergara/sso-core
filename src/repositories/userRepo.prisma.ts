@@ -292,3 +292,85 @@ export async function countUsers(where?: any): Promise<number> {
   const prisma = getPrisma();
   return await prisma.user.count({ where });
 }
+
+/**
+ * Find user by ID with addresses
+ */
+export async function findUserByIdWithAddresses(id: string): Promise<any> {
+  const prisma = getPrisma();
+
+  const user = await prisma.user.findUnique({
+    where: { id },
+    include: {
+      addresses: true,
+    },
+  });
+
+  return user;
+}
+
+/**
+ * Update user profile with addresses
+ */
+export async function updateUserProfile(
+  id: string,
+  data: {
+    firstName?: string;
+    secondName?: string | null;
+    lastName?: string;
+    secondLastName?: string | null;
+    phone?: string;
+    birthDate?: Date | null;
+    gender?: string | null;
+    nationality?: string | null;
+    birthPlace?: string | null;
+    placeOfResidence?: string | null;
+    occupation?: string | null;
+    maritalStatus?: string | null;
+  },
+  addresses?: Array<{
+    country: string;
+    province: string;
+    city: string;
+    detail: string;
+    postalCode?: string;
+  }>
+): Promise<any> {
+  const prisma = getPrisma();
+
+  // Update user basic information
+  await prisma.user.update({
+    where: { id },
+    data,
+  });
+
+  // Update addresses if provided
+  if (addresses && addresses.length > 0) {
+    // Delete existing addresses
+    await prisma.address.deleteMany({
+      where: { userId: id },
+    });
+
+    // Create new addresses
+    await prisma.address.createMany({
+      data: addresses.map((addr) => ({
+        userId: id,
+        country: addr.country,
+        province: addr.province,
+        city: addr.city,
+        detail: addr.detail,
+        postalCode: addr.postalCode,
+      })),
+    });
+  }
+
+  // Fetch updated user with addresses
+  const updatedUser = await prisma.user.findUnique({
+    where: { id },
+    include: {
+      addresses: true,
+    },
+  });
+
+  return updatedUser;
+}
