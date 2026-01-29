@@ -1,0 +1,39 @@
+meta {
+  name: Invite Member
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{apiUrl}}/tenant/{{tenantId}}/members
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "email": "newmember@example.com",
+    "role": "member"
+  }
+}
+
+docs {
+  # Invite Member
+  
+  Invita a un nuevo miembro al tenant.
+  
+  ## URL Parameters
+  - tenantId: ID del tenant
+  
+  ## Request Body
+  - email: Email del usuario a invitar (requerido)
+  - role: Rol del usuario (admin, member, viewer) (requerido)
+  
+  ## Autenticación
+  Requiere Bearer token (accessToken)
+  Solo administradores pueden invitar
+}

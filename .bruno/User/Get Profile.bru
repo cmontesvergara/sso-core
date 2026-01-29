@@ -1,0 +1,27 @@
+meta {
+  name: Get Profile
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{apiUrl}}/user/profile
+  body: none
+  auth: none
+}
+
+headers {
+  Cookie: sso_session={{ssoSessionCookie}}
+}
+
+docs {
+  # Get Profile
+  
+  Obtiene el perfil del usuario autenticado mediante cookie SSO.
+  
+  ## Autenticación
+  Requiere cookie sso_session válida
+  
+  ## Response
+  Devuelve información del usuario: userId, email, firstName, lastName, phone, isActive, createdAt
+}

@@ -1,0 +1,31 @@
+meta {
+  name: Validate Code
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{apiUrl}}/auth/validate-code
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "code": "authorization-code-from-authorize",
+    "appId": "app-id-from-tenant"
+  }
+}
+
+docs {
+  # Validate Code
+  
+  Valida un código de autorización y devuelve tokens de acceso.
+  
+  ## Request Body
+  - code: Código de autorización recibido
+  - appId: ID de la aplicación
+  
+  ## Response
+  Devuelve accessToken y refreshToken para la aplicación
+}

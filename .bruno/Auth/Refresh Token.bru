@@ -1,0 +1,38 @@
+meta {
+  name: Refresh Token
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{apiUrl}}/auth/refresh
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "refreshToken": "{{refreshToken}}"
+  }
+}
+
+script:post-response {
+  if (res.status === 200 && res.body.accessToken) {
+    bru.setEnvVar("accessToken", res.body.accessToken);
+  }
+}
+
+docs {
+  # Refresh Token
+  
+  Renueva el access token usando el refresh token.
+  
+  ## Request Body
+  - refreshToken: Token de refresco válido
+  
+  ## Response
+  Devuelve un nuevo accessToken
+  
+  ## Rate Limit
+  30 refreshes por minuto
+}

@@ -1,0 +1,38 @@
+meta {
+  name: Update Metadata
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{apiUrl}}/metadata/{{userId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "key": "theme",
+    "value": "light"
+  }
+}
+
+docs {
+  # Update Metadata
+  
+  Actualiza un registro de metadata existente.
+  
+  ## URL Parameters
+  - userId: ID del usuario
+  
+  ## Request Body
+  - key: Clave del metadata a actualizar
+  - value: Nuevo valor
+  
+  ## Autenticación
+  Requiere Bearer token (accessToken)
+}

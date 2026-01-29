@@ -1,0 +1,27 @@
+meta {
+  name: Get Metadata
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{apiUrl}}/metadata/{{userId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  # Get Metadata
+  
+  Obtiene todos los registros de metadata de un usuario.
+  
+  ## URL Parameters
+  - userId: ID del usuario
+  
+  ## Autenticación
+  Requiere Bearer token (accessToken)
+}

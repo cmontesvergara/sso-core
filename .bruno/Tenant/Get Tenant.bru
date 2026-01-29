@@ -1,0 +1,27 @@
+meta {
+  name: Get Tenant
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{apiUrl}}/tenant/{{tenantId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  # Get Tenant
+  
+  Obtiene los detalles de un tenant específico.
+  
+  ## URL Parameters
+  - tenantId: ID del tenant
+  
+  ## Autenticación
+  Requiere Bearer token (accessToken)
+}

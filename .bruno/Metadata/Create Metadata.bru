@@ -1,0 +1,40 @@
+meta {
+  name: Create Metadata
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{apiUrl}}/metadata/{{userId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "key": "theme",
+    "value": "dark",
+    "dataType": "string"
+  }
+}
+
+docs {
+  # Create Metadata
+  
+  Crea un nuevo registro de metadata para un usuario.
+  
+  ## URL Parameters
+  - userId: ID del usuario
+  
+  ## Request Body
+  - key: Clave del metadata
+  - value: Valor del metadata
+  - dataType: Tipo de dato (string, number, boolean, json)
+  
+  ## Autenticación
+  Requiere Bearer token (accessToken)
+}

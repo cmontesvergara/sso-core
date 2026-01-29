@@ -1,0 +1,4 @@
+# Ignore Bruno local state
+*.db
+*.db-journal
+.bruno-*

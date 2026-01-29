@@ -1,0 +1,17 @@
+meta {
+  name: Readiness Check
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/ready
+  body: none
+  auth: none
+}
+
+docs {
+  # Readiness Check
+  
+  Verifica que el JWKS está inicializado y el servidor está listo para recibir peticiones.
+}

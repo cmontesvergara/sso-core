@@ -1,0 +1,29 @@
+meta {
+  name: Remove Member
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{apiUrl}}/tenant/{{tenantId}}/members/{{userId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  # Remove Member
+  
+  Elimina un miembro del tenant.
+  
+  ## URL Parameters
+  - tenantId: ID del tenant
+  - userId: ID del usuario a eliminar
+  
+  ## Autenticación
+  Requiere Bearer token (accessToken)
+  Solo administradores pueden eliminar miembros
+}

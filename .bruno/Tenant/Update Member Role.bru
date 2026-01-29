@@ -1,0 +1,38 @@
+meta {
+  name: Update Member Role
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{apiUrl}}/tenant/{{tenantId}}/members/{{userId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "role": "admin"
+  }
+}
+
+docs {
+  # Update Member Role
+  
+  Actualiza el rol de un miembro del tenant.
+  
+  ## URL Parameters
+  - tenantId: ID del tenant
+  - userId: ID del usuario
+  
+  ## Request Body
+  - role: Nuevo rol (admin, member, viewer)
+  
+  ## Autenticación
+  Requiere Bearer token (accessToken)
+  Solo administradores pueden actualizar roles
+}

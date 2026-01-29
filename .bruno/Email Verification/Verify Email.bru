@@ -1,0 +1,35 @@
+meta {
+  name: Verify Email
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{apiUrl}}/email-verification/verify
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "email": "user@example.com",
+    "code": "123456"
+  }
+}
+
+docs {
+  # Verify Email
+  
+  Verifica el email usando el código recibido.
+  
+  ## Request Body
+  - email: Email a verificar
+  - code: Código de verificación de 6 dígitos
+  
+  ## Autenticación
+  Requiere Bearer token (accessToken)
+}

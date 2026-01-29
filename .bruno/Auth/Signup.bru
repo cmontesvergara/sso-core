@@ -1,0 +1,37 @@
+meta {
+  name: Signup
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{apiUrl}}/auth/signup
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "user@example.com",
+    "password": "Password123!",
+    "firstName": "John",
+    "lastName": "Doe",
+    "phone": "+1234567890"
+  }
+}
+
+docs {
+  # Signup
+  
+  Registra un nuevo usuario en el sistema.
+  
+  ## Request Body
+  - email: Email del usuario (requerido)
+  - password: Contraseña (requerido, mínimo 8 caracteres)
+  - firstName: Nombre (requerido)
+  - lastName: Apellido (requerido)
+  - phone: Teléfono (opcional)
+  
+  ## Rate Limit
+  5 registros por hora
+}

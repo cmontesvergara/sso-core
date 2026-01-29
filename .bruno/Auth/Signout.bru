@@ -1,0 +1,33 @@
+meta {
+  name: Signout
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{apiUrl}}/auth/signout
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "refreshToken": "{{refreshToken}}"
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    bru.setEnvVar("accessToken", "");
+    bru.setEnvVar("refreshToken", "");
+  }
+}
+
+docs {
+  # Signout
+  
+  Cierra sesión y revoca el refresh token.
+  
+  ## Request Body
+  - refreshToken: Token de refresco a revocar
+}

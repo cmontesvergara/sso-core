@@ -1,0 +1,17 @@
+meta {
+  name: Get JWKS
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/.well-known/jwks.json
+  body: none
+  auth: none
+}
+
+docs {
+  # Get JWKS
+  
+  Obtiene las claves públicas JSON Web Key Set para verificar tokens JWT.
+}

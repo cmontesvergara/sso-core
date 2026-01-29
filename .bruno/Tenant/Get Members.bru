@@ -1,0 +1,27 @@
+meta {
+  name: Get Members
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{apiUrl}}/tenant/{{tenantId}}/members
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  # Get Members
+  
+  Obtiene la lista de miembros de un tenant.
+  
+  ## URL Parameters
+  - tenantId: ID del tenant
+  
+  ## Autenticación
+  Requiere Bearer token (accessToken)
+}

@@ -1,0 +1,36 @@
+meta {
+  name: Authorize (SSO)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{apiUrl}}/auth/authorize
+  body: json
+  auth: none
+}
+
+headers {
+  Cookie: sso_session={{ssoSessionCookie}}
+}
+
+body:json {
+  {
+    "appId": "app-id-from-tenant",
+    "redirectUri": "https://app.example.com/callback"
+  }
+}
+
+docs {
+  # Authorize (SSO)
+  
+  Genera un código de autorización para SSO.
+  Requiere cookie sso_session válida.
+  
+  ## Request Body
+  - appId: ID de la aplicación registrada
+  - redirectUri: URI de redirección de la app
+  
+  ## Response
+  Devuelve un código de autorización temporal
+}

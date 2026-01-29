@@ -1,0 +1,37 @@
+meta {
+  name: Update Tenant
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{apiUrl}}/tenant/{{tenantId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "name": "Mi Empresa Actualizada"
+  }
+}
+
+docs {
+  # Update Tenant
+  
+  Actualiza la información de un tenant.
+  
+  ## URL Parameters
+  - tenantId: ID del tenant
+  
+  ## Request Body
+  - name: Nuevo nombre del tenant
+  
+  ## Autenticación
+  Requiere Bearer token (accessToken)
+  Solo administradores del tenant pueden actualizar
+}
