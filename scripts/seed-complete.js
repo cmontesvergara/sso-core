@@ -9,7 +9,7 @@
  */
 
 const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcrypt');
+const argon2 = require('argon2');
 
 const prisma = new PrismaClient();
 
@@ -21,13 +21,13 @@ async function main() {
   // ============================================================
   console.log('👤 Creating Super Admin...');
 
-  const superAdminPassword = await bcrypt.hash('SuperAdmin2026!', 10);
+  const superAdminPassword = await argon2.hash('@Password21');
 
   const superAdmin = await prisma.user.upsert({
-    where: { email: 'superadmin@sso.local' },
+    where: { email: 'krlosbergara@gmail.com' },
     update: {},
     create: {
-      email: 'superadmin@sso.local',
+      email: 'krlosbergara@gmail.com',
       passwordHash: superAdminPassword,
       firstName: 'Super',
       lastName: 'Admin',
@@ -332,7 +332,7 @@ async function main() {
     },
   ];
 
-  const defaultPassword = await bcrypt.hash('Password2026!', 10);
+  const defaultPassword = await argon2.hash('Password2026!');
 
   for (const tenantData of tenantsData) {
     console.log(`\n  🏢 Creating tenant: ${tenantData.name}...`);
@@ -450,8 +450,8 @@ async function main() {
 
   console.log('\n🔐 Credentials:');
   console.log(`  Super Admin:`);
-  console.log(`    Email: superadmin@sso.local`);
-  console.log(`    Password: SuperAdmin2026!`);
+  console.log(`    Email: krlosbergara@gmail.com`);
+  console.log(`    Password: @Password21`);
   console.log(`\n  All other users:`);
   console.log(`    Password: Password2026!`);
 
