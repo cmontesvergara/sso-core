@@ -2,7 +2,8 @@ import { NextFunction, Response, Router } from 'express';
 import Joi from 'joi';
 import { AuthenticatedRequest, authMiddleware } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
-import { superAdminMiddleware, systemAdminMiddleware } from '../middleware/systemAdmin';
+import { authenticateSSO } from '../middleware/ssoAuth';
+import { requireSuperAdmin, requireSystemAdmin } from '../middleware/ssoSystemAdmin';
 import {
     appIdExists,
     createApplication,
@@ -74,12 +75,12 @@ const grantBulkAccessSchema = Joi.object({
 /**
  * POST /api/v1/applications
  * Create a new application (system-wide)
- * Requires: Auth token + System Admin role
+ * Requires: SSO session + System Admin role
  */
 router.post(
   '/',
-  authMiddleware,
-  systemAdminMiddleware,
+  authenticateSSO,
+  requireSystemAdmin,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const { error, value } = createApplicationSchema.validate(req.body);
@@ -108,11 +109,12 @@ router.post(
 /**
  * GET /api/v1/applications
  * List all applications
- * Requires: Auth token
+ * Requires: SSO session + System Admin role
  */
 router.get(
   '/',
-  authMiddleware,
+  authenticateSSO,
+  requireSystemAdmin,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const activeOnly = req.query.active === 'true';
@@ -131,11 +133,12 @@ router.get(
 /**
  * GET /api/v1/applications/:id
  * Get application by ID
- * Requires: Auth token
+ * Requires: SSO session + System Admin role
  */
 router.get(
   '/:id',
-  authMiddleware,
+  authenticateSSO,
+  requireSystemAdmin,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const application = await findApplicationById(req.params.id);
@@ -157,12 +160,12 @@ router.get(
 /**
  * PUT /api/v1/applications/:id
  * Update application
- * Requires: Auth token + System Admin role
+ * Requires: SSO session + System Admin role
  */
 router.put(
   '/:id',
-  authMiddleware,
-  systemAdminMiddleware,
+  authenticateSSO,
+  requireSystemAdmin,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const { error, value } = updateApplicationSchema.validate(req.body);
@@ -190,12 +193,12 @@ router.put(
 /**
  * DELETE /api/v1/applications/:id
  * Soft delete application (set isActive = false)
- * Requires: Auth token + Super Admin role
+ * Requires: SSO session + Super Admin role
  */
 router.delete(
   '/:id',
-  authMiddleware,
-  superAdminMiddleware,
+  authenticateSSO,
+  requireSuperAdmin,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const exists = await findApplicationById(req.params.id);
