@@ -35,6 +35,7 @@ export async function createApplication(data: {
   url: string;
   description?: string;
   logoUrl?: string;
+  isActive?: boolean;
 }): Promise<ApplicationRow> {
   const prisma = getPrisma();
 
@@ -45,6 +46,7 @@ export async function createApplication(data: {
       url: data.url,
       description: data.description,
       logoUrl: data.logoUrl,
+      isActive: data.isActive,
     },
   });
 
@@ -107,7 +109,7 @@ export async function updateApplication(
     name?: string;
     url?: string;
     description?: string;
-    iconUrl?: string;
+    logoUrl?: string;
     isActive?: boolean;
   }
 ): Promise<ApplicationRow> {

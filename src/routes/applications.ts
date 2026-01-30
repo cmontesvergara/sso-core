@@ -43,6 +43,7 @@ const createApplicationSchema = Joi.object({
   url: Joi.string().required().uri(),
   description: Joi.string().optional().max(500),
   logoUrl: Joi.string().optional().allow('', null),
+  isActive: Joi.boolean().optional(),
 });
 
 const updateApplicationSchema = Joi.object({
