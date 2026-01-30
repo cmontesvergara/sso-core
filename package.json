@@ -17,7 +17,6 @@
     "migrate:create": "node scripts/migrate.js create",
     "migrate:up": "node scripts/migrate.js up",
     "migrate:down": "node scripts/migrate.js down",
-    "seed:apps": "node scripts/seed-applications.js",
     "seed:complete": "node scripts/seed-complete.js",
     "prisma:generate": "prisma generate",
     "prisma:format": "prisma format",
