@@ -47,7 +47,7 @@ router.post(
         throw new AppError(400, error.details[0].message, 'VALIDATION_ERROR');
       }
 
-      const userId = req.user?.userId;
+      const userId = req.ssoUser?.userId;
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
@@ -107,7 +107,7 @@ router.get(
   authenticateSSO,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const userId = req.user?.userId;
+      const userId = req.ssoUser?.userId;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
@@ -143,7 +143,7 @@ router.post(
       }
 
       const { tenantId } = req.params;
-      const userId = req.user?.userId;
+      const userId = req.ssoUser?.userId;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
@@ -204,7 +204,7 @@ router.put(
       }
 
       const { tenantId, memberId } = req.params;
-      const userId = req.user?.userId;
+      const userId = req.ssoUser?.userId;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
@@ -239,7 +239,7 @@ router.delete(
   async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { tenantId, memberId } = req.params;
-      const userId = req.user?.userId;
+      const userId = req.ssoUser?.userId;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
