@@ -192,15 +192,26 @@ export async function findTenantMember(
 /**
  * List members of a tenant
  */
-export async function listTenantMembers(tenantId: string): Promise<TenantMemberRow[]> {
+export async function listTenantMembers(tenantId: string) {
   const prisma = getPrisma();
 
   const members = await prisma.tenantMember.findMany({
     where: { tenantId },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          userStatus: true,
+        },
+      },
+    },
     orderBy: { createdAt: 'desc' },
   });
 
-  return members as TenantMemberRow[];
+  return members;
 }
 
 /**
