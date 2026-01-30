@@ -47,46 +47,53 @@ async function main() {
 
   const appsData = [
     {
+      appId: 'sso',
+      name: 'Single Sign-On',
+      url: process.env.SSO_PORTAL_URL || 'http://localhost:4200',
+      description: 'Sistema de autenticación y gestión de usuarios',
+      logoUrl: 'https://cdn.example.com/icons/sso.svg',
+    },
+    {
       appId: 'crm',
       name: 'CRM',
       url: process.env.CRM_APP_URL || 'https://crm.example.com',
       description: 'Customer Relationship Management system',
-      iconUrl: 'https://cdn.example.com/icons/crm.svg',
+      logoUrl: 'https://cdn.example.com/icons/crm.svg',
     },
     {
       appId: 'admin',
       name: 'Admin Panel',
       url: process.env.ADMIN_APP_URL || 'https://admin.example.com',
       description: 'Administrative control panel',
-      iconUrl: 'https://cdn.example.com/icons/admin.svg',
+      logoUrl: 'https://cdn.example.com/icons/admin.svg',
     },
     {
       appId: 'analytics',
       name: 'Analytics',
       url: process.env.ANALYTICS_APP_URL || 'https://analytics.example.com',
       description: 'Business intelligence and analytics dashboard',
-      iconUrl: 'https://cdn.example.com/icons/analytics.svg',
+      logoUrl: 'https://cdn.example.com/icons/analytics.svg',
     },
     {
       appId: 'billing',
       name: 'Billing & Payments',
       url: process.env.BILLING_APP_URL || 'https://billing.example.com',
       description: 'Invoice management and payment processing',
-      iconUrl: 'https://cdn.example.com/icons/billing.svg',
+      logoUrl: 'https://cdn.example.com/icons/billing.svg',
     },
     {
       appId: 'support',
       name: 'Support Desk',
       url: process.env.SUPPORT_APP_URL || 'https://support.example.com',
       description: 'Customer support ticket management',
-      iconUrl: 'https://cdn.example.com/icons/support.svg',
+      logoUrl: 'https://cdn.example.com/icons/support.svg',
     },
     {
       appId: 'hr',
       name: 'Human Resources',
       url: process.env.HR_APP_URL || 'https://hr.example.com',
       description: 'Employee management and HR operations',
-      iconUrl: 'https://cdn.example.com/icons/hr.svg',
+      logoUrl: 'https://cdn.example.com/icons/hr.svg',
     },
   ];
 
@@ -100,6 +107,141 @@ async function main() {
     applications.push(app);
     console.log(`  ✅ Created ${app.name} (${app.appId})`);
   }
+
+  // ============================================================
+  // 2.1 CREATE SSO RESOURCES (App Resources Catalog)
+  // ============================================================
+  console.log('\n🔐 Creating SSO Resources Catalog...');
+
+  const ssoApp = applications.find((app) => app.appId === 'sso');
+  if (!ssoApp) {
+    throw new Error('SSO application not found');
+  }
+
+  const ssoResources = [
+    // User Management
+    {
+      resource: 'users',
+      action: 'create',
+      description: 'Crear usuarios',
+      category: 'user_management',
+    },
+    { resource: 'users', action: 'read', description: 'Ver usuarios', category: 'user_management' },
+    {
+      resource: 'users',
+      action: 'update',
+      description: 'Editar usuarios',
+      category: 'user_management',
+    },
+    {
+      resource: 'users',
+      action: 'delete',
+      description: 'Eliminar usuarios',
+      category: 'user_management',
+    },
+    // Application Management
+    {
+      resource: 'applications',
+      action: 'create',
+      description: 'Registrar aplicaciones',
+      category: 'app_management',
+    },
+    {
+      resource: 'applications',
+      action: 'read',
+      description: 'Ver aplicaciones',
+      category: 'app_management',
+    },
+    {
+      resource: 'applications',
+      action: 'update',
+      description: 'Editar aplicaciones',
+      category: 'app_management',
+    },
+    {
+      resource: 'applications',
+      action: 'delete',
+      description: 'Eliminar aplicaciones',
+      category: 'app_management',
+    },
+    // Role Management
+    {
+      resource: 'roles',
+      action: 'create',
+      description: 'Crear roles personalizados',
+      category: 'access_control',
+    },
+    { resource: 'roles', action: 'read', description: 'Ver roles', category: 'access_control' },
+    {
+      resource: 'roles',
+      action: 'update',
+      description: 'Editar roles',
+      category: 'access_control',
+    },
+    {
+      resource: 'roles',
+      action: 'delete',
+      description: 'Eliminar roles',
+      category: 'access_control',
+    },
+    // Permission Management
+    {
+      resource: 'permissions',
+      action: 'grant_access',
+      description: 'Otorgar permisos a roles',
+      category: 'access_control',
+    },
+    {
+      resource: 'permissions',
+      action: 'revoke_access',
+      description: 'Revocar permisos de roles',
+      category: 'access_control',
+    },
+    // Tenant Management
+    {
+      resource: 'tenants',
+      action: 'create',
+      description: 'Crear organizaciones',
+      category: 'tenant_management',
+    },
+    {
+      resource: 'tenants',
+      action: 'read',
+      description: 'Ver organizaciones',
+      category: 'tenant_management',
+    },
+    {
+      resource: 'tenants',
+      action: 'update',
+      description: 'Editar organizaciones',
+      category: 'tenant_management',
+    },
+    {
+      resource: 'tenants',
+      action: 'invite_members',
+      description: 'Invitar miembros',
+      category: 'tenant_management',
+    },
+  ];
+
+  for (const resource of ssoResources) {
+    await prisma.appResource.upsert({
+      where: {
+        applicationId_resource_action: {
+          applicationId: ssoApp.id,
+          resource: resource.resource,
+          action: resource.action,
+        },
+      },
+      update: {},
+      create: {
+        applicationId: ssoApp.id,
+        ...resource,
+      },
+    });
+  }
+
+  console.log(`  ✅ Created ${ssoResources.length} SSO resources`);
 
   // ============================================================
   // 3. CREATE TENANTS WITH USERS
@@ -132,7 +274,7 @@ async function main() {
           nuid: 'ACME-USER-002',
         },
       ],
-      apps: ['crm', 'admin', 'analytics', 'billing'], // AppIds to enable
+      apps: ['sso', 'crm', 'admin', 'analytics', 'billing'], // AppIds to enable
     },
     {
       name: 'TechStart Inc',
@@ -152,7 +294,7 @@ async function main() {
           nuid: 'TECH-USER-001',
         },
       ],
-      apps: ['crm', 'support', 'analytics'],
+      apps: ['sso', 'crm', 'support', 'analytics'],
     },
     {
       name: 'Global Retail Co',
@@ -186,7 +328,7 @@ async function main() {
           nuid: 'RETAIL-USER-003',
         },
       ],
-      apps: ['crm', 'billing', 'support', 'hr'],
+      apps: ['sso', 'crm', 'billing', 'support', 'hr'],
     },
   ];
 

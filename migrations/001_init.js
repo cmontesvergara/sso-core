@@ -336,6 +336,140 @@ exports.up = (pgm) => {
   pgm.createIndex('tenant_members', 'user_id');
 
   // ============================================================
+  // HELPER FUNCTIONS
+  // ============================================================
+
+  // Function to auto-update updated_at timestamp
+  pgm.sql(`
+    CREATE OR REPLACE FUNCTION update_updated_at_column()
+    RETURNS TRIGGER AS $$
+    BEGIN
+      NEW.updated_at = now();
+      RETURN NEW;
+    END;
+    $$ language 'plpgsql';
+  `);
+
+  // ============================================================
+  // APPLICATIONS TABLE
+  // Registry of all available applications in the system
+  // ============================================================
+  pgm.createTable('applications', {
+    id: {
+      type: 'uuid',
+      primaryKey: true,
+      default: pgm.func('gen_random_uuid()'),
+    },
+    app_id: {
+      type: 'varchar(100)',
+      notNull: true,
+      unique: true,
+      comment: 'Unique identifier like "crm", "admin", "analytics"',
+    },
+    name: {
+      type: 'varchar(255)',
+      notNull: true,
+      comment: 'Display name of the application',
+    },
+    url: {
+      type: 'text',
+      notNull: true,
+      comment: 'Base URL of the application',
+    },
+    description: {
+      type: 'text',
+      notNull: false,
+      comment: 'Description of the application',
+    },
+    logo_url: {
+      type: 'text',
+      notNull: false,
+      comment: 'URL to application icon/logo',
+    },
+    is_active: {
+      type: 'boolean',
+      notNull: true,
+      default: true,
+      comment: 'Whether the application is active system-wide',
+    },
+    created_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
+    },
+    updated_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
+    },
+  });
+
+  pgm.createIndex('applications', 'app_id');
+  pgm.createIndex('applications', 'is_active');
+  pgm.createIndex('applications', ['is_active', 'app_id']);
+
+  pgm.sql(`
+    CREATE TRIGGER update_applications_updated_at
+    BEFORE UPDATE ON applications
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column()
+  `);
+
+  // ============================================================
+  // APP_RESOURCES TABLE
+  // Catalog of resources/actions that each application manages
+  // ============================================================
+  pgm.createTable('app_resources', {
+    id: {
+      type: 'uuid',
+      primaryKey: true,
+      default: pgm.func('gen_random_uuid()'),
+    },
+    application_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"applications"(id)',
+      onDelete: 'CASCADE',
+      comment: 'Reference to the application that owns this resource',
+    },
+    resource: {
+      type: 'varchar(100)',
+      notNull: true,
+      comment: 'Resource name (e.g., "invoices", "products", "users")',
+    },
+    action: {
+      type: 'varchar(100)',
+      notNull: true,
+      comment: 'Action name (e.g., "create", "approve", "transfer")',
+    },
+    description: {
+      type: 'text',
+      notNull: false,
+      comment: 'Human-readable description of what this permission allows',
+    },
+    category: {
+      type: 'varchar(50)',
+      notNull: false,
+      comment: 'Category for grouping (e.g., "financial", "inventory", "hr")',
+    },
+    is_active: {
+      type: 'boolean',
+      notNull: true,
+      default: true,
+      comment: 'Whether this resource is currently active',
+    },
+    created_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
+    },
+  });
+
+  pgm.createIndex('app_resources', ['application_id', 'resource', 'action'], { unique: true });
+  pgm.createIndex('app_resources', 'application_id');
+  pgm.createIndex('app_resources', ['application_id', 'is_active']);
+
+  // ============================================================
   // ROLES TABLE
   // ============================================================
   pgm.createTable('roles', {
@@ -379,6 +513,13 @@ exports.up = (pgm) => {
       references: '"roles"(id)',
       onDelete: 'CASCADE',
     },
+    application_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"applications"(id)',
+      onDelete: 'CASCADE',
+      comment: 'Application that owns this resource',
+    },
     resource: {
       type: 'text',
       notNull: true,
@@ -394,8 +535,11 @@ exports.up = (pgm) => {
     },
   });
 
-  pgm.createIndex('permissions', ['role_id', 'resource', 'action'], { unique: true });
+  pgm.createIndex('permissions', ['role_id', 'application_id', 'resource', 'action'], {
+    unique: true,
+  });
   pgm.createIndex('permissions', 'role_id');
+  pgm.createIndex('permissions', 'application_id');
 
   // ============================================================
   // OTP SECRETS TABLE
@@ -647,17 +791,7 @@ exports.up = (pgm) => {
   // TRIGGERS
   // ============================================================
 
-  // Trigger to auto-update updated_at on users table
-  pgm.sql(`
-    CREATE OR REPLACE FUNCTION update_updated_at_column()
-    RETURNS TRIGGER AS $$
-    BEGIN
-      NEW.updated_at = now();
-      RETURN NEW;
-    END;
-    $$ language 'plpgsql';
-  `);
-
+  // Triggers to auto-update updated_at on tables
   pgm.sql(`
     CREATE TRIGGER update_users_updated_at 
     BEFORE UPDATE ON users
@@ -740,71 +874,6 @@ exports.up = (pgm) => {
         WHERE tm.user_id = current_setting('app.current_user_id', true)::uuid
       )
     )
-  `);
-
-  // ============================================================
-  // APPLICATIONS TABLE
-  // Registry of all available applications in the system
-  // ============================================================
-  pgm.createTable('applications', {
-    id: {
-      type: 'uuid',
-      primaryKey: true,
-      default: pgm.func('gen_random_uuid()'),
-    },
-    app_id: {
-      type: 'varchar(100)',
-      notNull: true,
-      unique: true,
-      comment: 'Unique identifier like "crm", "admin", "analytics"',
-    },
-    name: {
-      type: 'varchar(255)',
-      notNull: true,
-      comment: 'Display name of the application',
-    },
-    url: {
-      type: 'text',
-      notNull: true,
-      comment: 'Base URL of the application',
-    },
-    description: {
-      type: 'text',
-      notNull: false,
-      comment: 'Description of the application',
-    },
-    icon_url: {
-      type: 'text',
-      notNull: false,
-      comment: 'URL to application icon/logo',
-    },
-    is_active: {
-      type: 'boolean',
-      notNull: true,
-      default: true,
-      comment: 'Whether the application is active system-wide',
-    },
-    created_at: {
-      type: 'timestamptz',
-      notNull: true,
-      default: pgm.func('now()'),
-    },
-    updated_at: {
-      type: 'timestamptz',
-      notNull: true,
-      default: pgm.func('now()'),
-    },
-  });
-
-  pgm.createIndex('applications', 'app_id');
-  pgm.createIndex('applications', 'is_active');
-  pgm.createIndex('applications', ['is_active', 'app_id']);
-
-  pgm.sql(`
-    CREATE TRIGGER update_applications_updated_at
-    BEFORE UPDATE ON applications
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column()
   `);
 
   // ============================================================
