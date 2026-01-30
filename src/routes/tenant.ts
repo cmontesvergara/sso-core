@@ -108,12 +108,13 @@ router.get(
   async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = req.ssoUser?.userId;
+      const systemRole = req.ssoUser?.systemRole;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
 
-      const tenants = await TenantService_Instance.getUserTenants(userId);
+      const tenants = await TenantService_Instance.getUserTenants(userId, systemRole);
 
       res.json({
         success: true,

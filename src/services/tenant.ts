@@ -8,6 +8,7 @@ import {
   findTenantBySlug,
   findTenantMember,
   listTenantMembers,
+  listTenants,
   listUserTenants,
   removeTenantMember,
   updateTenantMemberRole,
@@ -145,9 +146,23 @@ export class TenantService {
 
   /**
    * Get all tenants for a user
+   * System/Super admins see all tenants, regular users see only their tenants
    */
-  async getUserTenants(userId: string) {
+  async getUserTenants(userId: string, systemRole?: string) {
     try {
+      // System/Super admins see all tenants
+      if (systemRole === 'system_admin' || systemRole === 'super_admin') {
+        const allTenants = await listTenants({ take: 1000 });
+        return allTenants.map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          slug: t.slug,
+          role: undefined, // Admins don't have a role as they're not members
+          createdAt: t.createdAt,
+        }));
+      }
+
+      // Regular users see only their tenants
       const tenants = await listUserTenants(userId);
 
       return tenants.map((t: any) => ({

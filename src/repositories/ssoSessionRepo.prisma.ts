@@ -68,6 +68,7 @@ export async function findSSOSessionByToken(
           firstName: true,
           lastName: true,
           userStatus: true,
+          systemRole: true,
         },
       },
     },

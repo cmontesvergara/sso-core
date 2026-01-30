@@ -15,6 +15,7 @@ declare global {
         firstName: string;
         lastName: string;
         userStatus: string;
+        systemRole: string;
       };
     }
   }

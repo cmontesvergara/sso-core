@@ -144,6 +144,7 @@ export class SSOSessionService {
       firstName: session.user.firstName,
       lastName: session.user.lastName,
       userStatus: session.user.userStatus,
+      systemRole: session.user.systemRole,
     };
   }
 
