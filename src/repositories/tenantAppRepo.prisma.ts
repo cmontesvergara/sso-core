@@ -38,7 +38,7 @@ export interface TenantAppWithApplication {
     name: string;
     url: string;
     description: string | null;
-    iconUrl: string | null;
+    logoUrl: string | null;
     isActive: boolean;
   };
 }
@@ -151,7 +151,7 @@ export async function listTenantApps(
           name: true,
           url: true,
           description: true,
-          iconUrl: true,
+          logoUrl: true,
           isActive: true,
         },
       },

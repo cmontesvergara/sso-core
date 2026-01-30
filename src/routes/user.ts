@@ -115,7 +115,7 @@ router.get(
               name: ua.application.name,
               url: ua.application.url,
               description: ua.application.description || '',
-              iconUrl: ua.application.iconUrl || null,
+              logoUrl: ua.application.logoUrl || null,
             }));
 
           return {

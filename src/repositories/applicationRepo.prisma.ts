@@ -20,7 +20,7 @@ export interface ApplicationRow {
   name: string;
   url: string;
   description: string | null;
-  iconUrl: string | null;
+  logoUrl: string | null;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -34,7 +34,7 @@ export async function createApplication(data: {
   name: string;
   url: string;
   description?: string;
-  iconUrl?: string;
+  logoUrl?: string;
 }): Promise<ApplicationRow> {
   const prisma = getPrisma();
 
@@ -44,7 +44,7 @@ export async function createApplication(data: {
       name: data.name,
       url: data.url,
       description: data.description,
-      iconUrl: data.iconUrl,
+      logoUrl: data.logoUrl,
     },
   });
 

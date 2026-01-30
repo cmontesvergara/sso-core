@@ -36,7 +36,7 @@ export interface UserAppAccessWithApplication {
     name: string;
     url: string;
     description: string | null;
-    iconUrl: string | null;
+    logoUrl: string | null;
     isActive: boolean;
   };
 }
@@ -126,7 +126,7 @@ export async function listUserAppsInTenant(
           name: true,
           url: true,
           description: true,
-          iconUrl: true,
+          logoUrl: true,
           isActive: true,
         },
       },
@@ -260,7 +260,7 @@ export async function listAllUserApps(userId: string): Promise<UserAppAccessWith
           name: true,
           url: true,
           description: true,
-          iconUrl: true,
+          logoUrl: true,
           isActive: true,
         },
       },
