@@ -28,6 +28,7 @@ interface SSOSessionWithUser {
     firstName: string;
     lastName: string;
     userStatus: string;
+    systemRole: string;
   };
 }
 
@@ -94,10 +95,7 @@ export async function updateSSOSessionActivity(sessionToken: string): Promise<vo
  * Extend session expiration
  * Used when user is active
  */
-export async function extendSSOSession(
-  sessionToken: string,
-  newExpiresAt: Date
-): Promise<void> {
+export async function extendSSOSession(sessionToken: string, newExpiresAt: Date): Promise<void> {
   const prisma = getPrismaClient();
 
   await prisma.sSOSession.update({
