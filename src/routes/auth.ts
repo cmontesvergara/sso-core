@@ -151,6 +151,7 @@ router.post('/signin', signinLimiter, async (req: Request, res: Response, next: 
         email: result.email,
         firstName: result.firstName,
         lastName: result.lastName,
+        systemRole: result.systemRole, // Include system role for admin features
       },
     });
   } catch (error) {

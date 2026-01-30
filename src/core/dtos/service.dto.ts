@@ -51,6 +51,7 @@ export interface SigninResult {
   email: string;
   firstName: string;
   lastName: string;
+  systemRole?: string; // System role for admin features
 }
 
 export interface SignoutInput {

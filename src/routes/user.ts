@@ -51,6 +51,7 @@ router.get(
           occupation: user.occupation,
           maritalStatus: user.maritalStatus,
           userStatus: user.userStatus,
+          systemRole: user.systemRole, // System role for admin features
           isActive: user.userStatus === 'active',
           createdAt: user.createdAt,
           addresses: user.addresses.map((addr: any) => ({

@@ -84,7 +84,7 @@ export class AuthenticationService {
     } else if (nuid) {
       user = await findUserByNuid(nuid);
     }
-    
+
     if (!user) {
       throw new AppError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
     }
@@ -99,16 +99,18 @@ export class AuthenticationService {
     if (user.userStatus !== 'active') {
       // Encode userId in base64 for security
       const encodedUserId = Buffer.from(user.id).toString('base64');
-      throw new AppError(403, 'Account is not active', 'ACCOUNT_NOT_ACTIVE', [{ userId: encodedUserId }]);
+      throw new AppError(403, 'Account is not active', 'ACCOUNT_NOT_ACTIVE', [
+        { userId: encodedUserId },
+      ]);
     }
 
     // Check if user has 2FA enabled
     const has2FA = await OTP.isOTPEnabled(user.id);
-    
+
     if (has2FA) {
       // Generate temporary token for 2FA verification
       const tempToken = JWT.generateTwoFactorToken(user.id);
-      
+
       return {
         requiresTwoFactor: true,
         tempToken,
@@ -132,6 +134,7 @@ export class AuthenticationService {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      systemRole: user.systemRole, // Include system role for admin features
     };
   }
 
