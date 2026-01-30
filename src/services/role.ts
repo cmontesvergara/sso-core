@@ -12,6 +12,7 @@ import {
 } from '../repositories/roleRepo.prisma';
 import { findTenantById, findTenantMember } from '../repositories/tenantRepo.prisma';
 import { logger } from '../utils/logger';
+import { appResourceService } from './appResource';
 
 export interface CreateRoleInput {
   name: string;
@@ -23,6 +24,7 @@ export interface UpdateRoleInput {
 }
 
 export interface CreatePermissionInput {
+  applicationId: string;
   resource: string;
   action: string;
 }
@@ -136,6 +138,9 @@ export class RoleService {
           id: p.id,
           resource: p.resource,
           action: p.action,
+          applicationId: p.applicationId,
+          applicationName: p.applicationName,
+          appId: p.appId,
           createdAt: p.createdAt,
         })),
       };
@@ -302,9 +307,33 @@ export class RoleService {
         throw new Error('Cannot modify permissions of default roles (admin, member, viewer)');
       }
 
+      // Validate permission exists in app resource catalog
+      const validation = await appResourceService.validatePermission(
+        input.applicationId,
+        input.resource,
+        input.action
+      );
+
+      if (!validation.valid) {
+        throw new Error(validation.message || 'Invalid permission');
+      }
+
+      // Validate tenant has access to the application
+      const accessValidation = await appResourceService.validateTenantAccess(
+        role.tenantId,
+        input.applicationId
+      );
+
+      if (!accessValidation.valid) {
+        throw new Error(
+          accessValidation.message || 'Tenant does not have access to this application'
+        );
+      }
+
       // Create permission
       const permission = await createPermission({
         roleId,
+        applicationId: validation.applicationId!,
         resource: input.resource,
         action: input.action,
       });
@@ -368,6 +397,7 @@ export class RoleService {
    */
   async removePermissionByResourceAction(
     roleId: string,
+    applicationId: string,
     resource: string,
     action: string,
     removedByUserId: string
@@ -390,7 +420,7 @@ export class RoleService {
         throw new Error('Cannot modify permissions of default roles (admin, member, viewer)');
       }
 
-      await deletePermissionByRoleResourceAction(roleId, resource, action);
+      await deletePermissionByRoleResourceAction(roleId, applicationId, resource, action);
 
       logger.info(
         `Permission ${resource}:${action} removed from role ${roleId} by user ${removedByUserId}`
@@ -434,6 +464,9 @@ export class RoleService {
         id: p.id,
         resource: p.resource,
         action: p.action,
+        applicationId: p.applicationId,
+        applicationName: p.applicationName,
+        appId: p.appId,
         createdAt: p.createdAt,
       }));
     } catch (error) {

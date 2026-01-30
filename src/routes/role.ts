@@ -20,11 +20,13 @@ const updateRoleSchema = Joi.object({
 });
 
 const createPermissionSchema = Joi.object({
+  applicationId: Joi.string().required().uuid(),
   resource: Joi.string().required().min(2).max(50),
   action: Joi.string().required().min(2).max(50),
 });
 
 const removePermissionByResourceActionSchema = Joi.object({
+  applicationId: Joi.string().required().uuid(),
   resource: Joi.string().required().min(2).max(50),
   action: Joi.string().required().min(2).max(50),
 });
@@ -305,6 +307,7 @@ router.delete(
 
       await RoleService_Instance.removePermissionByResourceAction(
         roleId,
+        value.applicationId,
         value.resource,
         value.action,
         userId

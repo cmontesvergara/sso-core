@@ -1,4 +1,5 @@
 import { CreateTenantInput, InviteTenantMemberInput } from '../core/dtos';
+import { findApplicationByAppId } from '../repositories/appResourceRepo.prisma';
 import { createDefaultRoles } from '../repositories/roleRepo.prisma';
 import {
   addTenantMember,
@@ -96,8 +97,15 @@ export class TenantService {
 
       logger.info(`Tenant created: ${tenant.name} (${tenant.id}) by user ${createdByUserId}`);
 
+      // Get SSO application ID for default roles
+      const ssoApp = await findApplicationByAppId('sso');
+
+      if (!ssoApp) {
+        throw new Error('SSO application not found. Please ensure SSO app is seeded.');
+      }
+
       // Create default roles with permissions
-      await createDefaultRoles(tenant.id);
+      await createDefaultRoles(tenant.id, ssoApp.id);
       logger.info(`Default roles created for tenant ${tenant.id}`);
 
       // Add tenant admin as member with admin role
@@ -129,7 +137,12 @@ export class TenantService {
   /**
    * Get tenant by ID with members and roles
    */
-  async getTenantById(tenantId: string) {
+  async getTenantById(tenantId: string): Promise<{
+    id: string;
+    name: string;
+    slug: string;
+    createdAt: Date;
+  }> {
     try {
       const tenant = await findTenantByIdWithRelations(tenantId);
 
@@ -148,12 +161,24 @@ export class TenantService {
    * Get all tenants for a user
    * System/Super admins see all tenants, regular users see only their tenants
    */
-  async getUserTenants(userId: string, systemRole?: string) {
+  async getUserTenants(
+    userId: string,
+    systemRole?: string
+  ): Promise<
+    Array<{
+      id: string;
+      name: string;
+      slug: string;
+      role?: string;
+      memberCount: number;
+      createdAt: Date;
+    }>
+  > {
     try {
       // System/Super admins see all tenants
       if (systemRole === 'system_admin' || systemRole === 'super_admin') {
         const allTenants = await listTenants({ take: 1000 });
-        return allTenants.map((t: any) => ({
+        return allTenants.map((t) => ({
           id: t.id,
           name: t.name,
           slug: t.slug,
@@ -166,7 +191,7 @@ export class TenantService {
       // Regular users see only their tenants
       const tenants = await listUserTenants(userId);
 
-      return tenants.map((t: any) => ({
+      return tenants.map((t) => ({
         id: t.id,
         name: t.name,
         slug: t.slug,
@@ -188,7 +213,12 @@ export class TenantService {
     tenantId: string,
     invitedByUserId: string,
     input: InviteTenantMemberInput
-  ) {
+  ): Promise<{
+    userId: string;
+    email: string;
+    role: string;
+    tenantId: string;
+  }> {
     try {
       // Verify inviter is admin
       const inviterMembership = await findTenantMember(tenantId, invitedByUserId);
@@ -251,7 +281,11 @@ export class TenantService {
     updatedByUserId: string,
     targetUserId: string,
     newRole: 'admin' | 'member' | 'viewer'
-  ) {
+  ): Promise<{
+    userId: string;
+    tenantId: string;
+    role: string;
+  }> {
     try {
       // Verify updater is admin
       const updaterMembership = await findTenantMember(tenantId, updatedByUserId);
@@ -270,7 +304,7 @@ export class TenantService {
       // Prevent removing last admin
       if (member.role === 'admin' && newRole !== 'admin') {
         const members = await listTenantMembers(tenantId);
-        const adminCount = members.filter((m: any) => m.role === 'admin').length;
+        const adminCount = members.filter((m) => m.role === 'admin').length;
 
         if (adminCount === 1) {
           throw new Error('Cannot remove the last admin from tenant');
@@ -293,7 +327,13 @@ export class TenantService {
    * Remove member from tenant
    * Only admins can remove, cannot remove last admin
    */
-  async removeMember(tenantId: string, removedByUserId: string, targetUserId: string) {
+  async removeMember(
+    tenantId: string,
+    removedByUserId: string,
+    targetUserId: string
+  ): Promise<{
+    success: boolean;
+  }> {
     try {
       // Verify remover is admin
       const removerMembership = await findTenantMember(tenantId, removedByUserId);
@@ -312,7 +352,7 @@ export class TenantService {
       // Prevent removing last admin
       if (member.role === 'admin') {
         const members = await listTenantMembers(tenantId);
-        const adminCount = members.filter((m: any) => m.role === 'admin').length;
+        const adminCount = members.filter((m) => m.role === 'admin').length;
 
         if (adminCount === 1) {
           throw new Error('Cannot remove the last admin from tenant');
@@ -334,11 +374,20 @@ export class TenantService {
   /**
    * Get tenant members
    */
-  async getTenantMembers(tenantId: string) {
+  async getTenantMembers(tenantId: string): Promise<
+    Array<{
+      userId: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      role: string;
+      joinedAt: Date;
+    }>
+  > {
     try {
       const members = await listTenantMembers(tenantId);
 
-      return members.map((m: any) => ({
+      return members.map((m) => ({
         userId: m.user.id,
         email: m.user.email,
         firstName: m.user.firstName,

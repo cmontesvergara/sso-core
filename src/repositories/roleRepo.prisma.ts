@@ -25,6 +25,7 @@ export interface RoleRow {
 export interface PermissionRow {
   id: string;
   roleId: string;
+  applicationId: string;
   resource: string;
   action: string;
   createdAt: Date;
@@ -129,6 +130,7 @@ export async function deleteRole(id: string): Promise<void> {
  */
 export async function createPermission(data: {
   roleId: string;
+  applicationId: string;
   resource: string;
   action: string;
 }): Promise<PermissionRow> {
@@ -137,6 +139,7 @@ export async function createPermission(data: {
   const permission = await prisma.permission.create({
     data: {
       roleId: data.roleId,
+      applicationId: data.applicationId,
       resource: data.resource,
       action: data.action,
     },
@@ -161,15 +164,35 @@ export async function findPermissionById(id: string): Promise<PermissionRow | nu
 /**
  * List permissions for a role
  */
-export async function listPermissionsByRole(roleId: string): Promise<PermissionRow[]> {
+export async function listPermissionsByRole(
+  roleId: string
+): Promise<Array<PermissionRow & { applicationName?: string; appId?: string }>> {
   const prisma = getPrisma();
 
   const permissions = await prisma.permission.findMany({
     where: { roleId },
+    include: {
+      application: {
+        select: {
+          id: true,
+          appId: true,
+          name: true,
+        },
+      },
+    },
     orderBy: { createdAt: 'desc' },
   });
 
-  return permissions as PermissionRow[];
+  return permissions.map((p) => ({
+    id: p.id,
+    roleId: p.roleId,
+    applicationId: p.applicationId,
+    resource: p.resource,
+    action: p.action,
+    createdAt: p.createdAt,
+    applicationName: p.application.name,
+    appId: p.application.appId,
+  }));
 }
 
 /**
@@ -184,10 +207,11 @@ export async function deletePermission(id: string): Promise<void> {
 }
 
 /**
- * Delete permission by role, resource, and action
+ * Delete permission by role, application, resource, and action
  */
 export async function deletePermissionByRoleResourceAction(
   roleId: string,
+  applicationId: string,
   resource: string,
   action: string
 ): Promise<void> {
@@ -196,6 +220,7 @@ export async function deletePermissionByRoleResourceAction(
   await prisma.permission.deleteMany({
     where: {
       roleId,
+      applicationId,
       resource,
       action,
     },
@@ -207,6 +232,7 @@ export async function deletePermissionByRoleResourceAction(
  */
 export async function hasPermission(
   roleId: string,
+  applicationId: string,
   resource: string,
   action: string
 ): Promise<boolean> {
@@ -215,6 +241,7 @@ export async function hasPermission(
   const permission = await prisma.permission.findFirst({
     where: {
       roleId,
+      applicationId,
       resource,
       action,
     },
@@ -225,64 +252,67 @@ export async function hasPermission(
 
 /**
  * Create default roles for a new tenant with permissions
- * Creates: admin, member, viewer roles with appropriate permissions
+ * Creates: admin, member, viewer roles with appropriate SSO permissions
  */
-export async function createDefaultRoles(tenantId: string): Promise<{
+export async function createDefaultRoles(
+  tenantId: string,
+  ssoApplicationId: string
+): Promise<{
   admin: RoleRow;
   member: RoleRow;
   viewer: RoleRow;
 }> {
   const prisma = getPrisma();
 
-  // Admin role with all permissions
+  // Admin role with all SSO permissions
   const adminRole = await prisma.role.create({
     data: {
       tenantId,
       name: 'admin',
       permissions: {
         create: [
-          { resource: 'users', action: 'create' },
-          { resource: 'users', action: 'read' },
-          { resource: 'users', action: 'update' },
-          { resource: 'users', action: 'delete' },
-          { resource: 'applications', action: 'enable' },
-          { resource: 'applications', action: 'disable' },
-          { resource: 'applications', action: 'grant_access' },
-          { resource: 'applications', action: 'revoke_access' },
-          { resource: 'roles', action: 'create' },
-          { resource: 'roles', action: 'read' },
-          { resource: 'roles', action: 'update' },
-          { resource: 'roles', action: 'delete' },
-          { resource: 'permissions', action: 'assign' },
+          { applicationId: ssoApplicationId, resource: 'users', action: 'create' },
+          { applicationId: ssoApplicationId, resource: 'users', action: 'read' },
+          { applicationId: ssoApplicationId, resource: 'users', action: 'update' },
+          { applicationId: ssoApplicationId, resource: 'users', action: 'delete' },
+          { applicationId: ssoApplicationId, resource: 'applications', action: 'read' },
+          { applicationId: ssoApplicationId, resource: 'roles', action: 'create' },
+          { applicationId: ssoApplicationId, resource: 'roles', action: 'read' },
+          { applicationId: ssoApplicationId, resource: 'roles', action: 'update' },
+          { applicationId: ssoApplicationId, resource: 'roles', action: 'delete' },
+          { applicationId: ssoApplicationId, resource: 'permissions', action: 'grant_access' },
+          { applicationId: ssoApplicationId, resource: 'permissions', action: 'revoke_access' },
+          { applicationId: ssoApplicationId, resource: 'tenants', action: 'update' },
+          { applicationId: ssoApplicationId, resource: 'tenants', action: 'invite_members' },
         ],
       },
     },
   });
 
-  // Member role with read/write permissions
+  // Member role with read permissions
   const memberRole = await prisma.role.create({
     data: {
       tenantId,
       name: 'member',
       permissions: {
         create: [
-          { resource: 'users', action: 'read' },
-          { resource: 'applications', action: 'read' },
-          { resource: 'roles', action: 'read' },
+          { applicationId: ssoApplicationId, resource: 'users', action: 'read' },
+          { applicationId: ssoApplicationId, resource: 'applications', action: 'read' },
+          { applicationId: ssoApplicationId, resource: 'roles', action: 'read' },
         ],
       },
     },
   });
 
-  // Viewer role with read-only permissions
+  // Viewer role with limited read-only permissions
   const viewerRole = await prisma.role.create({
     data: {
       tenantId,
       name: 'viewer',
       permissions: {
         create: [
-          { resource: 'users', action: 'read' },
-          { resource: 'applications', action: 'read' },
+          { applicationId: ssoApplicationId, resource: 'users', action: 'read' },
+          { applicationId: ssoApplicationId, resource: 'applications', action: 'read' },
         ],
       },
     },

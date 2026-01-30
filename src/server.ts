@@ -7,6 +7,7 @@ import { Config } from './config';
 import { errorHandler } from './middleware/errorHandler';
 import { loggingMiddleware } from './middleware/logging';
 import applicationsRoutes from './routes/applications';
+import appResourceRoutes from './routes/appResource';
 import docsRoutes from './routes/docs';
 import emailVerificationRoutes from './routes/emailVerification';
 import metadataRoutes from './routes/metadata';
@@ -97,6 +98,7 @@ export async function createServer(): Promise<Express> {
   apiV1.use('/user', userRoutes);
   apiV1.use('/tenant', tenantRoutes);
   apiV1.use('/role', roleRoutes);
+  apiV1.use('/app-resources', appResourceRoutes);
   apiV1.use('/otp', otpRoutes);
   apiV1.use('/email-verification', emailVerificationRoutes);
   apiV1.use('/metadata', metadataRoutes);
