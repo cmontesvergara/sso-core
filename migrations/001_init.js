@@ -22,6 +22,11 @@ exports.up = (pgm) => {
   pgm.sql('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
 
   // ============================================================
+  // ENUMS
+  // ============================================================
+  pgm.createType('system_role_type', ['super_admin', 'system_admin', 'user']);
+
+  // ============================================================
   // USERS TABLE - Complete with all fields
   // ============================================================
   pgm.createTable('users', {
@@ -111,6 +116,13 @@ exports.up = (pgm) => {
     recovery_email: {
       type: 'varchar(255)',
       notNull: false,
+    },
+
+    // System Role
+    system_role: {
+      type: 'system_role_type',
+      notNull: true,
+      default: 'user',
     },
 
     // Timestamps
@@ -729,26 +741,277 @@ exports.up = (pgm) => {
       )
     )
   `);
+
+  // ============================================================
+  // APPLICATIONS TABLE
+  // Registry of all available applications in the system
+  // ============================================================
+  pgm.createTable('applications', {
+    id: {
+      type: 'uuid',
+      primaryKey: true,
+      default: pgm.func('gen_random_uuid()'),
+    },
+    app_id: {
+      type: 'varchar(100)',
+      notNull: true,
+      unique: true,
+      comment: 'Unique identifier like "crm", "admin", "analytics"',
+    },
+    name: {
+      type: 'varchar(255)',
+      notNull: true,
+      comment: 'Display name of the application',
+    },
+    url: {
+      type: 'text',
+      notNull: true,
+      comment: 'Base URL of the application',
+    },
+    description: {
+      type: 'text',
+      notNull: false,
+      comment: 'Description of the application',
+    },
+    icon_url: {
+      type: 'text',
+      notNull: false,
+      comment: 'URL to application icon/logo',
+    },
+    is_active: {
+      type: 'boolean',
+      notNull: true,
+      default: true,
+      comment: 'Whether the application is active system-wide',
+    },
+    created_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
+    },
+    updated_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
+    },
+  });
+
+  pgm.createIndex('applications', 'app_id');
+  pgm.createIndex('applications', 'is_active');
+  pgm.createIndex('applications', ['is_active', 'app_id']);
+
+  pgm.sql(`
+    CREATE TRIGGER update_applications_updated_at
+    BEFORE UPDATE ON applications
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column()
+  `);
+
+  // ============================================================
+  // TENANT_APPS TABLE
+  // Junction table: which apps are enabled for which tenants
+  // ============================================================
+  pgm.createTable('tenant_apps', {
+    id: {
+      type: 'uuid',
+      primaryKey: true,
+      default: pgm.func('gen_random_uuid()'),
+    },
+    tenant_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"tenants"(id)',
+      onDelete: 'CASCADE',
+      comment: 'Reference to tenant',
+    },
+    application_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"applications"(id)',
+      onDelete: 'CASCADE',
+      comment: 'Reference to application',
+    },
+    is_enabled: {
+      type: 'boolean',
+      notNull: true,
+      default: true,
+      comment: 'Whether the app is enabled for this tenant',
+    },
+    config: {
+      type: 'jsonb',
+      notNull: false,
+      comment: 'Tenant-specific configuration for the application',
+    },
+    created_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
+    },
+    updated_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
+    },
+  });
+
+  pgm.addConstraint('tenant_apps', 'tenant_apps_tenant_id_application_id_key', {
+    unique: ['tenant_id', 'application_id'],
+  });
+
+  pgm.createIndex('tenant_apps', 'tenant_id');
+  pgm.createIndex('tenant_apps', 'application_id');
+  pgm.createIndex('tenant_apps', 'is_enabled');
+  pgm.createIndex('tenant_apps', ['tenant_id', 'is_enabled']);
+
+  pgm.sql(`
+    CREATE TRIGGER update_tenant_apps_updated_at
+    BEFORE UPDATE ON tenant_apps
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column()
+  `);
+
+  // ============================================================
+  // USER_APP_ACCESS TABLE
+  // Junction table: which users have access to which apps in which tenants
+  // ============================================================
+  pgm.createTable('user_app_access', {
+    id: {
+      type: 'uuid',
+      primaryKey: true,
+      default: pgm.func('gen_random_uuid()'),
+    },
+    user_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"users"(id)',
+      onDelete: 'CASCADE',
+      comment: 'Reference to user',
+    },
+    tenant_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"tenants"(id)',
+      onDelete: 'CASCADE',
+      comment: 'Reference to tenant',
+    },
+    application_id: {
+      type: 'uuid',
+      notNull: true,
+      references: '"applications"(id)',
+      onDelete: 'CASCADE',
+      comment: 'Reference to application',
+    },
+    granted_at: {
+      type: 'timestamptz',
+      notNull: true,
+      default: pgm.func('now()'),
+      comment: 'When access was granted',
+    },
+    granted_by: {
+      type: 'uuid',
+      notNull: false,
+      references: '"users"(id)',
+      onDelete: 'SET NULL',
+      comment: 'User ID of admin who granted access',
+    },
+  });
+
+  pgm.addConstraint('user_app_access', 'user_app_access_user_id_tenant_id_application_id_key', {
+    unique: ['user_id', 'tenant_id', 'application_id'],
+  });
+
+  pgm.createIndex('user_app_access', 'user_id');
+  pgm.createIndex('user_app_access', 'tenant_id');
+  pgm.createIndex('user_app_access', 'application_id');
+  pgm.createIndex('user_app_access', ['user_id', 'tenant_id']);
+  pgm.createIndex('user_app_access', ['tenant_id', 'application_id']);
+
+  // ============================================================
+  // ROW LEVEL SECURITY (RLS) POLICIES - Applications
+  // ============================================================
+
+  pgm.sql('ALTER TABLE applications ENABLE ROW LEVEL SECURITY');
+  pgm.sql('ALTER TABLE tenant_apps ENABLE ROW LEVEL SECURITY');
+  pgm.sql('ALTER TABLE user_app_access ENABLE ROW LEVEL SECURITY');
+
+  pgm.sql(`
+    CREATE POLICY applications_visible_to_all ON applications
+    FOR SELECT
+    USING (true)
+  `);
+
+  pgm.sql(`
+    CREATE POLICY applications_admin_only ON applications
+    FOR ALL
+    USING (true)
+    WITH CHECK (true)
+  `);
+
+  pgm.sql(`
+    CREATE POLICY tenant_apps_own_tenants ON tenant_apps
+    USING (
+      tenant_id IN (
+        SELECT tenant_id FROM tenant_members 
+        WHERE user_id = current_setting('app.current_user_id', true)::uuid
+      )
+    )
+  `);
+
+  pgm.sql(`
+    CREATE POLICY user_app_access_own ON user_app_access
+    FOR SELECT
+    USING (
+      user_id = current_setting('app.current_user_id', true)::uuid
+    )
+  `);
+
+  pgm.sql(`
+    CREATE POLICY user_app_access_tenant_admin ON user_app_access
+    FOR ALL
+    USING (
+      tenant_id IN (
+        SELECT tenant_id FROM tenant_members 
+        WHERE user_id = current_setting('app.current_user_id', true)::uuid
+        AND role = 'admin'
+      )
+    )
+  `);
+
+  pgm.sql(
+    "COMMENT ON TABLE applications IS 'Registry of all available applications in the SSO system'"
+  );
+  pgm.sql(
+    "COMMENT ON TABLE tenant_apps IS 'Junction table defining which applications are enabled for which tenants'"
+  );
+  pgm.sql(
+    "COMMENT ON TABLE user_app_access IS 'Access control table defining which users can access which applications in which tenants'"
+  );
 };
 
 exports.down = (pgm) => {
-  // Drop tables in reverse order (respecting foreign keys)
-  pgm.dropTable('app_sessions');
-  pgm.dropTable('auth_codes');
-  pgm.dropTable('sso_sessions');
-  pgm.dropTable('email_verifications');
-  pgm.dropTable('otp_secrets');
-  pgm.dropTable('permissions');
-  pgm.dropTable('roles');
-  pgm.dropTable('tenant_members');
-  pgm.dropTable('tenants');
-  pgm.dropTable('refresh_tokens');
-  pgm.dropTable('other_information');
-  pgm.dropTable('addresses');
-  pgm.dropTable('users');
+  // Drop tables in reverse order (respecting foreign keys) with CASCADE
+  pgm.dropTable('user_app_access', { cascade: true });
+  pgm.dropTable('tenant_apps', { cascade: true });
+  pgm.dropTable('applications', { cascade: true });
+  pgm.dropTable('app_sessions', { cascade: true });
+  pgm.dropTable('auth_codes', { cascade: true });
+  pgm.dropTable('sso_sessions', { cascade: true });
+  pgm.dropTable('email_verifications', { cascade: true });
+  pgm.dropTable('otp_secrets', { cascade: true });
+  pgm.dropTable('permissions', { cascade: true });
+  pgm.dropTable('roles', { cascade: true });
+  pgm.dropTable('tenant_members', { cascade: true });
+  pgm.dropTable('tenants', { cascade: true });
+  pgm.dropTable('refresh_tokens', { cascade: true });
+  pgm.dropTable('other_information', { cascade: true });
+  pgm.dropTable('addresses', { cascade: true });
+  pgm.dropTable('users', { cascade: true });
+
+  // Drop type
+  pgm.dropType('system_role_type', { ifExists: true });
 
   // Drop functions
-  pgm.sql('DROP FUNCTION IF EXISTS update_updated_at_column');
+  pgm.sql('DROP FUNCTION IF EXISTS update_updated_at_column CASCADE');
 
   // Drop extensions
   pgm.sql('DROP EXTENSION IF EXISTS "uuid-ossp"');

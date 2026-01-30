@@ -17,6 +17,8 @@
     "migrate:create": "node scripts/migrate.js create",
     "migrate:up": "node scripts/migrate.js up",
     "migrate:down": "node scripts/migrate.js down",
+    "seed:apps": "node scripts/seed-applications.js",
+    "seed:complete": "node scripts/seed-complete.js",
     "prisma:generate": "prisma generate",
     "prisma:format": "prisma format",
     "clean": "rm -rf dist"
@@ -38,6 +40,7 @@
     "@types/pg": "^8.16.0",
     "argon2": "^0.30.0",
     "axios": "^1.6.5",
+    "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
     "cookie": "^0.5.0",

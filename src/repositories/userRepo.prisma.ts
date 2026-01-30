@@ -28,6 +28,7 @@ export interface UserRow {
   phone: string;
   nuid: string;
   userStatus: string;
+  systemRole: 'super_admin' | 'system_admin' | 'user';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -94,6 +95,7 @@ export async function createUser(params: {
     phone: user.phone,
     nuid: user.nuid,
     userStatus: user.userStatus,
+    systemRole: user.systemRole,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -119,6 +121,7 @@ export async function findUserByEmail(email: string): Promise<UserRow | undefine
     phone: user.phone,
     nuid: user.nuid,
     userStatus: user.userStatus,
+    systemRole: user.systemRole,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -144,6 +147,7 @@ export async function findUserByNuid(nuid: string): Promise<UserRow | undefined>
     phone: user.phone,
     nuid: user.nuid,
     userStatus: user.userStatus,
+    systemRole: user.systemRole,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -169,6 +173,7 @@ export async function findUserById(id: string): Promise<UserRow | undefined> {
     phone: user.phone,
     nuid: user.nuid,
     userStatus: user.userStatus,
+    systemRole: user.systemRole,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -224,6 +229,7 @@ export async function updateUser(
     phone: user.phone,
     nuid: user.nuid,
     userStatus: user.userStatus,
+    systemRole: user.systemRole,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -280,6 +286,7 @@ export async function listUsers(params: {
     phone: user.phone,
     nuid: user.nuid,
     userStatus: user.userStatus,
+    systemRole: user.systemRole,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   }));

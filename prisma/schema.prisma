@@ -10,6 +10,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum SystemRole {
+  super_admin
+  system_admin
+  user
+
+  @@map("system_role_type")
+}
+
 model User {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email            String    @unique
@@ -35,6 +43,9 @@ model User {
   recoveryPhone String? @map("recovery_phone")
   recoveryEmail String? @map("recovery_email")
 
+  // System Role
+  systemRole SystemRole @default(user) @map("system_role")
+
   // Metadata
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -48,6 +59,7 @@ model User {
   ssoSessions        SSOSession[]
   authCodes          AuthCode[]
   appSessions        AppSession[]
+  userAppAccess      UserAppAccess[]
 
   @@map("users")
 }
@@ -105,10 +117,12 @@ model Tenant {
   slug      String   @unique
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  members     TenantMember[]
-  roles       Role[]
-  authCodes   AuthCode[]
-  appSessions AppSession[]
+  members       TenantMember[]
+  roles         Role[]
+  authCodes     AuthCode[]
+  appSessions   AppSession[]
+  tenantApps    TenantApp[]
+  userAppAccess UserAppAccess[]
 
   @@map("tenants")
 }
@@ -247,4 +261,62 @@ model AppSession {
   @@index([tenantId])
   @@index([expiresAt])
   @@map("app_sessions")
+}
+
+model Application {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  appId       String   @unique @map("app_id") @db.VarChar(100) // 'crm', 'admin', 'analytics'
+  name        String
+  url         String
+  description String?
+  iconUrl     String?  @map("icon_url")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenantApps    TenantApp[]
+  userAppAccess UserAppAccess[]
+
+  @@index([appId])
+  @@index([isActive])
+  @@map("applications")
+}
+
+model TenantApp {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  applicationId String   @map("application_id") @db.Uuid
+  isEnabled     Boolean  @default(true) @map("is_enabled")
+  config        Json? // Configuración específica por tenant si es necesario
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, applicationId])
+  @@index([tenantId])
+  @@index([applicationId])
+  @@index([isEnabled])
+  @@map("tenant_apps")
+}
+
+model UserAppAccess {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  applicationId String   @map("application_id") @db.Uuid
+  grantedAt     DateTime @default(now()) @map("granted_at") @db.Timestamptz(6)
+  grantedBy     String?  @map("granted_by") @db.Uuid // userId del admin que otorgó acceso
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId, applicationId])
+  @@index([userId])
+  @@index([tenantId])
+  @@index([applicationId])
+  @@index([userId, tenantId])
+  @@map("user_app_access")
 }

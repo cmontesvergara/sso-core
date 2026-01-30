@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import { Config } from './config';
 import { errorHandler } from './middleware/errorHandler';
 import { loggingMiddleware } from './middleware/logging';
+import applicationsRoutes from './routes/applications';
 import docsRoutes from './routes/docs';
 import emailVerificationRoutes from './routes/emailVerification';
 import metadataRoutes from './routes/metadata';
@@ -99,6 +100,7 @@ export async function createServer(): Promise<Express> {
   apiV1.use('/otp', otpRoutes);
   apiV1.use('/email-verification', emailVerificationRoutes);
   apiV1.use('/metadata', metadataRoutes);
+  apiV1.use('/applications', applicationsRoutes);
   apiV1.use('/util', utilRoutes);
 
   app.use('/api/v1', apiV1);

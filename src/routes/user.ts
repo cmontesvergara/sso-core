@@ -3,6 +3,7 @@ import { AuthenticatedRequest, authMiddleware } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { authenticateSSO } from '../middleware/ssoAuth';
 import { listUserTenants } from '../repositories/tenantRepo.prisma';
+import { listUserAppsInTenant } from '../repositories/userAppAccessRepo.prisma';
 import { findUserByIdWithAddresses, updateUserProfile } from '../repositories/userRepo.prisma';
 
 const router = Router();
@@ -96,46 +97,39 @@ router.get(
     try {
       const userId = (req as any).ssoUser.userId;
 
-      // Get all tenants for the user (uses listUserTenants from tenantRepo)
+      // Get all tenants for the user
       const userTenants = await listUserTenants(userId);
 
-      // Build response with tenant details and apps
-      const tenants = userTenants.map((tenant) => {
-        // TODO: In the future, fetch actual apps from database
-        // For now, return a static list of available apps
-        // This should be replaced with a query to an 'apps' or 'tenant_apps' table
-        const apps = [
-          {
-            appId: 'crm',
-            name: 'CRM',
-            url: `https://crm.${process.env.BASE_DOMAIN || 'empire.com'}`,
-            description: 'Customer Relationship Management',
-          },
-          {
-            appId: 'admin',
-            name: 'Admin Panel',
-            url: `https://apps-admin.${process.env.BASE_DOMAIN || 'empire.com'}`,
-            description: 'Administrative Dashboard',
-          },
-          {
-            appId: 'analytics',
-            name: 'Analytics',
-            url: `https://analytics.${process.env.BASE_DOMAIN || 'empire.com'}`,
-            description: 'Business Intelligence & Reporting',
-          },
-        ];
+      // Build response with tenant details and apps the user has access to
+      const tenantsWithApps = await Promise.all(
+        userTenants.map(async (tenant) => {
+          // Fetch apps the user has access to in this tenant
+          const userApps = await listUserAppsInTenant(userId, tenant.id);
 
-        return {
-          tenantId: tenant.id,
-          name: tenant.name,
-          slug: tenant.slug,
-          apps,
-        };
-      });
+          // Map to response format
+          const apps = userApps
+            .filter((ua) => ua.application.isActive) // Only active apps
+            .map((ua) => ({
+              appId: ua.application.appId,
+              name: ua.application.name,
+              url: ua.application.url,
+              description: ua.application.description || '',
+              iconUrl: ua.application.iconUrl || null,
+            }));
+
+          return {
+            tenantId: tenant.id,
+            name: tenant.name,
+            slug: tenant.slug,
+            role: tenant.role,
+            apps,
+          };
+        })
+      );
 
       res.json({
         success: true,
-        tenants,
+        tenants: tenantsWithApps,
       });
     } catch (error) {
       next(error);

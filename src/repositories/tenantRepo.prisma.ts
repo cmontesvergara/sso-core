@@ -189,7 +189,7 @@ export async function listTenantMembers(tenantId: string): Promise<TenantMemberR
 /**
  * List tenants for a user
  */
-export async function listUserTenants(userId: string): Promise<TenantRow[]> {
+export async function listUserTenants(userId: string): Promise<(TenantRow & { role: string })[]> {
   const prisma = getPrisma();
 
   const memberships = await prisma.tenantMember.findMany({
@@ -197,7 +197,9 @@ export async function listUserTenants(userId: string): Promise<TenantRow[]> {
     include: { tenant: true },
   });
 
-  return memberships.map((m: any) => m.tenant) as TenantRow[];
+  return memberships.map((m: any) => ({ ...m.tenant, role: m.role })) as (TenantRow & {
+    role: string;
+  })[];
 }
 
 /**
