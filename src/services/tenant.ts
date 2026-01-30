@@ -142,6 +142,8 @@ export class TenantService {
     name: string;
     slug: string;
     createdAt: Date;
+    members: unknown[];
+    roles: unknown[];
   }> {
     try {
       const tenant = await findTenantByIdWithRelations(tenantId);
