@@ -42,14 +42,14 @@ const createApplicationSchema = Joi.object({
   name: Joi.string().required().min(3).max(100),
   url: Joi.string().required().uri(),
   description: Joi.string().optional().max(500),
-  iconUrl: Joi.string().optional().uri(),
+  logoUrl: Joi.string().optional().uri(),
 });
 
 const updateApplicationSchema = Joi.object({
   name: Joi.string().optional().min(3).max(100),
   url: Joi.string().optional().uri(),
   description: Joi.string().optional().max(500).allow('', null),
-  iconUrl: Joi.string().optional().uri().allow('', null),
+  logoUrl: Joi.string().optional().uri().allow('', null),
   isActive: Joi.boolean().optional(),
 });
 
