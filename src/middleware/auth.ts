@@ -24,6 +24,11 @@ export interface AuthenticatedRequest extends Request {
     sessionToken: string;
     expiresAt: Date;
   };
+  tenantMembership?: {
+    role: string;
+    tenantId: string;
+    userId: string;
+  };
 }
 
 /**

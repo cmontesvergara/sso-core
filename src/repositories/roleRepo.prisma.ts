@@ -223,6 +223,78 @@ export async function hasPermission(
   return !!permission;
 }
 
+/**
+ * Create default roles for a new tenant with permissions
+ * Creates: admin, member, viewer roles with appropriate permissions
+ */
+export async function createDefaultRoles(tenantId: string): Promise<{
+  admin: RoleRow;
+  member: RoleRow;
+  viewer: RoleRow;
+}> {
+  const prisma = getPrisma();
+
+  // Admin role with all permissions
+  const adminRole = await prisma.role.create({
+    data: {
+      tenantId,
+      name: 'admin',
+      permissions: {
+        create: [
+          { resource: 'users', action: 'create' },
+          { resource: 'users', action: 'read' },
+          { resource: 'users', action: 'update' },
+          { resource: 'users', action: 'delete' },
+          { resource: 'applications', action: 'enable' },
+          { resource: 'applications', action: 'disable' },
+          { resource: 'applications', action: 'grant_access' },
+          { resource: 'applications', action: 'revoke_access' },
+          { resource: 'roles', action: 'create' },
+          { resource: 'roles', action: 'read' },
+          { resource: 'roles', action: 'update' },
+          { resource: 'roles', action: 'delete' },
+          { resource: 'permissions', action: 'assign' },
+        ],
+      },
+    },
+  });
+
+  // Member role with read/write permissions
+  const memberRole = await prisma.role.create({
+    data: {
+      tenantId,
+      name: 'member',
+      permissions: {
+        create: [
+          { resource: 'users', action: 'read' },
+          { resource: 'applications', action: 'read' },
+          { resource: 'roles', action: 'read' },
+        ],
+      },
+    },
+  });
+
+  // Viewer role with read-only permissions
+  const viewerRole = await prisma.role.create({
+    data: {
+      tenantId,
+      name: 'viewer',
+      permissions: {
+        create: [
+          { resource: 'users', action: 'read' },
+          { resource: 'applications', action: 'read' },
+        ],
+      },
+    },
+  });
+
+  return {
+    admin: adminRole as RoleRow,
+    member: memberRole as RoleRow,
+    viewer: viewerRole as RoleRow,
+  };
+}
+
 export function closePrisma(): void {
   if (prismaInstance) {
     prismaInstance

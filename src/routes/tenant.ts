@@ -1,7 +1,10 @@
 import { NextFunction, Response, Router } from 'express';
 import * as Joi from 'joi';
-import { AuthenticatedRequest, authMiddleware } from '../middleware/auth';
+import { AuthenticatedRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
+import { authenticateSSO } from '../middleware/ssoAuth';
+import { requireSystemAdmin } from '../middleware/ssoSystemAdmin';
+import { requireTenantAdmin, requireTenantMember } from '../middleware/tenantAuth';
 import { TenantService_Instance } from '../services/tenant';
 
 const router = Router();
@@ -11,7 +14,11 @@ const router = Router();
  */
 const createTenantSchema = Joi.object({
   name: Joi.string().required().min(3).max(100),
-  slug: Joi.string().optional().lowercase().pattern(/^[a-z0-9-]+$/),
+  slug: Joi.string()
+    .optional()
+    .lowercase()
+    .pattern(/^[a-z0-9-]+$/),
+  tenantAdminEmail: Joi.string().required().email(),
 });
 
 const inviteMemberSchema = Joi.object({
@@ -25,11 +32,14 @@ const updateMemberSchema = Joi.object({
 
 /**
  * POST /api/v1/tenant
- * Create a new tenant
+ * Create a new tenant (System Admin only)
+ * Requires: SSO session + System Admin role
+ * Tenant admin email is mandatory
  */
 router.post(
   '/',
-  authMiddleware,
+  authenticateSSO,
+  requireSystemAdmin,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { error, value } = createTenantSchema.validate(req.body);
@@ -57,26 +67,17 @@ router.post(
 /**
  * GET /api/v1/tenant/:tenantId
  * Get tenant details
+ * Requires: SSO session + Member of tenant
  */
 router.get(
   '/:tenantId',
-  authMiddleware,
+  authenticateSSO,
+  requireTenantMember,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { tenantId } = req.params;
-      const userId = req.user?.userId;
-
-      if (!userId) {
-        throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
-      }
 
       const tenant = await TenantService_Instance.getTenantById(tenantId);
-
-      // Verify user is member of tenant
-      const isMember = tenant.members.some((m: any) => m.userId === userId);
-      if (!isMember) {
-        throw new AppError(403, 'Tenant access denied', 'FORBIDDEN');
-      }
 
       res.json({
         success: true,
@@ -98,10 +99,12 @@ router.get(
 /**
  * GET /api/v1/tenant
  * Get all tenants for current user
+ * System admins see all tenants, regular users see only their tenants
+ * Requires: SSO session
  */
 router.get(
   '/',
-  authMiddleware,
+  authenticateSSO,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = req.user?.userId;
@@ -125,11 +128,13 @@ router.get(
 
 /**
  * POST /api/v1/tenant/:tenantId/members
- * Invite user to tenant
+ * Invite user to tenant (Tenant Admin only)
+ * Requires: SSO session + Admin role in tenant
  */
 router.post(
   '/:tenantId/members',
-  authMiddleware,
+  authenticateSSO,
+  requireTenantAdmin,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { error, value } = inviteMemberSchema.validate(req.body);
@@ -158,26 +163,16 @@ router.post(
 
 /**
  * GET /api/v1/tenant/:tenantId/members
- * Get tenant members
+ * Get all members of a tenant
+ * Requires: SSO session + Member of tenant
  */
 router.get(
   '/:tenantId/members',
-  authMiddleware,
+  authenticateSSO,
+  requireTenantMember,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { tenantId } = req.params;
-      const userId = req.user?.userId;
-
-      if (!userId) {
-        throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
-      }
-
-      // Verify user is member
-      const tenant = await TenantService_Instance.getTenantById(tenantId);
-      const isMember = (tenant.members as any[]).some((m: any) => m.userId === userId);
-      if (!isMember) {
-        throw new AppError(403, 'Tenant access denied', 'FORBIDDEN');
-      }
 
       const members = await TenantService_Instance.getTenantMembers(tenantId);
 
@@ -194,11 +189,13 @@ router.get(
 
 /**
  * PUT /api/v1/tenant/:tenantId/members/:memberId
- * Update member role
+ * Update member role (Tenant Admin only)
+ * Requires: SSO session + Admin role in tenant
  */
 router.put(
   '/:tenantId/members/:memberId',
-  authMiddleware,
+  authenticateSSO,
+  requireTenantAdmin,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { error, value } = updateMemberSchema.validate(req.body);
@@ -232,11 +229,13 @@ router.put(
 
 /**
  * DELETE /api/v1/tenant/:tenantId/members/:memberId
- * Remove member from tenant
+ * Remove member from tenant (Tenant Admin only)
+ * Requires: SSO session + Admin role in tenant
  */
 router.delete(
   '/:tenantId/members/:memberId',
-  authMiddleware,
+  authenticateSSO,
+  requireTenantAdmin,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { tenantId, memberId } = req.params;
@@ -257,25 +256,33 @@ router.delete(
     }
   }
 );
+/**
+ * PUT /api/v1/tenant/:tenantId
+ * Update tenant details (Tenant Admin only)
+ * Requires: SSO session + Admin role in tenant
+ */
+router.put(
+  '/:tenantId',
+  authenticateSSO,
+  requireTenantAdmin,
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { tenantId } = req.params;
+      const { displayName } = req.body;
 
-// PUT /api/v1/tenant/:tenantId
-router.put('/:tenantId', authMiddleware, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-  try {
-    const { tenantId } = req.params;
-    const { displayName } = req.body;
-
-    // TODO: Implement update tenant logic
-    res.json({
-      success: true,
-      message: 'Tenant updated successfully',
-      tenant: {
-        tenantId,
-        displayName,
-      },
-    });
-  } catch (error) {
-    next(error);
+      // TODO: Implement update tenant logic
+      res.json({
+        success: true,
+        message: 'Tenant updated successfully',
+        tenant: {
+          tenantId,
+          displayName,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 export default router;

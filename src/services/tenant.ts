@@ -1,6 +1,27 @@
 import { CreateTenantInput, InviteTenantMemberInput } from '../core/dtos';
+import { createDefaultRoles } from '../repositories/roleRepo.prisma';
+import {
+  addTenantMember,
+  createTenant as createTenantRepo,
+  findTenantByIdWithRelations,
+  findTenantByName,
+  findTenantBySlug,
+  findTenantMember,
+  listTenantMembers,
+  listUserTenants,
+  removeTenantMember,
+  updateTenantMemberRole,
+} from '../repositories/tenantRepo.prisma';
+import { createUser as createUserInRepo, findUserByEmail } from '../repositories/userRepo.prisma';
+import { generateSlug, generateTempPassword } from '../utils/helpers';
 import { logger } from '../utils/logger';
-import { getPrismaClient } from './prisma';
+
+/**
+ * Extended CreateTenantInput with required tenant admin
+ */
+export interface CreateTenantWithAdminInput extends CreateTenantInput {
+  tenantAdminEmail: string;
+}
 
 /**
  * Tenant Service
@@ -19,51 +40,84 @@ export class TenantService {
   }
 
   /**
-   * Create a new tenant
+   * Create a new tenant with mandatory tenant admin
+   * System admin creates tenant and assigns a tenant admin
    */
-  async createTenant(input: CreateTenantInput, createdByUserId: string) {
+  async createTenant(
+    input: CreateTenantWithAdminInput,
+    createdByUserId: string
+  ): Promise<{
+    id: string;
+    name: string;
+    slug: string;
+    tenantAdmin: {
+      userId: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+    };
+  }> {
     try {
-      const prisma = getPrismaClient();
+      const { tenantAdminEmail, ...tenantData } = input;
 
-      // Generate slug if not provided
-      const slug = input.slug || input.name.toLowerCase().replace(/\s+/g, '-');
-
-      // Create tenant
-      const tenant = await prisma.tenant.create({
-        data: {
-          name: input.name,
-          slug,
-        },
-      });
-
-      logger.info(`Tenant created: ${tenant.name} (${tenant.id})`);
-
-      // Create default roles for tenant
-      const roles = await this.createDefaultRoles(tenant.id);
-
-      logger.info(`Default roles created for tenant ${tenant.id}: admin, member, viewer`);
-
-      // Add creator as admin
-      const adminRole = roles.find((r) => r.name === 'admin');
-      if (!adminRole) {
-        throw new Error('Admin role not created');
+      // Check if tenant name or slug already exists
+      const existingByName = await findTenantByName(tenantData.name);
+      if (existingByName) {
+        throw new Error(`Tenant with name "${tenantData.name}" already exists`);
       }
 
-      await prisma.tenantMember.create({
-        data: {
-          tenantId: tenant.id,
-          userId: createdByUserId,
-          role: 'admin',
-        },
+      const slug = tenantData.slug || generateSlug(tenantData.name);
+      const existingBySlug = await findTenantBySlug(slug);
+      if (existingBySlug) {
+        throw new Error(`Tenant with slug "${slug}" already exists`);
+      }
+
+      // Find tenant admin user - must exist and be active
+      const tenantAdmin = await findUserByEmail(tenantAdminEmail);
+
+      if (!tenantAdmin) {
+        throw new Error(
+          `User with email "${tenantAdminEmail}" not found. Please ensure the user exists before creating the tenant.`
+        );
+      }
+
+      if (tenantAdmin.userStatus !== 'active') {
+        throw new Error(
+          `User "${tenantAdminEmail}" is not active. Only active users can be assigned as tenant admins.`
+        );
+      }
+
+      // Create tenant
+      const tenant = await createTenantRepo({
+        name: tenantData.name,
+        slug,
       });
 
-      logger.info(`User ${createdByUserId} added as admin to tenant ${tenant.id}`);
+      logger.info(`Tenant created: ${tenant.name} (${tenant.id}) by user ${createdByUserId}`);
+
+      // Create default roles with permissions
+      await createDefaultRoles(tenant.id);
+      logger.info(`Default roles created for tenant ${tenant.id}`);
+
+      // Add tenant admin as member with admin role
+      await addTenantMember({
+        tenantId: tenant.id,
+        userId: tenantAdmin.id,
+        role: 'admin',
+      });
+
+      logger.info(`User ${tenantAdmin.email} assigned as admin of tenant ${tenant.id}`);
 
       return {
         id: tenant.id,
         name: tenant.name,
         slug: tenant.slug,
-        createdAt: tenant.createdAt,
+        tenantAdmin: {
+          userId: tenantAdmin.id,
+          email: tenantAdmin.email,
+          firstName: tenantAdmin.firstName,
+          lastName: tenantAdmin.lastName,
+        },
       };
     } catch (error) {
       logger.error('Failed to create tenant:', error);
@@ -72,19 +126,11 @@ export class TenantService {
   }
 
   /**
-   * Get tenant by ID
+   * Get tenant by ID with members and roles
    */
   async getTenantById(tenantId: string) {
     try {
-      const prisma = getPrismaClient();
-
-      const tenant = await prisma.tenant.findUnique({
-        where: { id: tenantId },
-        include: {
-          members: true,
-          roles: true,
-        },
-      });
+      const tenant = await findTenantByIdWithRelations(tenantId);
 
       if (!tenant) {
         throw new Error(`Tenant ${tenantId} not found`);
@@ -102,21 +148,7 @@ export class TenantService {
    */
   async getUserTenants(userId: string) {
     try {
-      const prisma = getPrismaClient();
-
-      const tenants = await prisma.tenant.findMany({
-        where: {
-          members: {
-            some: { userId },
-          },
-        },
-        include: {
-          members: {
-            where: { userId },
-            select: { role: true },
-          },
-        },
-      });
+      const tenants = await listUserTenants(userId);
 
       return tenants.map((t: any) => ({
         id: t.id,
@@ -133,6 +165,7 @@ export class TenantService {
 
   /**
    * Invite user to tenant
+   * Only tenant admins can invite
    */
   async inviteTenantMember(
     tenantId: string,
@@ -140,57 +173,42 @@ export class TenantService {
     input: InviteTenantMemberInput
   ) {
     try {
-      const prisma = getPrismaClient();
-
       // Verify inviter is admin
-      const inviterMembership = await prisma.tenantMember.findUnique({
-        where: {
-          tenantId_userId: { tenantId, userId: invitedByUserId },
-        },
-      });
+      const inviterMembership = await findTenantMember(tenantId, invitedByUserId);
 
       if (!inviterMembership || inviterMembership.role !== 'admin') {
         throw new Error('Only admins can invite members');
       }
 
       // Get or create user with email
-      let user = await prisma.user.findUnique({
-        where: { email: input.email },
-      });
+      let user = await findUserByEmail(input.email);
 
       if (!user) {
-        user = await prisma.user.create({
-          data: {
-            email: input.email,
-            passwordHash: '', // User must signup to set password
-            lastName: '',
-            secondLastName: '',
-            phone: '',
-            firstName: '',
-            nuid: '',
-          },
+        const tempPassword = generateTempPassword();
+        user = await createUserInRepo({
+          email: input.email,
+          password: tempPassword,
+          firstName: '',
+          lastName: '',
+          phone: '0000000000',
+          nuid: `INVITE-${Date.now()}`,
         });
-        logger.info(`New user created: ${input.email}`);
+        logger.info(`New user created for invite: ${input.email}`);
+        // TODO: Send email with temporary password
       }
 
       // Check if already member
-      const existing = await prisma.tenantMember.findUnique({
-        where: {
-          tenantId_userId: { tenantId, userId: user.id },
-        },
-      });
+      const existing = await findTenantMember(tenantId, user.id);
 
       if (existing) {
         throw new Error(`User ${input.email} is already a member of this tenant`);
       }
 
       // Add to tenant
-      await prisma.tenantMember.create({
-        data: {
-          tenantId,
-          userId: user.id,
-          role: input.role,
-        },
+      await addTenantMember({
+        tenantId,
+        userId: user.id,
+        role: input.role,
       });
 
       logger.info(`User ${input.email} invited to tenant ${tenantId} as ${input.role}`);
@@ -209,6 +227,7 @@ export class TenantService {
 
   /**
    * Update member role
+   * Only admins can update roles, cannot remove last admin
    */
   async updateMemberRole(
     tenantId: string,
@@ -217,25 +236,15 @@ export class TenantService {
     newRole: 'admin' | 'member' | 'viewer'
   ) {
     try {
-      const prisma = getPrismaClient();
-
       // Verify updater is admin
-      const updaterMembership = await prisma.tenantMember.findUnique({
-        where: {
-          tenantId_userId: { tenantId, userId: updatedByUserId },
-        },
-      });
+      const updaterMembership = await findTenantMember(tenantId, updatedByUserId);
 
       if (!updaterMembership || updaterMembership.role !== 'admin') {
         throw new Error('Only admins can update member roles');
       }
 
       // Verify target is member of tenant
-      const member = await prisma.tenantMember.findUnique({
-        where: {
-          tenantId_userId: { tenantId, userId: targetUserId },
-        },
-      });
+      const member = await findTenantMember(tenantId, targetUserId);
 
       if (!member) {
         throw new Error('User is not a member of this tenant');
@@ -243,9 +252,8 @@ export class TenantService {
 
       // Prevent removing last admin
       if (member.role === 'admin' && newRole !== 'admin') {
-        const adminCount = await prisma.tenantMember.count({
-          where: { tenantId, role: 'admin' },
-        });
+        const members = await listTenantMembers(tenantId);
+        const adminCount = members.filter((m: any) => m.role === 'admin').length;
 
         if (adminCount === 1) {
           throw new Error('Cannot remove the last admin from tenant');
@@ -253,12 +261,7 @@ export class TenantService {
       }
 
       // Update role
-      await prisma.tenantMember.update({
-        where: {
-          tenantId_userId: { tenantId, userId: targetUserId },
-        },
-        data: { role: newRole },
-      });
+      await updateTenantMemberRole(tenantId, targetUserId, newRole);
 
       logger.info(`Member ${targetUserId} role updated to ${newRole} in tenant ${tenantId}`);
 
@@ -271,28 +274,19 @@ export class TenantService {
 
   /**
    * Remove member from tenant
+   * Only admins can remove, cannot remove last admin
    */
   async removeMember(tenantId: string, removedByUserId: string, targetUserId: string) {
     try {
-      const prisma = getPrismaClient();
-
       // Verify remover is admin
-      const removerMembership = await prisma.tenantMember.findUnique({
-        where: {
-          tenantId_userId: { tenantId, userId: removedByUserId },
-        },
-      });
+      const removerMembership = await findTenantMember(tenantId, removedByUserId);
 
       if (!removerMembership || removerMembership.role !== 'admin') {
         throw new Error('Only admins can remove members');
       }
 
       // Get member to remove
-      const member = await prisma.tenantMember.findUnique({
-        where: {
-          tenantId_userId: { tenantId, userId: targetUserId },
-        },
-      });
+      const member = await findTenantMember(tenantId, targetUserId);
 
       if (!member) {
         throw new Error('User is not a member of this tenant');
@@ -300,9 +294,8 @@ export class TenantService {
 
       // Prevent removing last admin
       if (member.role === 'admin') {
-        const adminCount = await prisma.tenantMember.count({
-          where: { tenantId, role: 'admin' },
-        });
+        const members = await listTenantMembers(tenantId);
+        const adminCount = members.filter((m: any) => m.role === 'admin').length;
 
         if (adminCount === 1) {
           throw new Error('Cannot remove the last admin from tenant');
@@ -310,11 +303,7 @@ export class TenantService {
       }
 
       // Remove
-      await prisma.tenantMember.delete({
-        where: {
-          tenantId_userId: { tenantId, userId: targetUserId },
-        },
-      });
+      await removeTenantMember(tenantId, targetUserId);
 
       logger.info(`User ${targetUserId} removed from tenant ${tenantId}`);
 
@@ -330,22 +319,7 @@ export class TenantService {
    */
   async getTenantMembers(tenantId: string) {
     try {
-      const prisma = getPrismaClient();
-
-      const members = await prisma.tenantMember.findMany({
-        where: { tenantId },
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+      const members = await listTenantMembers(tenantId);
 
       return members.map((m: any) => ({
         userId: m.user.id,
@@ -358,128 +332,6 @@ export class TenantService {
     } catch (error) {
       logger.error(`Failed to get tenant members for ${tenantId}:`, error);
       throw error;
-    }
-  }
-
-  /**
-   * Create default roles for tenant
-   */
-  private async createDefaultRoles(tenantId: string) {
-    try {
-      const prisma = getPrismaClient();
-
-      // Define default roles and permissions
-      const rolesConfig = {
-        admin: [
-          { resource: 'users', action: 'read' },
-          { resource: 'users', action: 'write' },
-          { resource: 'users', action: 'delete' },
-          { resource: 'billing', action: 'read' },
-          { resource: 'billing', action: 'write' },
-          { resource: 'settings', action: 'read' },
-          { resource: 'settings', action: 'write' },
-        ],
-        member: [
-          { resource: 'users', action: 'read' },
-          { resource: 'profile', action: 'read' },
-          { resource: 'profile', action: 'write' },
-          { resource: 'billing', action: 'read' },
-        ],
-        viewer: [
-          { resource: 'users', action: 'read' },
-          { resource: 'billing', action: 'read' },
-        ],
-      };
-
-      const roles = [];
-
-      for (const [roleName, permissions] of Object.entries(rolesConfig)) {
-        const role = await prisma.role.create({
-          data: {
-            tenantId,
-            name: roleName,
-            permissions: {
-              createMany: {
-                data: permissions,
-              },
-            },
-          },
-          include: { permissions: true },
-        });
-
-        roles.push(role);
-      }
-
-      return roles;
-    } catch (error) {
-      logger.error('Failed to create default roles:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get tenant roles with permissions
-   */
-  async getTenantRoles(tenantId: string) {
-    try {
-      const prisma = getPrismaClient();
-
-      const roles = await prisma.role.findMany({
-        where: { tenantId },
-        include: { permissions: true },
-        orderBy: { name: 'asc' },
-      });
-
-      return roles.map((r: any) => ({
-        id: r.id,
-        name: r.name,
-        permissions: r.permissions.map((p: any) => `${p.resource}:${p.action}`),
-      }));
-    } catch (error) {
-      logger.error(`Failed to get tenant roles for ${tenantId}:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Check if user has permission in tenant
-   */
-  async hasPermission(
-    tenantId: string,
-    userId: string,
-    resource: string,
-    action: string
-  ): Promise<boolean> {
-    try {
-      const prisma = getPrismaClient();
-
-      // Get user's role in tenant
-      const membership = await prisma.tenantMember.findUnique({
-        where: {
-          tenantId_userId: { tenantId, userId },
-        },
-      });
-
-      if (!membership) {
-        return false;
-      }
-
-      // Check if role has permission
-      const permission = await prisma.permission.findFirst({
-        where: {
-          resource,
-          action,
-          role: {
-            tenantId,
-            name: membership.role,
-          },
-        },
-      });
-
-      return !!permission;
-    } catch (error) {
-      logger.error(`Failed to check permission: ${resource}:${action}`, error);
-      return false;
     }
   }
 }

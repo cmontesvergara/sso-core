@@ -60,6 +60,23 @@ export async function findTenantById(id: string): Promise<TenantRow | null> {
 }
 
 /**
+ * Find tenant by ID with members and roles
+ */
+export async function findTenantByIdWithRelations(id: string) {
+  const prisma = getPrisma();
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { id },
+    include: {
+      members: true,
+      roles: true,
+    },
+  });
+
+  return tenant;
+}
+
+/**
  * Find tenant by slug
  */
 export async function findTenantBySlug(slug: string): Promise<TenantRow | null> {
