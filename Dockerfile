@@ -1,6 +1,9 @@
 # Stage 1: Build
 FROM node:22-alpine AS builder
 
+# Build argument to bust cache
+ARG CACHEBUST=1
+
 WORKDIR /app
 
 # Install OpenSSL for Prisma
