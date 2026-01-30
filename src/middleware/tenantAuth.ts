@@ -26,6 +26,12 @@ export async function requireTenantAdmin(
       throw new AppError(400, 'Tenant ID is required', 'MISSING_TENANT_ID');
     }
 
+    // System/Super admins have full access to all tenants
+    const systemRole = req.ssoUser.systemRole;
+    if (systemRole === 'super_admin' || systemRole === 'system_admin') {
+      return next();
+    }
+
     // Check if user is member of the tenant
     const membership = await findTenantMember(tenantId, req.ssoUser.userId);
 
@@ -65,6 +71,12 @@ export async function requireTenantMember(
 
     if (!tenantId) {
       throw new AppError(400, 'Tenant ID is required', 'MISSING_TENANT_ID');
+    }
+
+    // System/Super admins have full access to all tenants
+    const systemRole = req.ssoUser.systemRole;
+    if (systemRole === 'super_admin' || systemRole === 'system_admin') {
+      return next();
     }
 
     // Check if user is member of the tenant
