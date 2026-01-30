@@ -20,6 +20,7 @@ export interface TenantRow {
   name: string;
   slug: string;
   createdAt: Date;
+  memberCount?: number;
 }
 
 export interface TenantMemberRow {
@@ -62,7 +63,9 @@ export async function findTenantById(id: string): Promise<TenantRow | null> {
 /**
  * Find tenant by ID with members and roles
  */
-export async function findTenantByIdWithRelations(id: string) {
+export async function findTenantByIdWithRelations(
+  id: string
+): Promise<(TenantRow & { members: unknown[]; roles: unknown[] }) | null> {
   const prisma = getPrisma();
 
   const tenant = await prisma.tenant.findUnique({
@@ -112,10 +115,21 @@ export async function listTenants(params?: { skip?: number; take?: number }): Pr
   const tenants = await prisma.tenant.findMany({
     skip,
     take,
+    include: {
+      members: {
+        select: { id: true },
+      },
+    },
     orderBy: { createdAt: 'desc' },
   });
 
-  return tenants as TenantRow[];
+  return tenants.map((t) => ({
+    id: t.id,
+    name: t.name,
+    slug: t.slug,
+    createdAt: t.createdAt,
+    memberCount: t.members.length,
+  })) as TenantRow[];
 }
 
 /**
@@ -192,7 +206,17 @@ export async function findTenantMember(
 /**
  * List members of a tenant
  */
-export async function listTenantMembers(tenantId: string) {
+export async function listTenantMembers(tenantId: string): Promise<
+  (TenantMemberRow & {
+    user: {
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      userStatus: string;
+    };
+  })[]
+> {
   const prisma = getPrisma();
 
   const members = await prisma.tenantMember.findMany({
@@ -222,12 +246,25 @@ export async function listUserTenants(userId: string): Promise<(TenantRow & { ro
 
   const memberships = await prisma.tenantMember.findMany({
     where: { userId },
-    include: { tenant: true },
+    include: {
+      tenant: {
+        include: {
+          members: {
+            select: { id: true },
+          },
+        },
+      },
+    },
   });
 
-  return memberships.map((m: any) => ({ ...m.tenant, role: m.role })) as (TenantRow & {
-    role: string;
-  })[];
+  return memberships.map((m) => ({
+    id: m.tenant.id,
+    name: m.tenant.name,
+    slug: m.tenant.slug,
+    createdAt: m.tenant.createdAt,
+    memberCount: m.tenant.members.length,
+    role: m.role,
+  })) as (TenantRow & { role: string })[];
 }
 
 /**

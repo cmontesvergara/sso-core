@@ -158,6 +158,7 @@ export class TenantService {
           name: t.name,
           slug: t.slug,
           role: undefined, // Admins don't have a role as they're not members
+          memberCount: t.memberCount || 0,
           createdAt: t.createdAt,
         }));
       }
@@ -169,7 +170,8 @@ export class TenantService {
         id: t.id,
         name: t.name,
         slug: t.slug,
-        role: t.members[0]?.role,
+        role: t.role,
+        memberCount: t.memberCount || 0,
         createdAt: t.createdAt,
       }));
     } catch (error) {
