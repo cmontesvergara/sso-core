@@ -286,4 +286,68 @@ router.put(
   }
 );
 
+/**
+ * GET /api/v1/tenant/:tenantId/apps
+ * Get all apps assigned to a tenant
+ * Requires: SSO session + Member of tenant
+ */
+router.get(
+  '/:tenantId/apps',
+  authenticateSSO,
+  requireTenantMember,
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { tenantId } = req.params;
+      const { TenantAppService } = await import('../services/tenantApp');
+      const apps = await TenantAppService.getTenantApps(tenantId);
+      res.json({ success: true, applications: apps.map((a) => a.application) });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/v1/tenant/:tenantId/apps
+ * Assign an app to a tenant (System Admin only)
+ * Requires: SSO session + System Admin role
+ */
+router.post(
+  '/:tenantId/apps',
+  authenticateSSO,
+  requireSystemAdmin,
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { tenantId } = req.params;
+      const { applicationId } = req.body;
+      const { TenantAppService } = await import('../services/tenantApp');
+      await TenantAppService.addAppToTenant(tenantId, applicationId);
+      res.status(201).json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * DELETE /api/v1/tenant/:tenantId/apps/:applicationId
+ * Remove an app from a tenant (System Admin only)
+ * Requires: SSO session + System Admin role
+ */
+router.delete(
+  '/:tenantId/apps/:applicationId',
+  authenticateSSO,
+  requireSystemAdmin,
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { tenantId, applicationId } = req.params;
+      const { TenantAppService } = await import('../services/tenantApp');
+      await TenantAppService.removeAppFromTenant(tenantId, applicationId);
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export default router;
