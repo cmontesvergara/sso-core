@@ -75,12 +75,13 @@ router.get(
     try {
       const { tenantId } = req.params;
       const userId = req.ssoUser?.userId;
+      const systemRole = req.ssoUser?.systemRole;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
 
-      const roles = await RoleService_Instance.getTenantRoles(tenantId, userId);
+      const roles = await RoleService_Instance.getTenantRoles(tenantId, userId, systemRole);
 
       res.json({
         success: true,

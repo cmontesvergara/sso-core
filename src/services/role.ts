@@ -1,14 +1,14 @@
 import {
-    createPermission,
-    createRole,
-    deletePermission,
-    deletePermissionByRoleResourceAction,
-    deleteRole,
-    findRoleById,
-    findRoleByTenantAndName,
-    listPermissionsByRole,
-    listRolesByTenant,
-    updateRole,
+  createPermission,
+  createRole,
+  deletePermission,
+  deletePermissionByRoleResourceAction,
+  deleteRole,
+  findRoleById,
+  findRoleByTenantAndName,
+  listPermissionsByRole,
+  listRolesByTenant,
+  updateRole,
 } from '../repositories/roleRepo.prisma';
 import { findTenantById, findTenantMember } from '../repositories/tenantRepo.prisma';
 import { logger } from '../utils/logger';
@@ -36,7 +36,7 @@ export interface CreatePermissionInput {
 export class RoleService {
   private static instance: RoleService;
 
-  private constructor() {}
+  private constructor() { }
 
   static getInstance(): RoleService {
     if (!RoleService.instance) {
@@ -155,7 +155,8 @@ export class RoleService {
    */
   async getTenantRoles(
     tenantId: string,
-    userId: string
+    userId: string,
+    systemRole?: string
   ): Promise<
     Array<{
       id: string;
@@ -165,10 +166,15 @@ export class RoleService {
     }>
   > {
     try {
-      // Verify user is member of the tenant
-      const membership = await findTenantMember(tenantId, userId);
-      if (!membership) {
-        throw new Error('User is not a member of this tenant');
+      // Super Admin and System Admin can access all tenants
+      const isSystemAdmin = systemRole === 'super_admin' || systemRole === 'system_admin';
+
+      if (!isSystemAdmin) {
+        // Regular users must be members of the tenant
+        const membership = await findTenantMember(tenantId, userId);
+        if (!membership) {
+          throw new Error('User is not a member of this tenant');
+        }
       }
 
       const roles = await listRolesByTenant(tenantId);
