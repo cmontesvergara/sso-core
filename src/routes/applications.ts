@@ -1,32 +1,32 @@
-import { NextFunction, Response, Router } from 'express';
+import { NextFunction, Request, Response, Router } from 'express';
 import Joi from 'joi';
 import { AuthenticatedRequest, authMiddleware } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { authenticateSSO } from '../middleware/ssoAuth';
 import { requireSuperAdmin, requireSystemAdmin } from '../middleware/ssoSystemAdmin';
 import {
-    appIdExists,
-    createApplication,
-    findApplicationById,
-    listApplications,
-    softDeleteApplication,
-    updateApplication,
+  appIdExists,
+  createApplication,
+  findApplicationById,
+  listApplications,
+  softDeleteApplication,
+  updateApplication,
 } from '../repositories/applicationRepo.prisma';
 import {
-    enableAppForTenant,
-    findTenantApp,
-    listTenantApps,
-    removeAppFromTenant,
+  enableAppForTenant,
+  findTenantApp,
+  listTenantApps,
+  removeAppFromTenant,
 } from '../repositories/tenantAppRepo.prisma';
 import { findTenantMember } from '../repositories/tenantRepo.prisma';
 import {
-    grantBulkAppAccess,
-    grantUserAppAccess,
-    listUserAppsInTenant,
-    listUsersWithAppAccess,
-    revokeAllAccessToAppInTenant,
-    revokeUserAppAccess,
-    userHasAppAccess,
+  grantBulkAppAccess,
+  grantUserAppAccess,
+  listUserAppsInTenant,
+  listUsersWithAppAccess,
+  revokeAllAccessToAppInTenant,
+  revokeUserAppAccess,
+  userHasAppAccess,
 } from '../repositories/userAppAccessRepo.prisma';
 
 const router = Router();
@@ -370,15 +370,15 @@ router.delete(
 /**
  * POST /api/v1/applications/tenant/:tenantId/:applicationId/grant
  * Grant a user access to an application in a tenant
- * Requires: Auth token + Admin role in tenant
+ * Requires: SSO session + Admin role in tenant
  */
 router.post(
   '/tenant/:tenantId/:applicationId/grant',
-  authMiddleware,
-  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  authenticateSSO,
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { tenantId, applicationId } = req.params;
-      const userId = req.user?.userId;
+      const userId = req.ssoUser?.userId;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
@@ -437,15 +437,15 @@ router.post(
 /**
  * POST /api/v1/applications/tenant/:tenantId/:applicationId/grant-bulk
  * Grant multiple users access to an application in a tenant
- * Requires: Auth token + Admin role in tenant
+ * Requires: SSO session + Admin role in tenant
  */
 router.post(
   '/tenant/:tenantId/:applicationId/grant-bulk',
-  authMiddleware,
-  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  authenticateSSO,
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { tenantId, applicationId } = req.params;
-      const userId = req.user?.userId;
+      const userId = req.ssoUser?.userId;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
@@ -492,15 +492,15 @@ router.post(
 /**
  * DELETE /api/v1/applications/tenant/:tenantId/:applicationId/revoke/:userId
  * Revoke a user's access to an application in a tenant
- * Requires: Auth token + Admin role in tenant
+ * Requires: SSO session + Admin role in tenant
  */
 router.delete(
   '/tenant/:tenantId/:applicationId/revoke/:userId',
-  authMiddleware,
-  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  authenticateSSO,
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { tenantId, applicationId, userId: targetUserId } = req.params;
-      const userId = req.user?.userId;
+      const userId = req.ssoUser?.userId;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
@@ -527,15 +527,15 @@ router.delete(
 /**
  * GET /api/v1/applications/tenant/:tenantId/:applicationId/users
  * List all users with access to an application in a tenant
- * Requires: Auth token + Admin role in tenant
+ * Requires: SSO session + Admin role in tenant
  */
 router.get(
   '/tenant/:tenantId/:applicationId/users',
-  authMiddleware,
-  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  authenticateSSO,
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { tenantId, applicationId } = req.params;
-      const userId = req.user?.userId;
+      const userId = req.ssoUser?.userId;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
