@@ -298,10 +298,16 @@ router.get(
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
 
-      // Verify user is member of tenant
-      const member = await findTenantMember(tenantId, userId);
-      if (!member) {
-        throw new AppError(403, 'Access denied to tenant', 'FORBIDDEN');
+      // Super Admin and System Admin can view any tenant's apps
+      const systemRole = req.ssoUser?.systemRole;
+      const isSystemAdmin = systemRole === 'super_admin' || systemRole === 'system_admin';
+
+      if (!isSystemAdmin) {
+        // Regular users must be members of tenant
+        const member = await findTenantMember(tenantId, userId);
+        if (!member) {
+          throw new AppError(403, 'Access denied to tenant', 'FORBIDDEN');
+        }
       }
 
       const tenantApps = await listTenantApps(tenantId, true);
