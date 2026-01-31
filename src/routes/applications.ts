@@ -284,15 +284,15 @@ router.post(
 /**
  * GET /api/v1/applications/tenant/:tenantId
  * List all applications enabled for a tenant
- * Requires: Auth token + Member in tenant
+ * Requires: SSO session + Member in tenant
  */
 router.get(
   '/tenant/:tenantId',
-  authMiddleware,
-  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  authenticateSSO,
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { tenantId } = req.params;
-      const userId = req.user?.userId;
+      const userId = req.ssoUser?.userId;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
