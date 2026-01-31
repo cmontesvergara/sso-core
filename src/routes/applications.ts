@@ -384,10 +384,16 @@ router.post(
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
 
-      // Verify user is admin in tenant
-      const member = await findTenantMember(tenantId, userId);
-      if (!member || member.role !== 'admin') {
-        throw new AppError(403, 'Only tenant admins can grant app access', 'FORBIDDEN');
+      // Super Admin and System Admin can grant access in any tenant
+      const systemRole = req.ssoUser?.systemRole;
+      const isSystemAdmin = systemRole === 'super_admin' || systemRole === 'system_admin';
+
+      if (!isSystemAdmin) {
+        // Regular users must be admin in tenant
+        const member = await findTenantMember(tenantId, userId);
+        if (!member || member.role !== 'admin') {
+          throw new AppError(403, 'Only tenant admins can grant app access', 'FORBIDDEN');
+        }
       }
 
       const { error, value } = grantAccessSchema.validate(req.body);
@@ -451,10 +457,16 @@ router.post(
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
 
-      // Verify user is admin in tenant
-      const member = await findTenantMember(tenantId, userId);
-      if (!member || member.role !== 'admin') {
-        throw new AppError(403, 'Only tenant admins can grant app access', 'FORBIDDEN');
+      // Super Admin and System Admin can grant access in any tenant
+      const systemRole = req.ssoUser?.systemRole;
+      const isSystemAdmin = systemRole === 'super_admin' || systemRole === 'system_admin';
+
+      if (!isSystemAdmin) {
+        // Regular users must be admin in tenant
+        const member = await findTenantMember(tenantId, userId);
+        if (!member || member.role !== 'admin') {
+          throw new AppError(403, 'Only tenant admins can grant app access', 'FORBIDDEN');
+        }
       }
 
       const { error, value } = grantBulkAccessSchema.validate(req.body);
@@ -506,10 +518,16 @@ router.delete(
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
 
-      // Verify user is admin in tenant
-      const member = await findTenantMember(tenantId, userId);
-      if (!member || member.role !== 'admin') {
-        throw new AppError(403, 'Only tenant admins can revoke app access', 'FORBIDDEN');
+      // Super Admin and System Admin can revoke access in any tenant
+      const systemRole = req.ssoUser?.systemRole;
+      const isSystemAdmin = systemRole === 'super_admin' || systemRole === 'system_admin';
+
+      if (!isSystemAdmin) {
+        // Regular users must be admin in tenant
+        const member = await findTenantMember(tenantId, userId);
+        if (!member || member.role !== 'admin') {
+          throw new AppError(403, 'Only tenant admins can revoke app access', 'FORBIDDEN');
+        }
       }
 
       await revokeUserAppAccess(targetUserId, tenantId, applicationId);
@@ -541,10 +559,16 @@ router.get(
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
 
-      // Verify user is admin in tenant
-      const member = await findTenantMember(tenantId, userId);
-      if (!member || member.role !== 'admin') {
-        throw new AppError(403, 'Only tenant admins can view app access', 'FORBIDDEN');
+      // Super Admin and System Admin can view any tenant's app access
+      const systemRole = req.ssoUser?.systemRole;
+      const isSystemAdmin = systemRole === 'super_admin' || systemRole === 'system_admin';
+
+      if (!isSystemAdmin) {
+        // Regular users must be admin in tenant
+        const member = await findTenantMember(tenantId, userId);
+        if (!member || member.role !== 'admin') {
+          throw new AppError(403, 'Only tenant admins can view app access', 'FORBIDDEN');
+        }
       }
 
       const users = await listUsersWithAppAccess(tenantId, applicationId);
