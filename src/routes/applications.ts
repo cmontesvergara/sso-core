@@ -569,10 +569,17 @@ router.get(
       const systemRole = req.ssoUser?.systemRole;
       const isSystemAdmin = systemRole === 'super_admin' || systemRole === 'system_admin';
 
+      // DEBUG LOGGING
+      console.log(`[DEBUG] GET /users - User: ${userId}, SystemRole: ${systemRole}, IsSystemAdmin: ${isSystemAdmin}, Tenant: ${tenantId}, App: ${applicationId}`);
+
       if (!isSystemAdmin) {
         // Regular users must be admin in tenant
         const member = await findTenantMember(tenantId, userId);
+
+        console.log(`[DEBUG] Member Check - Found: ${!!member}, Role: ${member?.role}`);
+
         if (!member || member.role !== 'admin') {
+          console.log(`[DEBUG] Access DENIED - 403`);
           throw new AppError(403, 'Only tenant admins can view app access', 'FORBIDDEN');
         }
       }
