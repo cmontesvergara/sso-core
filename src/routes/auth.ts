@@ -181,6 +181,39 @@ router.post('/signout', signoutLimiter, async (req: Request, res: Response, next
   }
 });
 
+// POST /api/v1/auth/logout (Cookie-based logout)
+router.post('/logout', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const sessionToken = req.cookies['sso_session'];
+
+    if (sessionToken) {
+      // Destroy session in DB
+      try {
+        await SSOSession.destroySession(sessionToken);
+      } catch (err) {
+        // Ignore error if session already gone
+      }
+    }
+
+    // Clear cookie
+    const cookieOptions: any = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    };
+
+    if (process.env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN) {
+      cookieOptions.domain = process.env.COOKIE_DOMAIN;
+    }
+
+    res.clearCookie('sso_session', cookieOptions);
+
+    res.json({ success: true, message: 'Logged out successfully' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // POST /api/v1/auth/refresh
 router.post('/refresh', refreshLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
