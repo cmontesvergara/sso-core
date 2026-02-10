@@ -190,6 +190,7 @@ router.post('/logout', async (req: Request, res: Response, next: NextFunction) =
       // Destroy session in DB
       try {
         await SSOSession.destroySession(sessionToken);
+        req.cookies['sso_session'] = null;
       } catch (err) {
         // Ignore error if session already gone
       }
