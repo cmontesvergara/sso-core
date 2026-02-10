@@ -376,6 +376,11 @@ exports.up = (pgm) => {
       notNull: true,
       comment: 'Base URL of the application',
     },
+    backend_url: {
+      type: 'text',
+      notNull: false,
+      comment: 'Base URL of the backend of the application',
+    },
     description: {
       type: 'text',
       notNull: false,
