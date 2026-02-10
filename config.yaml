@@ -126,7 +126,7 @@ email:
     apikey:
       _mandatory: false
   from:
-    _default: noreply@supertokens.com
+    _default: noreply@bigso.co
 
 # ============================================================
 # CORS Configuration

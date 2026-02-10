@@ -6,7 +6,7 @@ const HOST = process.env.HOST || 'localhost';
 
 async function bootstrap(): Promise<void> {
   try {
-    Logger.info('🚀 Starting SuperTokens Core Server...');
+    Logger.info('🚀 Starting SSO Server...');
 
     const app = await createServer();
 
@@ -14,7 +14,7 @@ async function bootstrap(): Promise<void> {
       Logger.info(`✅ Server is running at http://${HOST}:${PORT}`);
       Logger.info(`📚 API Documentation: http://${HOST}:${PORT}/docs`);
     });
-    
+
 
     // Graceful shutdown
     process.on('SIGTERM', () => {
