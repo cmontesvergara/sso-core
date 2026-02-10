@@ -21,6 +21,7 @@ export interface ApplicationRow {
   url: string;
   description: string | null;
   logoUrl: string | null;
+  backendUrl: string | null;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

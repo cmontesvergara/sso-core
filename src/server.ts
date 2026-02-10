@@ -6,7 +6,6 @@ import helmet from 'helmet';
 import { Config } from './config';
 import { errorHandler } from './middleware/errorHandler';
 import { loggingMiddleware } from './middleware/logging';
-import applicationsRoutes from './routes/applications';
 import appResourceRoutes from './routes/appResource';
 import docsRoutes from './routes/docs';
 import emailVerificationRoutes from './routes/emailVerification';
@@ -15,8 +14,10 @@ import otpRoutes from './routes/otp';
 import roleRoutes from './routes/role';
 import sessionRoutes from './routes/session';
 import tenantRoutes from './routes/tenant';
+import applicationsRoutes from './routes/applications';
 import userRoutes from './routes/user';
 import utilRoutes from './routes/util';
+import applicationSyncRoutes from './routes/applicationSync';
 import { JWT } from './services/jwt';
 import { initPrisma } from './services/prisma';
 import { initSessionSubsystem } from './services/session';
@@ -103,6 +104,7 @@ export async function createServer(): Promise<Express> {
   apiV1.use('/email-verification', emailVerificationRoutes);
   apiV1.use('/metadata', metadataRoutes);
   apiV1.use('/applications', applicationsRoutes);
+  apiV1.use('/applications', applicationSyncRoutes);
   apiV1.use('/util', utilRoutes);
 
   app.use('/api/v1', apiV1);
