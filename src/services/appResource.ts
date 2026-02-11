@@ -1,11 +1,11 @@
 import {
   bulkCreateAppResources,
   findAppResource,
-  findApplicationByAppId,
   findTenantApp,
   listAppResources,
   listResourcesByTenant,
 } from '../repositories/appResourceRepo.prisma';
+import { findApplicationById, findApplicationByAppId } from '../repositories/applicationRepo.prisma';
 import { findTenantById, findTenantMember } from '../repositories/tenantRepo.prisma';
 import { logger } from '../utils/logger';
 
@@ -158,7 +158,7 @@ export class AppResourceService {
    * Used before creating permissions to ensure they reference valid resources
    */
   async validatePermission(
-    appId: string,
+    appIdOrId: string, // Can be appId (slug) or id (UUID)
     resource: string,
     action: string
   ): Promise<{
@@ -167,12 +167,17 @@ export class AppResourceService {
     message?: string;
   }> {
     try {
-      // Find application
-      const application = await findApplicationByAppId(appId);
+      // Find application by ID (UUID) or appId (slug)
+      let application = await findApplicationById(appIdOrId);
+
+      if (!application) {
+        application = await findApplicationByAppId(appIdOrId);
+      }
+
       if (!application) {
         return {
           valid: false,
-          message: `Application with appId "${appId}" not found`,
+          message: `Application with id/appId "${appIdOrId}" not found`,
         };
       }
 
@@ -182,7 +187,7 @@ export class AppResourceService {
       if (!appResource) {
         return {
           valid: false,
-          message: `Resource "${resource}:${action}" is not registered for application "${appId}"`,
+          message: `Resource "${resource}:${action}" is not registered for application "${application.name}"`,
         };
       }
 
