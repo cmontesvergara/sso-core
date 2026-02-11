@@ -106,12 +106,13 @@ router.get(
     try {
       const { roleId } = req.params;
       const userId = req.ssoUser?.userId;
+      const systemRole = req.ssoUser?.systemRole;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
 
-      const role = await RoleService_Instance.getRoleById(roleId, userId);
+      const role = await RoleService_Instance.getRoleById(roleId, userId, systemRole);
 
       res.json({
         success: true,
@@ -122,6 +123,8 @@ router.get(
     }
   }
 );
+
+// ... (PUT and DELETE routes remain unchanged)
 
 /**
  * PUT /api/v1/role/:roleId
@@ -235,12 +238,13 @@ router.get(
     try {
       const { roleId } = req.params;
       const userId = req.ssoUser?.userId;
+      const systemRole = req.ssoUser?.systemRole;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
 
-      const permissions = await RoleService_Instance.getRolePermissions(roleId, userId);
+      const permissions = await RoleService_Instance.getRolePermissions(roleId, userId, systemRole);
 
       res.json({
         success: true,

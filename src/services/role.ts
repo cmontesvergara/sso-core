@@ -100,7 +100,8 @@ export class RoleService {
    */
   async getRoleById(
     roleId: string,
-    userId: string
+    userId: string,
+    systemRole?: string
   ): Promise<{
     id: string;
     tenantId: string;
@@ -120,10 +121,15 @@ export class RoleService {
         throw new Error(`Role ${roleId} not found`);
       }
 
-      // Verify user is member of the tenant
-      const membership = await findTenantMember(role.tenantId, userId);
-      if (!membership) {
-        throw new Error('User is not a member of this tenant');
+      // Super Admin and System Admin can access all tenants
+      const isSystemAdmin = systemRole === 'super_admin' || systemRole === 'system_admin';
+
+      if (!isSystemAdmin) {
+        // Verify user is member of the tenant
+        const membership = await findTenantMember(role.tenantId, userId);
+        if (!membership) {
+          throw new Error('User is not a member of this tenant');
+        }
       }
 
       // Get permissions
@@ -190,6 +196,8 @@ export class RoleService {
       throw error;
     }
   }
+
+  // ... (updateRole, deleteRole, addPermission, removePermission, removePermissionByResourceAction methods remain unchanged for now as they are strictly tenant admin actions)
 
   /**
    * Update a role (tenant admin only)
@@ -442,7 +450,8 @@ export class RoleService {
    */
   async getRolePermissions(
     roleId: string,
-    userId: string
+    userId: string,
+    systemRole?: string
   ): Promise<
     Array<{
       id: string;
@@ -458,10 +467,15 @@ export class RoleService {
         throw new Error(`Role ${roleId} not found`);
       }
 
-      // Verify user is member of the tenant
-      const membership = await findTenantMember(role.tenantId, userId);
-      if (!membership) {
-        throw new Error('User is not a member of this tenant');
+      // Super Admin and System Admin can access all tenants
+      const isSystemAdmin = systemRole === 'super_admin' || systemRole === 'system_admin';
+
+      if (!isSystemAdmin) {
+        // Verify user is member of the tenant
+        const membership = await findTenantMember(role.tenantId, userId);
+        if (!membership) {
+          throw new Error('User is not a member of this tenant');
+        }
       }
 
       const permissions = await listPermissionsByRole(roleId);
