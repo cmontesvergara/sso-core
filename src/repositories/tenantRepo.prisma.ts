@@ -1,19 +1,6 @@
-import { PrismaClient } from '@prisma/client';
-import { Logger } from '../utils/logger';
-
-let prismaInstance: PrismaClient;
-
-function getPrisma(): PrismaClient {
-  if (!prismaInstance) {
-    prismaInstance = new PrismaClient({
-      log:
-        process.env.NODE_ENV === 'development'
-          ? ['query', 'info', 'warn', 'error']
-          : ['warn', 'error'],
-    });
-  }
-  return prismaInstance;
-}
+import { Prisma } from '@prisma/client';
+import { getPrismaClient } from '../services/prisma';
+import { createDefaultRoles } from './roleRepo.prisma';
 
 export interface TenantRow {
   id: string;
@@ -34,8 +21,8 @@ export interface TenantMemberRow {
 /**
  * Create a new tenant
  */
-export async function createTenant(data: { name: string; slug: string }): Promise<TenantRow> {
-  const prisma = getPrisma();
+export async function createTenant(data: { name: string; slug: string }, tx?: Prisma.TransactionClient): Promise<TenantRow> {
+  const prisma = tx || getPrismaClient();
 
   const tenant = await prisma.tenant.create({
     data: {
@@ -48,10 +35,42 @@ export async function createTenant(data: { name: string; slug: string }): Promis
 }
 
 /**
+ * Create a new tenant with initial setup (roles and admin member)
+ * Executes in a transaction
+ */
+export async function createTenantWithRelations(
+  data: { name: string; slug: string },
+  adminUserId: string,
+  ssoAppId: string
+): Promise<TenantRow> {
+  const prisma = getPrismaClient();
+
+  return await prisma.$transaction(async (tx) => {
+    // Create tenant
+    const tenant = await createTenant(data, tx);
+
+    // Create default roles
+    await createDefaultRoles(tenant.id, ssoAppId, tx);
+
+    // Add tenant admin
+    await addTenantMember(
+      {
+        tenantId: tenant.id,
+        userId: adminUserId,
+        role: 'admin',
+      },
+      tx
+    );
+
+    return tenant;
+  });
+}
+
+/**
  * Find tenant by ID
  */
 export async function findTenantById(id: string): Promise<TenantRow | null> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   const tenant = await prisma.tenant.findUnique({
     where: { id },
@@ -66,7 +85,7 @@ export async function findTenantById(id: string): Promise<TenantRow | null> {
 export async function findTenantByIdWithRelations(
   id: string
 ): Promise<(TenantRow & { members: unknown[]; roles: unknown[] }) | null> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   const tenant = await prisma.tenant.findUnique({
     where: { id },
@@ -83,7 +102,7 @@ export async function findTenantByIdWithRelations(
  * Find tenant by slug
  */
 export async function findTenantBySlug(slug: string): Promise<TenantRow | null> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   const tenant = await prisma.tenant.findUnique({
     where: { slug },
@@ -96,7 +115,7 @@ export async function findTenantBySlug(slug: string): Promise<TenantRow | null> 
  * Find tenant by name
  */
 export async function findTenantByName(name: string): Promise<TenantRow | null> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   const tenant = await prisma.tenant.findUnique({
     where: { name },
@@ -109,7 +128,7 @@ export async function findTenantByName(name: string): Promise<TenantRow | null> 
  * List all tenants
  */
 export async function listTenants(params?: { skip?: number; take?: number }): Promise<TenantRow[]> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
   const { skip = 0, take = 10 } = params || {};
 
   const tenants = await prisma.tenant.findMany({
@@ -142,7 +161,7 @@ export async function updateTenant(
     slug?: string;
   }
 ): Promise<TenantRow> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   const tenant = await prisma.tenant.update({
     where: { id },
@@ -156,7 +175,7 @@ export async function updateTenant(
  * Delete a tenant
  */
 export async function deleteTenant(id: string): Promise<void> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   await prisma.tenant.delete({
     where: { id },
@@ -170,8 +189,8 @@ export async function addTenantMember(data: {
   tenantId: string;
   userId: string;
   role: string;
-}): Promise<TenantMemberRow> {
-  const prisma = getPrisma();
+}, tx?: Prisma.TransactionClient): Promise<TenantMemberRow> {
+  const prisma = tx || getPrismaClient();
 
   const member = await prisma.tenantMember.create({
     data: {
@@ -191,7 +210,7 @@ export async function findTenantMember(
   tenantId: string,
   userId: string
 ): Promise<TenantMemberRow | null> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   const member = await prisma.tenantMember.findFirst({
     where: {
@@ -217,7 +236,7 @@ export async function listTenantMembers(tenantId: string): Promise<
     };
   })[]
 > {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   const members = await prisma.tenantMember.findMany({
     where: { tenantId },
@@ -242,7 +261,7 @@ export async function listTenantMembers(tenantId: string): Promise<
  * List tenants for a user
  */
 export async function listUserTenants(userId: string): Promise<(TenantRow & { role: string })[]> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   const memberships = await prisma.tenantMember.findMany({
     where: { userId },
@@ -275,7 +294,7 @@ export async function updateTenantMemberRole(
   userId: string,
   role: string
 ): Promise<TenantMemberRow> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   await prisma.tenantMember.updateMany({
     where: {
@@ -294,7 +313,7 @@ export async function updateTenantMemberRole(
  * Remove a member from a tenant
  */
 export async function removeTenantMember(tenantId: string, userId: string): Promise<void> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   await prisma.tenantMember.deleteMany({
     where: {
@@ -304,10 +323,4 @@ export async function removeTenantMember(tenantId: string, userId: string): Prom
   });
 }
 
-export function closePrisma(): void {
-  if (prismaInstance) {
-    prismaInstance
-      .$disconnect()
-      .catch((err: unknown) => Logger.error('Error closing Prisma:', err));
-  }
-}
+export { closePrisma } from '../services/prisma';

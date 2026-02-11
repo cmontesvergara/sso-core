@@ -1,19 +1,5 @@
-import { PrismaClient } from '@prisma/client';
-import { Logger } from '../utils/logger';
-
-let prismaInstance: PrismaClient;
-
-function getPrisma(): PrismaClient {
-  if (!prismaInstance) {
-    prismaInstance = new PrismaClient({
-      log:
-        process.env.NODE_ENV === 'development'
-          ? ['query', 'info', 'warn', 'error']
-          : ['warn', 'error'],
-    });
-  }
-  return prismaInstance;
-}
+import { Prisma } from '@prisma/client';
+import { getPrismaClient } from '../services/prisma';
 
 export interface RoleRow {
   id: string;
@@ -34,8 +20,8 @@ export interface PermissionRow {
 /**
  * Create a new role
  */
-export async function createRole(data: { tenantId: string; name: string }): Promise<RoleRow> {
-  const prisma = getPrisma();
+export async function createRole(data: { tenantId: string; name: string }, tx?: Prisma.TransactionClient): Promise<RoleRow> {
+  const prisma = tx || getPrismaClient();
 
   const role = await prisma.role.create({
     data: {
@@ -51,7 +37,7 @@ export async function createRole(data: { tenantId: string; name: string }): Prom
  * Find role by ID
  */
 export async function findRoleById(id: string): Promise<RoleRow | null> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   const role = await prisma.role.findUnique({
     where: { id },
@@ -67,7 +53,7 @@ export async function findRoleByTenantAndName(
   tenantId: string,
   name: string
 ): Promise<RoleRow | null> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   const role = await prisma.role.findUnique({
     where: {
@@ -85,7 +71,7 @@ export async function findRoleByTenantAndName(
  * List roles for a tenant
  */
 export async function listRolesByTenant(tenantId: string): Promise<RoleRow[]> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   const roles = await prisma.role.findMany({
     where: { tenantId },
@@ -104,7 +90,7 @@ export async function updateRole(
     name?: string;
   }
 ): Promise<RoleRow> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   const role = await prisma.role.update({
     where: { id },
@@ -118,7 +104,7 @@ export async function updateRole(
  * Delete a role
  */
 export async function deleteRole(id: string): Promise<void> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   await prisma.role.delete({
     where: { id },
@@ -134,7 +120,7 @@ export async function createPermission(data: {
   resource: string;
   action: string;
 }): Promise<PermissionRow> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   const permission = await prisma.permission.create({
     data: {
@@ -152,7 +138,7 @@ export async function createPermission(data: {
  * Find permission by ID
  */
 export async function findPermissionById(id: string): Promise<PermissionRow | null> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   const permission = await prisma.permission.findUnique({
     where: { id },
@@ -167,7 +153,7 @@ export async function findPermissionById(id: string): Promise<PermissionRow | nu
 export async function listPermissionsByRole(
   roleId: string
 ): Promise<Array<PermissionRow & { applicationName?: string; appId?: string }>> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   const permissions = await prisma.permission.findMany({
     where: { roleId },
@@ -199,7 +185,7 @@ export async function listPermissionsByRole(
  * Delete a permission
  */
 export async function deletePermission(id: string): Promise<void> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   await prisma.permission.delete({
     where: { id },
@@ -215,7 +201,7 @@ export async function deletePermissionByRoleResourceAction(
   resource: string,
   action: string
 ): Promise<void> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   await prisma.permission.deleteMany({
     where: {
@@ -236,7 +222,7 @@ export async function hasPermission(
   resource: string,
   action: string
 ): Promise<boolean> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   const permission = await prisma.permission.findFirst({
     where: {
@@ -256,13 +242,14 @@ export async function hasPermission(
  */
 export async function createDefaultRoles(
   tenantId: string,
-  ssoApplicationId: string
+  ssoApplicationId: string,
+  tx?: Prisma.TransactionClient
 ): Promise<{
   admin: RoleRow;
   member: RoleRow;
   viewer: RoleRow;
 }> {
-  const prisma = getPrisma();
+  const prisma = tx || getPrismaClient();
 
   // Admin role with all SSO permissions
   const adminRole = await prisma.role.create({
@@ -325,10 +312,4 @@ export async function createDefaultRoles(
   };
 }
 
-export function closePrisma(): void {
-  if (prismaInstance) {
-    prismaInstance
-      .$disconnect()
-      .catch((err: unknown) => Logger.error('Error closing Prisma:', err));
-  }
-}
+export { closePrisma } from '../services/prisma';

@@ -1,9 +1,8 @@
 import { CreateTenantInput, InviteTenantMemberInput } from '../core/dtos';
 import { findApplicationByAppId } from '../repositories/appResourceRepo.prisma';
-import { createDefaultRoles } from '../repositories/roleRepo.prisma';
 import {
   addTenantMember,
-  createTenant as createTenantRepo,
+  createTenantWithRelations,
   findTenantByIdWithRelations,
   findTenantByName,
   findTenantBySlug,
@@ -32,7 +31,7 @@ export interface CreateTenantWithAdminInput extends CreateTenantInput {
 export class TenantService {
   private static instance: TenantService;
 
-  private constructor() {}
+  private constructor() { }
 
   static getInstance(): TenantService {
     if (!TenantService.instance) {
@@ -41,6 +40,10 @@ export class TenantService {
     return TenantService.instance;
   }
 
+  /**
+   * Create a new tenant with mandatory tenant admin
+   * System admin creates tenant and assigns a tenant admin
+   */
   /**
    * Create a new tenant with mandatory tenant admin
    * System admin creates tenant and assigns a tenant admin
@@ -89,14 +92,6 @@ export class TenantService {
         );
       }
 
-      // Create tenant
-      const tenant = await createTenantRepo({
-        name: tenantData.name,
-        slug,
-      });
-
-      logger.info(`Tenant created: ${tenant.name} (${tenant.id}) by user ${createdByUserId}`);
-
       // Get SSO application ID for default roles
       const ssoApp = await findApplicationByAppId('sso');
 
@@ -104,17 +99,17 @@ export class TenantService {
         throw new Error('SSO application not found. Please ensure SSO app is seeded.');
       }
 
-      // Create default roles with permissions
-      await createDefaultRoles(tenant.id, ssoApp.id);
-      logger.info(`Default roles created for tenant ${tenant.id}`);
+      // Create tenant structure in transaction via repository
+      const tenant = await createTenantWithRelations(
+        {
+          name: tenantData.name,
+          slug,
+        },
+        tenantAdmin.id,
+        ssoApp.id
+      );
 
-      // Add tenant admin as member with admin role
-      await addTenantMember({
-        tenantId: tenant.id,
-        userId: tenantAdmin.id,
-        role: 'admin',
-      });
-
+      logger.info(`Tenant created with relations: ${tenant.name} (${tenant.id}) by user ${createdByUserId}`);
       logger.info(`User ${tenantAdmin.email} assigned as admin of tenant ${tenant.id}`);
 
       return {
@@ -128,6 +123,7 @@ export class TenantService {
           lastName: tenantAdmin.lastName,
         },
       };
+
     } catch (error) {
       logger.error('Failed to create tenant:', error);
       throw error;
