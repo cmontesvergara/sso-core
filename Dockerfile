@@ -2,7 +2,7 @@
 FROM node:22-alpine AS builder
 
 # Build argument to bust cache
-ARG CACHEBUST=1
+ARG CACHEBUSTe=1
 
 WORKDIR /app
 
