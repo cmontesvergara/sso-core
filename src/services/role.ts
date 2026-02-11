@@ -122,7 +122,7 @@ export class RoleService {
       }
 
       // Super Admin and System Admin can access all tenants
-      const isSystemAdmin = systemRole === 'super_admin' || systemRole === 'system_admin';
+      const isSystemAdmin = ['super_admin', 'system_admin'].includes(systemRole?.toLowerCase() || '');
 
       if (!isSystemAdmin) {
         // Verify user is member of the tenant
@@ -173,7 +173,7 @@ export class RoleService {
   > {
     try {
       // Super Admin and System Admin can access all tenants
-      const isSystemAdmin = systemRole === 'super_admin' || systemRole === 'system_admin';
+      const isSystemAdmin = ['super_admin', 'system_admin'].includes(systemRole?.toLowerCase() || '');
 
       if (!isSystemAdmin) {
         // Regular users must be members of the tenant
@@ -468,7 +468,7 @@ export class RoleService {
       }
 
       // Super Admin and System Admin can access all tenants
-      const isSystemAdmin = systemRole === 'super_admin' || systemRole === 'system_admin';
+      const isSystemAdmin = ['super_admin', 'system_admin'].includes(systemRole?.toLowerCase() || '');
 
       if (!isSystemAdmin) {
         // Verify user is member of the tenant

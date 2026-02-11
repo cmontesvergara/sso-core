@@ -4,6 +4,7 @@ import { AuthenticatedRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { authenticateSSO } from '../middleware/ssoAuth';
 import { RoleService_Instance } from '../services/role';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -107,6 +108,8 @@ router.get(
       const { roleId } = req.params;
       const userId = req.ssoUser?.userId;
       const systemRole = req.ssoUser?.systemRole;
+
+      logger.info(`[RoleRoute] GET /${roleId} - User: ${userId}, SystemRole: ${systemRole}`);
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
