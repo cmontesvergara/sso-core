@@ -1,10 +1,10 @@
 import {
-    bulkCreateAppResources,
-    findAppResource,
-    findApplicationByAppId,
-    findTenantApp,
-    listAppResources,
-    listResourcesByTenant,
+  bulkCreateAppResources,
+  findAppResource,
+  findApplicationByAppId,
+  findTenantApp,
+  listAppResources,
+  listResourcesByTenant,
 } from '../repositories/appResourceRepo.prisma';
 import { findTenantById, findTenantMember } from '../repositories/tenantRepo.prisma';
 import { logger } from '../utils/logger';
@@ -35,7 +35,7 @@ export interface AppResourceInfo {
 export class AppResourceService {
   private static instance: AppResourceService;
 
-  private constructor() {}
+  private constructor() { }
 
   static getInstance(): AppResourceService {
     if (!AppResourceService.instance) {
@@ -115,7 +115,8 @@ export class AppResourceService {
    */
   async getAvailableResourcesForTenant(
     tenantId: string,
-    userId: string
+    userId: string,
+    systemRole?: string
   ): Promise<AppResourceInfo[]> {
     try {
       // Verify tenant exists
@@ -124,10 +125,15 @@ export class AppResourceService {
         throw new Error(`Tenant ${tenantId} not found`);
       }
 
-      // Verify user is member of the tenant
-      const membership = await findTenantMember(tenantId, userId);
-      if (!membership) {
-        throw new Error('User is not a member of this tenant');
+      // Super Admin and System Admin can access resources in any tenant
+      const isSystemAdmin = ['super_admin', 'system_admin'].includes(systemRole?.toLowerCase() || '');
+
+      if (!isSystemAdmin) {
+        // Verify user is member of the tenant
+        const membership = await findTenantMember(tenantId, userId);
+        if (!membership) {
+          throw new Error('User is not a member of this tenant');
+        }
       }
 
       // Get resources for tenant's enabled apps

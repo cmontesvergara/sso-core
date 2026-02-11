@@ -232,20 +232,26 @@ router.delete(
  */
 router.post(
   '/tenant/:tenantId/enable',
-  authMiddleware,
+  authenticateSSO,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const { tenantId } = req.params;
-      const userId = req.user?.userId;
+      const userId = req.ssoUser?.userId;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
 
-      // Verify user is admin in tenant
-      const member = await findTenantMember(tenantId, userId);
-      if (!member || member.role !== 'admin') {
-        throw new AppError(403, 'Only tenant admins can enable applications', 'FORBIDDEN');
+      // Super Admin and System Admin can enable apps for any tenant
+      const systemRole = req.ssoUser?.systemRole;
+      const isSystemAdmin = systemRole === 'super_admin' || systemRole === 'system_admin';
+
+      if (!isSystemAdmin) {
+        // Verify user is admin in tenant
+        const member = await findTenantMember(tenantId, userId);
+        if (!member || member.role !== 'admin') {
+          throw new AppError(403, 'Only tenant admins can enable applications', 'FORBIDDEN');
+        }
       }
 
       const { error, value } = enableAppForTenantSchema.validate(req.body);
@@ -329,20 +335,26 @@ router.get(
  */
 router.delete(
   '/tenant/:tenantId/:applicationId',
-  authMiddleware,
+  authenticateSSO,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const { tenantId, applicationId } = req.params;
-      const userId = req.user?.userId;
+      const userId = req.ssoUser?.userId;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
 
-      // Verify user is admin in tenant
-      const member = await findTenantMember(tenantId, userId);
-      if (!member || member.role !== 'admin') {
-        throw new AppError(403, 'Only tenant admins can remove applications', 'FORBIDDEN');
+      // Super Admin and System Admin can remove apps from any tenant
+      const systemRole = req.ssoUser?.systemRole;
+      const isSystemAdmin = systemRole === 'super_admin' || systemRole === 'system_admin';
+
+      if (!isSystemAdmin) {
+        // Verify user is admin in tenant
+        const member = await findTenantMember(tenantId, userId);
+        if (!member || member.role !== 'admin') {
+          throw new AppError(403, 'Only tenant admins can remove applications', 'FORBIDDEN');
+        }
       }
 
       // Check if app is enabled for tenant
