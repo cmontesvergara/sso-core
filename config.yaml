@@ -20,6 +20,9 @@ core_config_version: 0
 # Server Configuration
 # ============================================================
 
+front_url:
+  _default: https://sso.bigso.co
+
 port:
   _default: 3567
 
