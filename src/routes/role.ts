@@ -48,11 +48,13 @@ router.post(
       }
 
       const userId = req.ssoUser?.userId;
+      const systemRole = req.ssoUser?.systemRole;
+
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
 
-      const role = await RoleService_Instance.createRole(value, userId);
+      const role = await RoleService_Instance.createRole(value, userId, systemRole);
 
       res.status(201).json({
         success: true,
@@ -147,12 +149,13 @@ router.put(
 
       const { roleId } = req.params;
       const userId = req.ssoUser?.userId;
+      const systemRole = req.ssoUser?.systemRole;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
 
-      const role = await RoleService_Instance.updateRole(roleId, value, userId);
+      const role = await RoleService_Instance.updateRole(roleId, value, userId, systemRole);
 
       res.json({
         success: true,
@@ -177,12 +180,13 @@ router.delete(
     try {
       const { roleId } = req.params;
       const userId = req.ssoUser?.userId;
+      const systemRole = req.ssoUser?.systemRole;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
 
-      await RoleService_Instance.deleteRole(roleId, userId);
+      await RoleService_Instance.deleteRole(roleId, userId, systemRole);
 
       res.json({
         success: true,
@@ -212,12 +216,13 @@ router.post(
 
       const { roleId } = req.params;
       const userId = req.ssoUser?.userId;
+      const systemRole = req.ssoUser?.systemRole;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
 
-      const permission = await RoleService_Instance.addPermission(roleId, value, userId);
+      const permission = await RoleService_Instance.addPermission(roleId, value, userId, systemRole);
 
       res.status(201).json({
         success: true,
@@ -273,12 +278,13 @@ router.delete(
     try {
       const { roleId, permissionId } = req.params;
       const userId = req.ssoUser?.userId;
+      const systemRole = req.ssoUser?.systemRole;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
 
-      await RoleService_Instance.removePermission(roleId, permissionId, userId);
+      await RoleService_Instance.removePermission(roleId, permissionId, userId, systemRole);
 
       res.json({
         success: true,
@@ -308,6 +314,7 @@ router.delete(
 
       const { roleId } = req.params;
       const userId = req.ssoUser?.userId;
+      const systemRole = req.ssoUser?.systemRole;
 
       if (!userId) {
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
@@ -318,7 +325,8 @@ router.delete(
         value.applicationId,
         value.resource,
         value.action,
-        userId
+        userId,
+        systemRole
       );
 
       res.json({

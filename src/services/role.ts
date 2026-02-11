@@ -50,7 +50,8 @@ export class RoleService {
    */
   async createRole(
     input: CreateRoleInput,
-    createdByUserId: string
+    createdByUserId: string,
+    systemRole?: string
   ): Promise<{
     id: string;
     tenantId: string;
@@ -66,10 +67,15 @@ export class RoleService {
         throw new Error(`Tenant ${tenantId} not found`);
       }
 
-      // Verify creator is admin of tenant
-      const membership = await findTenantMember(tenantId, createdByUserId);
-      if (!membership || membership.role !== 'admin') {
-        throw new Error('Only tenant admins can create roles');
+      // Super Admin and System Admin can create roles in any tenant
+      const isSystemAdmin = ['super_admin', 'system_admin'].includes(systemRole?.toLowerCase() || '');
+
+      if (!isSystemAdmin) {
+        // Verify creator is admin of tenant
+        const membership = await findTenantMember(tenantId, createdByUserId);
+        if (!membership || membership.role !== 'admin') {
+          throw new Error('Only tenant admins can create roles');
+        }
       }
 
       // Check if role name already exists in tenant
@@ -205,7 +211,8 @@ export class RoleService {
   async updateRole(
     roleId: string,
     input: UpdateRoleInput,
-    updatedByUserId: string
+    updatedByUserId: string,
+    systemRole?: string
   ): Promise<{
     id: string;
     tenantId: string;
@@ -219,10 +226,15 @@ export class RoleService {
         throw new Error(`Role ${roleId} not found`);
       }
 
-      // Verify updater is admin of tenant
-      const membership = await findTenantMember(role.tenantId, updatedByUserId);
-      if (!membership || membership.role !== 'admin') {
-        throw new Error('Only tenant admins can update roles');
+      // Super Admin and System Admin can update roles in any tenant
+      const isSystemAdmin = ['super_admin', 'system_admin'].includes(systemRole?.toLowerCase() || '');
+
+      if (!isSystemAdmin) {
+        // Verify updater is admin of tenant
+        const membership = await findTenantMember(role.tenantId, updatedByUserId);
+        if (!membership || membership.role !== 'admin') {
+          throw new Error('Only tenant admins can update roles');
+        }
       }
 
       // Prevent updating default roles
@@ -258,7 +270,7 @@ export class RoleService {
   /**
    * Delete a role (tenant admin only)
    */
-  async deleteRole(roleId: string, deletedByUserId: string): Promise<void> {
+  async deleteRole(roleId: string, deletedByUserId: string, systemRole?: string): Promise<void> {
     try {
       const role = await findRoleById(roleId);
 
@@ -266,10 +278,15 @@ export class RoleService {
         throw new Error(`Role ${roleId} not found`);
       }
 
-      // Verify deleter is admin of tenant
-      const membership = await findTenantMember(role.tenantId, deletedByUserId);
-      if (!membership || membership.role !== 'admin') {
-        throw new Error('Only tenant admins can delete roles');
+      // Super Admin and System Admin can delete roles in any tenant
+      const isSystemAdmin = ['super_admin', 'system_admin'].includes(systemRole?.toLowerCase() || '');
+
+      if (!isSystemAdmin) {
+        // Verify deleter is admin of tenant
+        const membership = await findTenantMember(role.tenantId, deletedByUserId);
+        if (!membership || membership.role !== 'admin') {
+          throw new Error('Only tenant admins can delete roles');
+        }
       }
 
       // Prevent deleting default roles
@@ -295,7 +312,8 @@ export class RoleService {
   async addPermission(
     roleId: string,
     input: CreatePermissionInput,
-    addedByUserId: string
+    addedByUserId: string,
+    systemRole?: string
   ): Promise<{
     id: string;
     roleId: string;
@@ -310,10 +328,15 @@ export class RoleService {
         throw new Error(`Role ${roleId} not found`);
       }
 
-      // Verify adder is admin of tenant
-      const membership = await findTenantMember(role.tenantId, addedByUserId);
-      if (!membership || membership.role !== 'admin') {
-        throw new Error('Only tenant admins can add permissions');
+      // Super Admin and System Admin can add permissions in any tenant
+      const isSystemAdmin = ['super_admin', 'system_admin'].includes(systemRole?.toLowerCase() || '');
+
+      if (!isSystemAdmin) {
+        // Verify adder is admin of tenant
+        const membership = await findTenantMember(role.tenantId, addedByUserId);
+        if (!membership || membership.role !== 'admin') {
+          throw new Error('Only tenant admins can add permissions');
+        }
       }
 
       // Prevent modifying default roles
@@ -375,7 +398,8 @@ export class RoleService {
   async removePermission(
     roleId: string,
     permissionId: string,
-    removedByUserId: string
+    removedByUserId: string,
+    systemRole?: string
   ): Promise<void> {
     try {
       const role = await findRoleById(roleId);
@@ -384,10 +408,15 @@ export class RoleService {
         throw new Error(`Role ${roleId} not found`);
       }
 
-      // Verify remover is admin of tenant
-      const membership = await findTenantMember(role.tenantId, removedByUserId);
-      if (!membership || membership.role !== 'admin') {
-        throw new Error('Only tenant admins can remove permissions');
+      // Super Admin and System Admin can remove permissions in any tenant
+      const isSystemAdmin = ['super_admin', 'system_admin'].includes(systemRole?.toLowerCase() || '');
+
+      if (!isSystemAdmin) {
+        // Verify remover is admin of tenant
+        const membership = await findTenantMember(role.tenantId, removedByUserId);
+        if (!membership || membership.role !== 'admin') {
+          throw new Error('Only tenant admins can remove permissions');
+        }
       }
 
       // Prevent modifying default roles
@@ -414,7 +443,8 @@ export class RoleService {
     applicationId: string,
     resource: string,
     action: string,
-    removedByUserId: string
+    removedByUserId: string,
+    systemRole?: string
   ): Promise<void> {
     try {
       const role = await findRoleById(roleId);
@@ -423,10 +453,15 @@ export class RoleService {
         throw new Error(`Role ${roleId} not found`);
       }
 
-      // Verify remover is admin of tenant
-      const membership = await findTenantMember(role.tenantId, removedByUserId);
-      if (!membership || membership.role !== 'admin') {
-        throw new Error('Only tenant admins can remove permissions');
+      // Super Admin and System Admin can remove permissions in any tenant
+      const isSystemAdmin = ['super_admin', 'system_admin'].includes(systemRole?.toLowerCase() || '');
+
+      if (!isSystemAdmin) {
+        // Verify remover is admin of tenant
+        const membership = await findTenantMember(role.tenantId, removedByUserId);
+        if (!membership || membership.role !== 'admin') {
+          throw new Error('Only tenant admins can remove permissions');
+        }
       }
 
       // Prevent modifying default roles
