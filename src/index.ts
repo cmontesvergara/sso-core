@@ -13,6 +13,7 @@ async function bootstrap(): Promise<void> {
     app.listen(PORT as number, HOST as string, () => {
       Logger.info(`✅ Server is running at http://${HOST}:${PORT}`);
       Logger.info(`📚 API Documentation: http://${HOST}:${PORT}/docs`);
+      console.log(`DEPLOY DATE: ${new Date().toISOString()}`);
     });
 
 
