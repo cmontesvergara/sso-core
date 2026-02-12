@@ -212,12 +212,17 @@ export class AppResourceService {
     message?: string;
   }> {
     try {
-      // Find application
-      const application = await findApplicationByAppId(appId);
+      // Find application by ID (UUID) or appId (slug)
+      let application = await findApplicationById(appId);
+
+      if (!application) {
+        application = await findApplicationByAppId(appId);
+      }
+
       if (!application) {
         return {
           valid: false,
-          message: `Application with appId "${appId}" not found`,
+          message: `Application with id/appId "${appId}" not found`,
         };
       }
 
