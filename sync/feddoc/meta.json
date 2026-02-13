@@ -1,0 +1,11 @@
+{
+    "name": "sso-core",
+    "domain": "identity",
+    "project": "sso-core",
+    "ownerTeam": "sso-team",
+    "techLead": "lead@empiresoft.com",
+    "supportChannel": "#sso-core",
+    "lifecycle": "active",
+    "version": "1.0.0",
+    "lastReviewed": "2026-02-13"
+}
