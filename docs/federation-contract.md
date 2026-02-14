@@ -50,7 +50,7 @@ El portal genera automáticamente la página `index` — no la incluyas en el So
 Todo repositorio federado debe contener en su carpeta designada:
 
 ```
-sync/feddoc/
+sync/feddocs/
 ├── onboarding.md
 ├── architecture.md
 ├── integration.md
