@@ -1,6 +1,6 @@
 {
     "name": "sso-core",
-    "domain": "identity",
+    "description": "Identity Provider centralizado con OAuth 2.0, multi-tenancy y RBAC granular",
     "project": "sso-core",
     "ownerTeam": "sso-team",
     "techLead": "lead@empiresoft.com",
