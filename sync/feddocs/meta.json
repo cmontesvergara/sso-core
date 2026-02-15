@@ -2,9 +2,9 @@
     "name": "sso-core",
     "description": "Identity Provider centralizado con OAuth 2.0, multi-tenancy y RBAC granular",
     "project": "sso-core",
-    "ownerTeam": "sso-team",
-    "techLead": "lead@empiresoft.com",
-    "supportChannel": "#sso-core",
+    "ownerTeam": "core-team",
+    "techLead": "alfred@bigso.co",
+    "supportChannel": "#cor-core",
     "lifecycle": "active",
     "version": "1.0.0",
     "lastReviewed": "2026-02-13"
