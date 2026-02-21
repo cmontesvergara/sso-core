@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import { AuthenticatedRequest, authMiddleware } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
+import { deleteAppSession } from '../repositories/appSessionRepo.prisma';
 
 const router = Router();
 
@@ -42,7 +43,12 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
 // POST /api/v1/session/revoke
 router.post('/revoke', authMiddleware, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    // TODO: Implement session revocation
+    const sessionToken = req.session?.sessionToken;
+
+    if (sessionToken) {
+      await deleteAppSession(sessionToken);
+    }
+
     res.json({
       success: true,
       message: 'Session revoked',
