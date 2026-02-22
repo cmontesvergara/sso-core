@@ -1,10 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
 import {
-    cleanupExpiredAuthCodes,
-    createAuthCode as createAuthCodeRepo,
-    deleteAuthCode,
-    findAuthCodeByCode,
-    markAuthCodeAsUsed,
+  cleanupExpiredAuthCodes,
+  createAuthCode as createAuthCodeRepo,
+  deleteAuthCode,
+  findAuthCodeByCode,
+  markAuthCodeAsUsed,
 } from '../repositories/authCodeRepo.prisma';
 import { Logger } from '../utils/logger';
 
@@ -18,7 +18,7 @@ const AUTH_CODE_TTL_SECONDS = 300; // 5 minutes
 export class AuthCodeService {
   private static instance: AuthCodeService;
 
-  private constructor() {}
+  private constructor() { }
 
   static getInstance(): AuthCodeService {
     if (!AuthCodeService.instance) {
@@ -40,7 +40,8 @@ export class AuthCodeService {
     userId: string,
     tenantId: string,
     appId: string,
-    redirectUri: string
+    redirectUri: string,
+    ssoSessionId?: string
   ) {
     // Generate random code (UUID format)
     const code = `ac_${uuidv4().replace(/-/g, '')}`;
@@ -55,6 +56,7 @@ export class AuthCodeService {
       tenant_id: tenantId,
       app_id: appId,
       redirect_uri: redirectUri,
+      sso_session_id: ssoSessionId,
       expires_at: expiresAt,
     });
 
@@ -94,7 +96,7 @@ export class AuthCodeService {
 
     // Check if already used
     if (authCode.used) {
-      Logger.warn('Authorization code already used', { 
+      Logger.warn('Authorization code already used', {
         code: code.substring(0, 10) + '...',
         userId: authCode.userId,
       });
@@ -141,6 +143,7 @@ export class AuthCodeService {
       email: authCode.user.email,
       firstName: authCode.user.firstName,
       lastName: authCode.user.lastName,
+      ssoSessionId: authCode.ssoSessionId,
       tenant: {
         id: authCode.tenant.id,
         name: authCode.tenant.name,

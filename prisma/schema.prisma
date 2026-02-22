@@ -226,9 +226,10 @@ model AuthCode {
   code        String   @unique @db.VarChar(255)
   userId      String   @map("user_id") @db.Uuid
   tenantId    String   @map("tenant_id") @db.Uuid
-  appId       String   @map("app_id") @db.VarChar(100)
-  redirectUri String   @map("redirect_uri")
-  used        Boolean  @default(false)
+  appId        String   @map("app_id") @db.VarChar(100)
+  redirectUri  String   @map("redirect_uri")
+  ssoSessionId String?  @map("sso_session_id") @db.Uuid
+  used         Boolean  @default(false)
   expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -249,6 +250,7 @@ model AppSession {
   userId         String   @map("user_id") @db.Uuid
   tenantId       String   @map("tenant_id") @db.Uuid
   role           String
+  ssoSessionId   String?  @map("sso_session_id") @db.Uuid
   ip             String?
   userAgent      String?  @map("user_agent")
   expiresAt      DateTime @map("expires_at") @db.Timestamptz(6)

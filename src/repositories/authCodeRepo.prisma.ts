@@ -11,6 +11,7 @@ interface CreateAuthCodeInput {
   tenant_id: string;
   app_id: string;
   redirect_uri: string;
+  sso_session_id?: string | null;
   expires_at: Date;
 }
 
@@ -21,6 +22,7 @@ interface AuthCodeWithRelations {
   tenantId: string;
   appId: string;
   redirectUri: string;
+  ssoSessionId: string | null;
   used: boolean;
   expiresAt: Date;
   createdAt: Date;
@@ -50,6 +52,7 @@ export async function createAuthCode(data: CreateAuthCodeInput) {
       tenantId: data.tenant_id,
       appId: data.app_id,
       redirectUri: data.redirect_uri,
+      ssoSessionId: data.sso_session_id,
       expiresAt: data.expires_at,
       used: false,
     },

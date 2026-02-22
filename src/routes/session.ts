@@ -1,7 +1,8 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import { AuthenticatedRequest, authMiddleware } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
-import { deleteAppSession } from '../repositories/appSessionRepo.prisma';
+import { countActiveAppSessionsBySsoToken, deleteAppSession, findAppSessionByToken } from '../repositories/appSessionRepo.prisma';
+import { deleteSSOSessionById } from '../repositories/ssoSessionRepo.prisma';
 
 const router = Router();
 
@@ -46,7 +47,30 @@ router.post('/revoke', authMiddleware, async (req: AuthenticatedRequest, res: Re
     const sessionToken = req.session?.sessionToken;
 
     if (sessionToken) {
-      await deleteAppSession(sessionToken);
+      // Find the app session first to get the linked ssoSessionId
+      const appSession = await findAppSessionByToken(sessionToken);
+
+      if (appSession) {
+        // Find and delete the app session
+        await deleteAppSession(sessionToken);
+
+        // If a linked SSO session exists, check if it's safe to revoke
+        if (appSession.ssoSessionId) {
+          try {
+            // Check if there are other active apps using this same SSO session
+            const activeLinkedApps = await countActiveAppSessionsBySsoToken(appSession.ssoSessionId);
+
+            if (activeLinkedApps === 0) {
+              await deleteSSOSessionById(appSession.ssoSessionId);
+              console.log(`Global Logout: Revoked SSO Session ${appSession.ssoSessionId} as it was the last active app origin.`);
+            } else {
+              console.log(`Global Logout Skipped: SSO Session ${appSession.ssoSessionId} still has ${activeLinkedApps} active app(s) linked.`);
+            }
+          } catch (err) {
+            console.warn(`Could not revoke linked SSO Session ${appSession.ssoSessionId}`);
+          }
+        }
+      }
     }
 
     res.json({

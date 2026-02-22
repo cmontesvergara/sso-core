@@ -12,6 +12,7 @@ interface CreateAppSessionInput {
   user_id: string;
   tenant_id: string;
   role: string;
+  sso_session_id?: string | null;
   ip?: string;
   user_agent?: string;
   expires_at: Date;
@@ -24,6 +25,7 @@ interface AppSessionWithRelations {
   userId: string;
   tenantId: string;
   role: string;
+  ssoSessionId: string | null;
   ip: string | null;
   userAgent: string | null;
   expiresAt: Date;
@@ -55,6 +57,7 @@ export async function createAppSession(data: CreateAppSessionInput) {
       userId: data.user_id,
       tenantId: data.tenant_id,
       role: data.role,
+      ssoSessionId: data.sso_session_id,
       ip: data.ip,
       userAgent: data.user_agent,
       expiresAt: data.expires_at,
@@ -175,6 +178,21 @@ export async function deleteAppSession(sessionToken: string): Promise<void> {
 
   await prisma.appSession.delete({
     where: { sessionToken },
+  });
+}
+
+/**
+ * Count active app sessions linked to a specific SSO session
+ * Used to determine if SSO session can be closed when logging out of an app
+ */
+export async function countActiveAppSessionsBySsoToken(ssoSessionId: string): Promise<number> {
+  const prisma = getPrismaClient();
+
+  return await prisma.appSession.count({
+    where: {
+      ssoSessionId,
+      expiresAt: { gt: new Date() },
+    },
   });
 }
 

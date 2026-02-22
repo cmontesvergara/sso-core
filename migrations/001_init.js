@@ -707,6 +707,10 @@ exports.up = (pgm) => {
       type: 'text',
       notNull: true,
     },
+    sso_session_id: {
+      type: 'uuid',
+      notNull: false,
+    },
     used: {
       type: 'boolean',
       notNull: true,
@@ -761,6 +765,10 @@ exports.up = (pgm) => {
     role: {
       type: 'text',
       notNull: true,
+    },
+    sso_session_id: {
+      type: 'uuid',
+      notNull: false,
     },
     ip: {
       type: 'text',

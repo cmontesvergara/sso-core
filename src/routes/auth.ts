@@ -314,8 +314,11 @@ router.post(
         throw new AppError(403, 'Access denied to application', 'APP_ACCESS_DENIED');
       }
 
+      // Extract ssoSessionId from the authenticated SSO user
+      const ssoSessionId = (req as any).ssoUser.sessionId;
+
       // Generate authorization code
-      const authCode = await AuthCode.generateAuthCode(userId, tenantId, appId, redirectUri);
+      const authCode = await AuthCode.generateAuthCode(userId, tenantId, appId, redirectUri, ssoSessionId);
 
       res.json({
         success: true,
@@ -506,6 +509,7 @@ router.post('/token', async (req: Request, res: Response, next: NextFunction) =>
       user_id: user.id,
       tenant_id: tenant.id,
       role: tenantMember.role,
+      sso_session_id: codeData.ssoSessionId,
       ip: req.ip,
       user_agent: req.get('user-agent'),
       expires_at: expiresAt,
