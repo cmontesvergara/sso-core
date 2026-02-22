@@ -210,7 +210,8 @@ export class TenantService {
   async inviteTenantMember(
     tenantId: string,
     invitedByUserId: string,
-    input: InviteTenantMemberInput
+    input: InviteTenantMemberInput,
+    systemRole?: string
   ): Promise<{
     userId: string;
     email: string;
@@ -218,11 +219,16 @@ export class TenantService {
     tenantId: string;
   }> {
     try {
-      // Verify inviter is admin
-      const inviterMembership = await findTenantMember(tenantId, invitedByUserId);
+      // Super Admin and System Admin can bypass admin membership verification
+      const isSystemAdmin = ['super_admin', 'system_admin'].includes(systemRole?.toLowerCase() || '');
 
-      if (!inviterMembership || inviterMembership.role !== 'admin') {
-        throw new Error('Only admins can invite members');
+      if (!isSystemAdmin) {
+        // Verify inviter is admin
+        const inviterMembership = await findTenantMember(tenantId, invitedByUserId);
+
+        if (!inviterMembership || inviterMembership.role !== 'admin') {
+          throw new Error('Only admins can invite members');
+        }
       }
 
       // Get or create user with email
@@ -278,18 +284,24 @@ export class TenantService {
     tenantId: string,
     updatedByUserId: string,
     targetUserId: string,
-    newRole: string
+    newRole: string,
+    systemRole?: string
   ): Promise<{
     userId: string;
     tenantId: string;
     role: string;
   }> {
     try {
-      // Verify updater is admin
-      const updaterMembership = await findTenantMember(tenantId, updatedByUserId);
+      // Super Admin and System Admin can bypass admin membership verification
+      const isSystemAdmin = ['super_admin', 'system_admin'].includes(systemRole?.toLowerCase() || '');
 
-      if (!updaterMembership || updaterMembership.role !== 'admin') {
-        throw new Error('Only admins can update member roles');
+      if (!isSystemAdmin) {
+        // Verify updater is admin
+        const updaterMembership = await findTenantMember(tenantId, updatedByUserId);
+
+        if (!updaterMembership || updaterMembership.role !== 'admin') {
+          throw new Error('Only admins can update member roles');
+        }
       }
 
       // Verify target is member of tenant
@@ -328,16 +340,22 @@ export class TenantService {
   async removeMember(
     tenantId: string,
     removedByUserId: string,
-    targetUserId: string
+    targetUserId: string,
+    systemRole?: string
   ): Promise<{
     success: boolean;
   }> {
     try {
-      // Verify remover is admin
-      const removerMembership = await findTenantMember(tenantId, removedByUserId);
+      // Super Admin and System Admin can bypass admin membership verification
+      const isSystemAdmin = ['super_admin', 'system_admin'].includes(systemRole?.toLowerCase() || '');
 
-      if (!removerMembership || removerMembership.role !== 'admin') {
-        throw new Error('Only admins can remove members');
+      if (!isSystemAdmin) {
+        // Verify remover is admin
+        const removerMembership = await findTenantMember(tenantId, removedByUserId);
+
+        if (!removerMembership || removerMembership.role !== 'admin') {
+          throw new Error('Only admins can remove members');
+        }
       }
 
       // Get member to remove

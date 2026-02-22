@@ -150,7 +150,12 @@ router.post(
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
 
-      const member = await TenantService_Instance.inviteTenantMember(tenantId, userId, value);
+      const member = await TenantService_Instance.inviteTenantMember(
+        tenantId,
+        userId,
+        value,
+        req.ssoUser?.systemRole
+      );
 
       res.status(201).json({
         success: true,
@@ -215,7 +220,8 @@ router.put(
         tenantId,
         userId,
         memberId,
-        value.role
+        value.role,
+        req.ssoUser?.systemRole
       );
 
       res.json({
@@ -246,7 +252,12 @@ router.delete(
         throw new AppError(401, 'Unauthorized', 'UNAUTHORIZED');
       }
 
-      await TenantService_Instance.removeMember(tenantId, userId, memberId);
+      await TenantService_Instance.removeMember(
+        tenantId,
+        userId,
+        memberId,
+        req.ssoUser?.systemRole
+      );
 
       res.json({
         success: true,
