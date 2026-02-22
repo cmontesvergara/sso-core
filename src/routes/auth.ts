@@ -15,6 +15,7 @@ import { findTenantApp } from '../repositories/tenantAppRepo.prisma';
 import { findTenantById, findTenantMember } from '../repositories/tenantRepo.prisma';
 import { userHasAppAccess } from '../repositories/userAppAccessRepo.prisma';
 import { findUserById } from '../repositories/userRepo.prisma';
+import { listPermissionsByRole } from '../repositories/roleRepo.prisma';
 import { AuthenticationService } from '../services/auth';
 import { AuthCode } from '../services/authCode';
 import { JWT } from '../services/jwt';
@@ -604,6 +605,35 @@ router.post(
         return;
       }
 
+      // Resolve permissions for the specific app
+      let permissions: Array<{ resource: string; action: string }> = [];
+
+      try {
+        const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/i.test(appSession.role);
+
+        let roleId = null;
+
+        if (isUuid) {
+          roleId = appSession.role;
+        } else {
+          // It's a named role like 'admin', 'member', 'owner'. Find it in the tenant.
+          const { findRoleByTenantAndName } = await import('../repositories/roleRepo.prisma');
+          const roleRecord = await findRoleByTenantAndName(appSession.tenant.id, appSession.role);
+          if (roleRecord) {
+            roleId = roleRecord.id;
+          }
+        }
+
+        if (roleId) {
+          const rolePermissions = await listPermissionsByRole(roleId);
+          permissions = rolePermissions
+            .filter((p) => p.appId === appId || p.applicationId === appId)
+            .map((p) => ({ resource: p.resource, action: p.action }));
+        }
+      } catch (err) {
+        console.error('Error resolving permissions for verify-session:', err);
+      }
+
       // Valid session
       res.json({
         success: true,
@@ -619,6 +649,7 @@ router.post(
           name: appSession.tenant.name,
           slug: appSession.tenant.slug,
           role: appSession.role,
+          permissions: permissions,
         },
         appId: appSession.appId,
         expiresAt: appSession.expiresAt.toISOString(),
