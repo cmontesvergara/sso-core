@@ -237,8 +237,8 @@ export class RoleService {
         }
       }
 
-      // Prevent updating default roles
-      if (['admin', 'member', 'viewer'].includes(role.name)) {
+      // Prevent updating default roles, unless it's a System Admin
+      if (!isSystemAdmin && ['admin', 'member', 'viewer'].includes(role.name)) {
         throw new Error('Cannot update default roles (admin, member, viewer)');
       }
 
@@ -289,8 +289,8 @@ export class RoleService {
         }
       }
 
-      // Prevent deleting default roles
-      if (['admin', 'member', 'viewer'].includes(role.name)) {
+      // Prevent deleting default roles, unless it's a System Admin
+      if (!isSystemAdmin && ['admin', 'member', 'viewer'].includes(role.name)) {
         throw new Error('Cannot delete default roles (admin, member, viewer)');
       }
 
@@ -339,8 +339,8 @@ export class RoleService {
         }
       }
 
-      // Prevent modifying default roles
-      if (['admin', 'member', 'viewer'].includes(role.name)) {
+      // Prevent modifying default roles, unless it's a System Admin
+      if (!isSystemAdmin && ['admin', 'member', 'viewer'].includes(role.name)) {
         throw new Error('Cannot modify permissions of default roles (admin, member, viewer)');
       }
 
@@ -419,8 +419,8 @@ export class RoleService {
         }
       }
 
-      // Prevent modifying default roles
-      if (['admin', 'member', 'viewer'].includes(role.name)) {
+      // Prevent modifying default roles, unless it's a System Admin
+      if (!isSystemAdmin && ['admin', 'member', 'viewer'].includes(role.name)) {
         throw new Error('Cannot modify permissions of default roles (admin, member, viewer)');
       }
 
@@ -464,8 +464,8 @@ export class RoleService {
         }
       }
 
-      // Prevent modifying default roles
-      if (['admin', 'member', 'viewer'].includes(role.name)) {
+      // Prevent modifying default roles, unless it's a System Admin
+      if (!isSystemAdmin && ['admin', 'member', 'viewer'].includes(role.name)) {
         throw new Error('Cannot modify permissions of default roles (admin, member, viewer)');
       }
 
