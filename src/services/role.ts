@@ -242,8 +242,11 @@ export class RoleService {
         throw new Error('Cannot update default roles (admin, member, viewer)');
       }
 
-      // If changing name, check it doesn't already exist
+      // If changing name, check it doesn't already exist and that it's not a default role
       if (input.name && input.name !== role.name) {
+        if (['admin', 'member', 'viewer'].includes(role.name)) {
+          throw new Error('Cannot rename default roles');
+        }
         const existing = await findRoleByTenantAndName(role.tenantId, input.name);
         if (existing) {
           throw new Error(`Role "${input.name}" already exists in this tenant`);
