@@ -278,7 +278,7 @@ export class TenantService {
     tenantId: string,
     updatedByUserId: string,
     targetUserId: string,
-    newRole: 'admin' | 'member' | 'viewer'
+    newRole: string
   ): Promise<{
     userId: string;
     tenantId: string;

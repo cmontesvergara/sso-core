@@ -23,11 +23,11 @@ const createTenantSchema = Joi.object({
 
 const inviteMemberSchema = Joi.object({
   email: Joi.string().required().email(),
-  role: Joi.string().required().valid('admin', 'member', 'viewer'),
+  role: Joi.string().required(),
 });
 
 const updateMemberSchema = Joi.object({
-  role: Joi.string().required().valid('admin', 'member', 'viewer'),
+  role: Joi.string().required(),
 });
 
 /**
