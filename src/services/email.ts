@@ -133,7 +133,7 @@ export class EmailService {
   async sendEmailVerification(userId: string, email: string, callbackUrl: string): Promise<void> {
     try {
       const prisma = getPrismaClient();
-      
+
       // Check if there's a recent verification email sent (within last 15 minutes)
       const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
       const recentVerification = await prisma.emailVerification.findFirst({
@@ -179,14 +179,102 @@ export class EmailService {
 
       const verificationUrl = `${callbackUrl}?token=${token}`;
       const html = `
-        <h2>Verify your email address</h2>
-        <p>Click the link below to verify your email address:</p>
-        <a href="${verificationUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
-          Verify Email
-        </a>
-        <p>Or copy and paste this link:</p>
-        <p>${verificationUrl}</p>
-        <p>This link expires in 24 hours.</p>
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #f5f5f7; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f7; padding: 40px 20px;">
+            <tr>
+              <td align="center">
+                <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width: 560px; width: 100%;">
+
+                  <!-- Logo -->
+                  <tr>
+                    <td align="center" style="padding-bottom: 32px;">
+                      <span style="font-size: 28px; font-weight: 700; color: #1d1d1f; letter-spacing: -0.5px;">Big<span style="color: #007AFF;">SO</span></span>
+                    </td>
+                  </tr>
+
+                  <!-- Card -->
+                  <tr>
+                    <td style="background-color: #ffffff; border-radius: 18px; padding: 48px 40px; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);">
+
+                      <!-- Heading -->
+                      <h1 style="margin: 0 0 12px; font-size: 24px; font-weight: 600; color: #1d1d1f; text-align: center; letter-spacing: -0.3px;">
+                        Verifica tu correo electrónico
+                      </h1>
+
+                      <p style="margin: 0 0 32px; font-size: 15px; line-height: 1.6; color: #6e6e73; text-align: center;">
+                        Hemos recibido una solicitud para verificar tu dirección de correo electrónico. Haz clic en el botón de abajo para completar la verificación.
+                      </p>
+
+                      <!-- CTA Button -->
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td align="center" style="padding-bottom: 32px;">
+                            <a href="${verificationUrl}" style="display: inline-block; background-color: #007AFF; color: #ffffff; font-size: 16px; font-weight: 500; text-decoration: none; padding: 14px 40px; border-radius: 12px; letter-spacing: 0.2px;">
+                              Verificar correo
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <!-- Divider -->
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="border-top: 1px solid #e8e8ed; padding-top: 28px; padding-bottom: 8px;">
+                            <p style="margin: 0 0 16px; font-size: 14px; color: #6e6e73; text-align: center;">
+                              ¿No puedes hacer clic en el botón? Copia y pega el siguiente código en la página de verificación:
+                            </p>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <!-- Verification Code Box -->
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td align="center" style="padding-bottom: 28px;">
+                            <div style="display: inline-block; background-color: #f5f5f7; border: 1px solid #d2d2d7; border-radius: 12px; padding: 16px 28px;">
+                              <span style="font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace; font-size: 15px; font-weight: 500; color: #1d1d1f; letter-spacing: 1px; word-break: break-all;">
+                                ${token}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <!-- Alternative link -->
+                      <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #aeaeb2; text-align: center; word-break: break-all;">
+                        O copia este enlace: <a href="${verificationUrl}" style="color: #007AFF; text-decoration: none;">${verificationUrl}</a>
+                      </p>
+
+                    </td>
+                  </tr>
+
+                  <!-- Footer -->
+                  <tr>
+                    <td style="padding-top: 28px; text-align: center;">
+                      <p style="margin: 0 0 6px; font-size: 12px; color: #aeaeb2;">
+                        Este enlace expira en 24 horas.
+                      </p>
+                      <p style="margin: 0 0 6px; font-size: 12px; color: #aeaeb2;">
+                        Si no solicitaste esta verificación, puedes ignorar este correo.
+                      </p>
+                      <p style="margin: 0; font-size: 11px; color: #d2d2d7; padding-top: 12px;">
+                        © ${new Date().getFullYear()} BigSO · Todos los derechos reservados
+                      </p>
+                    </td>
+                  </tr>
+
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
       `;
 
       await this.sendEmail({
@@ -267,7 +355,7 @@ export class EmailService {
   async sendPasswordReset(userId: string, email: string, callbackUrl: string): Promise<void> {
     try {
       const prisma = getPrismaClient();
-      
+
       // Check if there's a recent verification email sent (within last 15 minutes)
       const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
       const recentVerification = await prisma.emailVerification.findFirst({
