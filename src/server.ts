@@ -18,6 +18,7 @@ import applicationsRoutes from './routes/applications';
 import userRoutes from './routes/user';
 import utilRoutes from './routes/util';
 import applicationSyncRoutes from './routes/applicationSync';
+import statsRoutes from './routes/stats';
 import { JWT } from './services/jwt';
 import { initPrisma } from './services/prisma';
 import { initSessionSubsystem } from './services/session';
@@ -106,6 +107,7 @@ export async function createServer(): Promise<Express> {
   apiV1.use('/applications', applicationsRoutes);
   apiV1.use('/applications', applicationSyncRoutes);
   apiV1.use('/util', utilRoutes);
+  apiV1.use('/stats', statsRoutes);
 
   app.use('/api/v1', apiV1);
 
