@@ -2,11 +2,44 @@ import { NextFunction, Response, Router } from 'express';
 import { AuthenticatedRequest, authMiddleware } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { authenticateSSO } from '../middleware/ssoAuth';
+import { requireSystemAdmin } from '../middleware/ssoSystemAdmin';
 import { listUserTenants } from '../repositories/tenantRepo.prisma';
 import { listUserAppsInTenant } from '../repositories/userAppAccessRepo.prisma';
 import { findUserByIdWithAddresses, updateUserProfile } from '../repositories/userRepo.prisma';
+import { userService } from '../services/user';
+import { listUsersSchema } from '../core/schemas/user.schema';
 
 const router = Router();
+
+/**
+ * GET /api/v1/user/list
+ * Get paginated list of all users from the system
+ *
+ * Requires: SSO session cookie (sso_session)
+ * Ext Access: System Admin / Super Admin
+ */
+router.get(
+  '/list',
+  authenticateSSO,
+  requireSystemAdmin,
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const { error, value } = listUsersSchema.validate(req.query);
+      if (error) {
+        throw new AppError(400, error.details[0].message, 'VALIDATION_ERROR');
+      }
+
+      const result = await userService.listUsers(value);
+
+      res.json({
+        success: true,
+        ...result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 /**
  * GET /api/v1/user/profile
