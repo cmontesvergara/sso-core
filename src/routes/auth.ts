@@ -481,6 +481,15 @@ router.post('/token', async (req: Request, res: Response, next: NextFunction) =>
     // Check if there's already an active session for this user/app/tenant combination
     const existingSession = await findAppSessionByAppAndUser(appId, user.id, tenant.id);
     if (existingSession) {
+      // Revoke SSO session even when reusing existing app session
+      if (codeData.ssoSessionId) {
+        try {
+          await SSOSession.revokeSession(codeData.ssoSessionId);
+        } catch (_) {
+          // Ignore if already revoked or not found
+        }
+      }
+
       // Reuse existing session token instead of creating duplicate
       res.json({
         success: true,
@@ -514,6 +523,15 @@ router.post('/token', async (req: Request, res: Response, next: NextFunction) =>
       user_agent: req.get('user-agent'),
       expires_at: expiresAt,
     });
+
+    // Revoke the SSO session that originated this exchange
+    if (codeData.ssoSessionId) {
+      try {
+        await SSOSession.revokeSession(codeData.ssoSessionId);
+      } catch (err) {
+        // Ignore if already revoked or not found
+      }
+    }
 
     res.json({
       success: true,

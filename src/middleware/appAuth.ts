@@ -4,6 +4,7 @@ import {
     updateAppSessionActivity,
 } from '../repositories/appSessionRepo.prisma';
 import { AppError } from './errorHandler';
+import { getAppSessionTokenFromCookies, clearAppSessionCookies } from '../utils/cookieUtils';
 
 /**
  * Extend Express Request to include App Session context
@@ -71,7 +72,7 @@ export async function authenticateApp(
 
     // Fallback to cookie
     if (!sessionToken) {
-      sessionToken = req.cookies?.app_session;
+      sessionToken = getAppSessionTokenFromCookies(req);
     }
 
     if (!sessionToken) {
@@ -120,11 +121,7 @@ export async function authenticateApp(
     if (error instanceof AppError) {
       // Clear invalid cookie if present
       if (error.code === 'INVALID_APP_SESSION' || error.code === 'APP_SESSION_EXPIRED') {
-        res.clearCookie('app_session', {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
-        });
+        clearAppSessionCookies(req, res);
       }
       return next(error);
     }
@@ -164,7 +161,7 @@ export async function optionalAppAuth(
     }
 
     if (!sessionToken) {
-      sessionToken = req.cookies?.app_session;
+      sessionToken = getAppSessionTokenFromCookies(req);
     }
 
     // If no token, just continue without auth

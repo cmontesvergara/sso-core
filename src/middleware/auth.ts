@@ -4,6 +4,7 @@ import {
   updateAppSessionActivity,
 } from '../repositories/appSessionRepo.prisma';
 import { AppError } from './errorHandler';
+import { getAppSessionTokenFromCookies } from '../utils/cookieUtils';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -43,7 +44,11 @@ export async function authMiddleware(
 ): Promise<void> {
   try {
     // Try to get token from cookie first, then Authorization header
-    const token = req.cookies?.app_session || req.headers.authorization?.replace('Bearer ', '');
+    let token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token) {
+      token = getAppSessionTokenFromCookies(req);
+    }
 
     if (!token) {
       throw new AppError(401, 'Missing session token', 'UNAUTHORIZED');
@@ -104,7 +109,11 @@ export async function optionalAuthMiddleware(
   next: NextFunction
 ): Promise<void> {
   try {
-    const token = req.cookies?.app_session || req.headers.authorization?.replace('Bearer ', '');
+    let token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token) {
+      token = getAppSessionTokenFromCookies(req);
+    }
 
     if (token) {
       const session = await findAppSessionByToken(token);
