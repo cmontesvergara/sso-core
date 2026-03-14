@@ -317,3 +317,20 @@ export async function countAllActiveAppSessions(): Promise<number> {
     },
   });
 }
+
+/**
+ * Count active app sessions grouped by app (for admin dashboard)
+ */
+export async function countActiveAppSessionsGroupedByApp() {
+  const prisma = getPrismaClient();
+
+  return await prisma.appSession.groupBy({
+    by: ['appId'],
+    where: {
+      expiresAt: { gt: new Date() },
+    },
+    _count: {
+      appId: true,
+    },
+  });
+}

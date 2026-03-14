@@ -2,7 +2,7 @@ import { StatsResponseDTO } from '../core/dtos/stats.dto';
 import { countUsers } from '../repositories/userRepo.prisma';
 import { listApplications } from '../repositories/applicationRepo.prisma';
 import { countActiveSSOSessions } from '../repositories/ssoSessionRepo.prisma';
-import { countAllActiveAppSessions } from '../repositories/appSessionRepo.prisma';
+import { countAllActiveAppSessions, countActiveAppSessionsGroupedByApp } from '../repositories/appSessionRepo.prisma';
 
 export class StatsService {
     /**
@@ -18,6 +18,7 @@ export class StatsService {
             allApps,
             activeSsoSessions,
             activeAppSessions,
+            groupedAppSessions,
         ] = await Promise.all([
             countUsers(),
             countUsers({ userStatus: 'active' }),
@@ -27,9 +28,20 @@ export class StatsService {
             listApplications(),
             countActiveSSOSessions(),
             countAllActiveAppSessions(),
+            countActiveAppSessionsGroupedByApp(),
         ]);
 
         const activeApps = allApps.filter((app) => app.isActive).length;
+
+        // Map grouped sessions to include application names
+        const appSessionsDetails = groupedAppSessions.map(group => {
+            const app = allApps.find(a => a.appId === group.appId);
+            return {
+                appId: group.appId,
+                appName: app ? app.name : group.appId,
+                activeSessions: group._count.appId
+            };
+        });
 
         return {
             totalUsers,
@@ -41,6 +53,7 @@ export class StatsService {
             activeApps,
             activeSsoSessions,
             activeAppSessions,
+            appSessionsDetails,
         };
     }
 }
