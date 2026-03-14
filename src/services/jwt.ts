@@ -39,8 +39,8 @@ class JWTService {
     const opts: jwt.SignOptions = {
       algorithm: 'RS256',
       expiresIn: expiresInSeconds,
-      issuer: process.env.JWT_ISS || 'http://localhost:3567',
-      audience: process.env.JWT_AUD || 'u-sso-api',
+      issuer: process.env.JWT_ISS || 'https://sso.bigso.co',
+      audience: process.env.JWT_AUD || 'https://*.bigso.co',
       keyid: KID
     };
     return jwt.sign(payload, this.privateKey, opts);
@@ -83,12 +83,12 @@ class JWTService {
   verifyTwoFactorToken(token: string): { userId: string } | null {
     try {
       const decoded = this.verifyToken(token) as any;
-      
+
       // Validate it's a 2FA token
       if (decoded.purpose !== '2fa-pending') {
         return null;
       }
-      
+
       return { userId: decoded.userId };
     } catch (err) {
       return null;

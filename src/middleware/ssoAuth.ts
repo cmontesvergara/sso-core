@@ -2,7 +2,9 @@ import { NextFunction, Request, Response } from 'express';
 import { SSOSession } from '../services/ssoSession';
 import { AppError } from './errorHandler';
 import { findAppSessionByToken } from '../repositories/appSessionRepo.prisma';
+import { getActiveSSOSessionsForUser } from '../repositories/ssoSessionRepo.prisma';
 import { getAppSessionTokenFromCookies } from '../utils/cookieUtils';
+import { Config } from '../config';
 
 /**
  * Extend Express Request to include SSO user context
@@ -61,10 +63,27 @@ async function tryAutoLoginFromAppSession(
   const appSession = await findAppSessionByToken(appSessionToken);
   if (!appSession || appSession.expiresAt <= new Date()) return null;
 
-  const ssoSession = await SSOSession.createSession(appSession.userId, {
-    ip: req.ip,
-    userAgent: req.get('user-agent'),
-  });
+  // Race Condition Fix: If the frontend sends multiple concurrent requests without the sso_session cookie,
+  // we must avoid creating multiple new sessions. We reuse the most recent active session for this user.
+  const activeSessions = await getActiveSSOSessionsForUser(appSession.userId);
+  let ssoSession;
+
+  if (activeSessions.length > 0) {
+    // Reuse existing latest active session to avoid race condition duplicates
+    const existing = activeSessions[0];
+    const ttl = Config.get('sso_session_ttl', 24 * 60 * 60);
+
+    ssoSession = {
+      sessionToken: existing.sessionToken,
+      maxAge: ttl * 1000,
+    };
+  } else {
+    // No active sessions, create a new one
+    ssoSession = await SSOSession.createSession(appSession.userId, {
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+  }
 
   const cookieOptions: any = {
     httpOnly: true,
@@ -140,7 +159,11 @@ export async function authenticateSSO(
       }
     }
 
-    if (error instanceof AppError && error.code === 'INVALID_SESSION') {
+    const isInvalidSession = 
+      (error instanceof AppError && error.code === 'INVALID_SESSION') || 
+      (error instanceof Error && error.message === 'INVALID_SESSION');
+      
+    if (isInvalidSession) {
       // Clear invalid cookie
       res.clearCookie('sso_session', {
         httpOnly: true,
@@ -151,7 +174,11 @@ export async function authenticateSSO(
       return next(new AppError(401, 'Invalid SSO session', 'INVALID_SSO_SESSION'));
     }
 
-    if (error instanceof AppError && error.code === 'SESSION_EXPIRED') {
+    const isSessionExpired = 
+      (error instanceof AppError && error.code === 'SESSION_EXPIRED') || 
+      (error instanceof Error && error.message === 'SESSION_EXPIRED');
+
+    if (isSessionExpired) {
       res.clearCookie('sso_session', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -161,7 +188,11 @@ export async function authenticateSSO(
       return next(new AppError(401, 'SSO session expired', 'SSO_SESSION_EXPIRED'));
     }
 
-    if (error instanceof AppError && error.code === 'ACCOUNT_NOT_ACTIVE') {
+    const isAccountNotActive = 
+      (error instanceof AppError && error.code === 'ACCOUNT_NOT_ACTIVE') || 
+      (error instanceof Error && error.message === 'ACCOUNT_NOT_ACTIVE');
+
+    if (isAccountNotActive) {
       return next(new AppError(403, 'Account not active', 'ACCOUNT_NOT_ACTIVE'));
     }
 
