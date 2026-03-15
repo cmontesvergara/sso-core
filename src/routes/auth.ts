@@ -21,6 +21,7 @@ import { AuthCode } from '../services/authCode';
 import { JWT } from '../services/jwt';
 import { SessionError } from '../services/session';
 import { SSOSession } from '../services/ssoSession';
+import { AppSessionService } from '../services/appSession';
 
 const router = Router();
 const authService = AuthenticationService.getInstance();
@@ -466,21 +467,28 @@ router.post('/token', async (req: Request, res: Response, next: NextFunction) =>
       throw new AppError(404, 'Tenant not found', 'TENANT_NOT_FOUND');
     }
 
-    // Generate session token
+    // Generate session token with 1 hour default validity
+    const validitySeconds = Config.get('session.expiry_time');
     const sessionToken = JWT.generateToken({
       userId: user.id,
       tenantId: tenant.id,
       appId,
       role: tenantMember.role,
-    });
+    }, validitySeconds);
 
-    // Set expiration (24 hours from now)
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
+    const expiresAt = new Date(Date.now() + validitySeconds * 1000);
 
     // Check if there's already an active session for this user/app/tenant combination
     const existingSession = await findAppSessionByAppAndUser(appId, user.id, tenant.id);
     if (existingSession) {
+      // Use existing app session or create a new one if it's too close to expiration?
+      // Since we want standard behavior, let's keep it as is, but we must make sure we hand out a refresh token.
+      const appSessionService = AppSessionService.getInstance();
+      const refreshResult = await appSessionService.generateAppRefreshToken(user.id, appId, {
+        ip: req.ip,
+        ua: req.get('user-agent'),
+      });
+
       // Revoke SSO session even when reusing existing app session
       if (codeData.ssoSessionId) {
         try {
@@ -494,7 +502,9 @@ router.post('/token', async (req: Request, res: Response, next: NextFunction) =>
       res.json({
         success: true,
         sessionToken: existingSession.sessionToken,
+        refreshToken: refreshResult.token,
         expiresAt: existingSession.expiresAt.toISOString(),
+        refreshExpiresAt: refreshResult.expiresAt.toISOString(),
         user: {
           userId: user.id,
           email: user.email,
@@ -524,6 +534,12 @@ router.post('/token', async (req: Request, res: Response, next: NextFunction) =>
       expires_at: expiresAt,
     });
 
+    const appSessionService = AppSessionService.getInstance();
+    const refreshResult = await appSessionService.generateAppRefreshToken(user.id, appId, {
+      ip: req.ip,
+      ua: req.get('user-agent'),
+    });
+
     // Revoke the SSO session that originated this exchange
     if (codeData.ssoSessionId) {
       try {
@@ -536,7 +552,9 @@ router.post('/token', async (req: Request, res: Response, next: NextFunction) =>
     res.json({
       success: true,
       sessionToken,
+      refreshToken: refreshResult.token,
       expiresAt: expiresAt.toISOString(),
+      refreshExpiresAt: refreshResult.expiresAt.toISOString(),
       user: {
         userId: user.id,
         email: user.email,
@@ -550,6 +568,49 @@ router.post('/token', async (req: Request, res: Response, next: NextFunction) =>
         role: tenantMember.role,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/v1/auth/app-refresh
+ * Renew app session using refresh token
+ */
+const appRefreshSchema = Joi.object({
+  refreshToken: Joi.string().required(),
+  appId: Joi.string().required(),
+});
+
+router.post('/app-refresh', refreshLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { error, value } = appRefreshSchema.validate(req.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    });
+    if (error) {
+      const details = error.details.map((d) => ({ field: d.path.join('.'), message: d.message }));
+      throw new AppError(400, 'Validation failed', 'INVALID_INPUT', details);
+    }
+
+    const { refreshToken, appId } = value;
+    const appSessionService = AppSessionService.getInstance();
+
+    try {
+      const result = await appSessionService.rotateAppRefreshToken(refreshToken, appId);
+      res.json({
+        success: true,
+        sessionToken: result.sessionToken,
+        refreshToken: result.refreshToken,
+        expiresAt: result.expiresAt.toISOString(),
+        refreshExpiresAt: result.refreshExpiresAt.toISOString(),
+      });
+    } catch (err: unknown) {
+      if (err instanceof SessionError) {
+        throw new AppError(401, err.message, 'INVALID_REFRESH');
+      }
+      throw err;
+    }
   } catch (error) {
     next(error);
   }
