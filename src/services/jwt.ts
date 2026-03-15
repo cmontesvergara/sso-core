@@ -35,12 +35,12 @@ class JWTService {
     return this.keystore.toJSON();
   }
 
-  generateToken(payload: Record<string, any>, expiresInSeconds = 60 * 15) {
+  generateToken(payload: Record<string, any>, expiresInSeconds: number = 60 * 15, audience?: string) {
     const opts: jwt.SignOptions = {
       algorithm: 'RS256',
       expiresIn: expiresInSeconds,
       issuer: process.env.JWT_ISS || 'https://sso.bigso.co',
-      audience: process.env.JWT_AUD || 'https://*.bigso.co',
+      audience: audience || process.env.JWT_AUD || 'https://sso.bigso.co',
       keyid: KID
     };
     return jwt.sign(payload, this.privateKey, opts);

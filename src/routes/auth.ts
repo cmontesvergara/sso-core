@@ -467,6 +467,10 @@ router.post('/token', async (req: Request, res: Response, next: NextFunction) =>
       throw new AppError(404, 'Tenant not found', 'TENANT_NOT_FOUND');
     }
 
+    // Get application info for custom audience
+    const application = await findApplicationByAppId(appId);
+    const audience = application?.audience || undefined;
+
     // Generate session token with 1 hour default validity
     const validitySeconds = Config.get('session.expiry_time');
     const sessionToken = JWT.generateToken({
@@ -474,7 +478,7 @@ router.post('/token', async (req: Request, res: Response, next: NextFunction) =>
       tenantId: tenant.id,
       appId,
       role: tenantMember.role,
-    }, validitySeconds);
+    }, validitySeconds, audience);
 
     const expiresAt = new Date(Date.now() + validitySeconds * 1000);
 

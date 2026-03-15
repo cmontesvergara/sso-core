@@ -23,6 +23,7 @@ export interface ApplicationRow {
   logoUrl: string | null;
   backendUrl: string | null;
   isActive: boolean;
+  audience: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,6 +38,7 @@ export async function createApplication(data: {
   description?: string;
   logoUrl?: string;
   isActive?: boolean;
+  audience?: string;
 }): Promise<ApplicationRow> {
   const prisma = getPrisma();
 
@@ -48,6 +50,7 @@ export async function createApplication(data: {
       description: data.description,
       logoUrl: data.logoUrl,
       isActive: data.isActive,
+      audience: data.audience,
     },
   });
 
@@ -112,6 +115,7 @@ export async function updateApplication(
     description?: string;
     logoUrl?: string;
     isActive?: boolean;
+    audience?: string | null;
   }
 ): Promise<ApplicationRow> {
   const prisma = getPrisma();

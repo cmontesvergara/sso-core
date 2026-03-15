@@ -397,6 +397,11 @@ exports.up = (pgm) => {
       default: true,
       comment: 'Whether the application is active system-wide',
     },
+    audience: {
+      type: 'varchar(255)',
+      notNull: false,
+      comment: 'Custom JWT audience for the application',
+    },
     created_at: {
       type: 'timestamptz',
       notNull: true,

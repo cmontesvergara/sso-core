@@ -123,6 +123,12 @@ export class AppSessionService {
       throw new SessionError('NO_APP_SESSION_FOUND');
     }
 
+    // Fetch application to get custom audience if defined
+    const application = await prisma.application.findUnique({
+      where: { appId }
+    });
+    const audience = application?.audience || undefined;
+
     // Generate new JWT
     const sessionValiditySeconds = Config.get('session.expiry_time', 3600); 
     const sessionExpiresAt = new Date(Date.now() + sessionValiditySeconds * 1000);
@@ -132,7 +138,7 @@ export class AppSessionService {
       tenantId: appSession.tenant.id,
       appId: appId,
       role: appSession.role,
-    }, sessionValiditySeconds);
+    }, sessionValiditySeconds, audience);
 
     // Update app session in DB
     await extendAppSession(appSession.sessionToken, sessionExpiresAt);
