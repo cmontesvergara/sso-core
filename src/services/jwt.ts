@@ -9,6 +9,8 @@ class JWTService {
   private keystore?: jose.JWK.KeyStore;
   private privateKey: Buffer;
   private publicKey: Buffer;
+  private cachedJWKS?: any;
+  private cachedJWKSString?: string;
 
   private constructor() {
     const privateKeyPath = process.env.PRIVATE_KEY_PATH || path.resolve(__dirname, '../../keys/private.pem');
@@ -28,11 +30,18 @@ class JWTService {
     this.keystore = jose.JWK.createKeyStore();
     const key = await jose.JWK.asKey(this.privateKey, 'pem', { kid: KID });
     await this.keystore.add(key);
+    this.cachedJWKS = this.keystore.toJSON();
+    this.cachedJWKSString = JSON.stringify(this.cachedJWKS);
   }
 
   getJWKS() {
-    if (!this.keystore) throw new Error('Keystore not initialized');
-    return this.keystore.toJSON();
+    if (!this.cachedJWKS) throw new Error('Keystore not initialized');
+    return this.cachedJWKS;
+  }
+
+  getJWKSString() {
+    if (!this.cachedJWKSString) throw new Error('Keystore not initialized');
+    return this.cachedJWKSString;
   }
 
   generateToken(payload: Record<string, any>, expiresInSeconds: number = 60 * 15, audience?: string) {

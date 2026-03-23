@@ -36,10 +36,13 @@ export async function createServer(): Promise<Express> {
   app.use(helmet());
 
   // JWKS endpoint (Publicly accessible globally for CORS)
-  app.get('/.well-known/jwks.json', cors(), (_req: Request, res: Response) => {
+  app.get('/.well-known/jwks.json', (_req: Request, res: Response) => {
     try {
-      const jwks = JWT.getJWKS();
-      res.json(jwks);
+      const jwksString = JWT.getJWKSString();
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'public, max-age=3600, immutable');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.end(jwksString);
     } catch (err: any) {
       res.status(500).json({ error: 'JWKS not initialized', message: err.message });
     }
