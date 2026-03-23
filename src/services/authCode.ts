@@ -34,6 +34,8 @@ export class AuthCodeService {
    * @param tenantId - Tenant ID
    * @param appId - Application ID (e.g., 'crm', 'hr', 'admin')
    * @param redirectUri - URI to redirect after exchange
+   * @param ssoSessionId - SSO session ID (optional)
+   * @param pkce - PKCE parameters (optional, v2.3)
    * @returns Authorization code object
    */
   async generateAuthCode(
@@ -41,7 +43,13 @@ export class AuthCodeService {
     tenantId: string,
     appId: string,
     redirectUri: string,
-    ssoSessionId?: string
+    ssoSessionId?: string,
+    pkce?: {
+      codeChallenge?: string;
+      codeChallengeMethod?: string;
+      state?: string;
+      nonce?: string;
+    }
   ) {
     // Generate random code (UUID format)
     const code = `ac_${uuidv4().replace(/-/g, '')}`;
@@ -58,6 +66,10 @@ export class AuthCodeService {
       redirect_uri: redirectUri,
       sso_session_id: ssoSessionId,
       expires_at: expiresAt,
+      code_challenge: pkce?.codeChallenge,
+      code_challenge_method: pkce?.codeChallengeMethod,
+      state: pkce?.state,
+      nonce: pkce?.nonce,
     });
 
     Logger.info('Authorization code generated', {
@@ -66,6 +78,7 @@ export class AuthCodeService {
       tenantId,
       appId,
       expiresAt,
+      hasPkce: !!pkce?.codeChallenge,
     });
 
     return code;

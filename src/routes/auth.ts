@@ -267,6 +267,11 @@ const authorizeSchema = Joi.object({
   tenantId: Joi.string().required(),
   appId: Joi.string().required(),
   redirectUri: Joi.string().uri().required(),
+  // PKCE / v2.3 (optional)
+  codeChallenge: Joi.string().max(128).optional(),
+  codeChallengeMethod: Joi.string().valid('S256', 'plain').optional(),
+  state: Joi.string().max(255).optional(),
+  nonce: Joi.string().max(255).optional(),
 });
 
 router.post(
@@ -284,7 +289,7 @@ router.post(
         throw new AppError(400, 'Validation failed', 'INVALID_INPUT', details);
       }
 
-      const { tenantId, appId, redirectUri } = value;
+      const { tenantId, appId, redirectUri, codeChallenge, codeChallengeMethod, state, nonce } = value;
       const userId = (req as any).ssoUser.userId; // Set by authenticateSSO middleware
 
       // Verify user has access to the tenant
@@ -318,14 +323,37 @@ router.post(
       // Extract ssoSessionId from the authenticated SSO user
       const ssoSessionId = (req as any).ssoUser.sessionId;
 
-      // Generate authorization code
-      const authCode = await AuthCode.generateAuthCode(userId, tenantId, appId, redirectUri, ssoSessionId);
+      // Generate authorization code (with optional PKCE params)
+      const authCode = await AuthCode.generateAuthCode(
+        userId, tenantId, appId, redirectUri, ssoSessionId,
+        codeChallenge ? { codeChallenge, codeChallengeMethod, state, nonce } : undefined
+      );
 
-      res.json({
+      // Base response (v1.0 compatible)
+      const response: Record<string, any> = {
         success: true,
         authCode,
         redirectUri: `${redirectUri}?code=${authCode}`,
-      });
+      };
+
+      // v2.3: If PKCE params were provided, generate a signed JWS payload
+      if (codeChallenge) {
+        const audience = application.audience || application.url || redirectUri;
+        const signedPayload = JWT.generateToken(
+          {
+            code: authCode,
+            state,
+            nonce,
+            appId,
+            tenantId,
+          },
+          5 * 60, // 5 minutes TTL (same as auth code)
+          audience
+        );
+        response.signedPayload = signedPayload;
+      }
+
+      res.json(response);
     } catch (error) {
       next(error);
     }

@@ -13,6 +13,11 @@ interface CreateAuthCodeInput {
   redirect_uri: string;
   sso_session_id?: string | null;
   expires_at: Date;
+  // PKCE / v2.3 (optional)
+  code_challenge?: string;
+  code_challenge_method?: string;
+  state?: string;
+  nonce?: string;
 }
 
 interface AuthCodeWithRelations {
@@ -55,6 +60,11 @@ export async function createAuthCode(data: CreateAuthCodeInput) {
       ssoSessionId: data.sso_session_id,
       expiresAt: data.expires_at,
       used: false,
+      // PKCE / v2.3
+      codeChallenge: data.code_challenge,
+      codeChallengeMethod: data.code_challenge_method,
+      state: data.state,
+      nonce: data.nonce,
     },
   });
 }

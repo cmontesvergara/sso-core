@@ -233,6 +233,12 @@ model AuthCode {
   expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
+  // PKCE / v2.3 fields (optional for backward compat)
+  codeChallenge       String?  @map("code_challenge") @db.VarChar(128)
+  codeChallengeMethod String?  @map("code_challenge_method") @db.VarChar(10)
+  state               String?  @db.VarChar(255)
+  nonce               String?  @db.VarChar(255)
+
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
