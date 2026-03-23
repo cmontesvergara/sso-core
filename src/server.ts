@@ -35,6 +35,16 @@ export async function createServer(): Promise<Express> {
   // Security middleware
   app.use(helmet());
 
+  // JWKS endpoint (Publicly accessible globally for CORS)
+  app.get('/.well-known/jwks.json', cors(), (_req: Request, res: Response) => {
+    try {
+      const jwks = JWT.getJWKS();
+      res.json(jwks);
+    } catch (err: any) {
+      res.status(500).json({ error: 'JWKS not initialized', message: err.message });
+    }
+  });
+
   // CORS configuration
   app.use(
     cors({
@@ -77,16 +87,6 @@ export async function createServer(): Promise<Express> {
     legacyHeaders: false,
   });
   app.use(limiter);
-
-  // JWKS endpoint
-  app.get('/.well-known/jwks.json', (_req: Request, res: Response) => {
-    try {
-      const jwks = JWT.getJWKS();
-      res.json(jwks);
-    } catch (err: any) {
-      res.status(500).json({ error: 'JWKS not initialized', message: err.message });
-    }
-  });
 
   // API v1 routes
   const apiV1 = express.Router();
