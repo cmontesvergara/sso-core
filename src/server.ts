@@ -1,7 +1,6 @@
-import { NextFunction, Request, Response } from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
-import express, { Express } from 'express';
+import express, { Express, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { Config } from './config';
@@ -27,19 +26,6 @@ import { initRedis } from './services/redis';
 import { initRedisSessionRepo } from './repositories/redisSessionRepo';
 import { initRedisAuthCodeRepo } from './repositories/redisAuthCodeRepo';
 import v2Routes from './routes/v2';
-
-function requireRedis(_req: Request, res: Response, next: NextFunction): void {
-  const { isRedisAvailable } = require('./services/redis');
-  if (!isRedisAvailable()) {
-    res.status(503).json({
-      error: 'SERVICE_UNAVAILABLE',
-      message: 'Redis is not connected. v2 API is temporarily unavailable.',
-      timestamp: new Date().toISOString(),
-    });
-    return;
-  }
-  next();
-}
 
 export async function createServer(): Promise<Express> {
   const app = express();
@@ -158,9 +144,8 @@ export async function createServer(): Promise<Express> {
 
   app.use('/api/v1', apiV1);
 
-  // API v2 routes (SSO v2 - Redis-backed sessions)
-  // Always register routes; middleware checks Redis availability at runtime
-  app.use('/api/v2', requireRedis, v2Routes);
+  // API v2 routes (SSO v2 - Redis-backed with PG fallback)
+  app.use('/api/v2', v2Routes);
 
   // 404 handler
   app.use((req: Request, res: Response) => {
