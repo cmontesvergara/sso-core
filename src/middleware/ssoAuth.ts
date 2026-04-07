@@ -5,6 +5,7 @@ import { findAppSessionByToken } from '../repositories/appSessionRepo.prisma';
 import { getActiveSSOSessionsForUser } from '../repositories/ssoSessionRepo.prisma';
 import { getAppSessionTokenFromCookies } from '../utils/cookieUtils';
 import { Config } from '../config';
+import { SessionV2 } from '../services/sessionV2';
 
 /**
  * Extend Express Request to include SSO user context
@@ -120,7 +121,35 @@ export async function authenticateSSO(
   let autoCreatedSession = false;
 
   try {
-    // Get session token from cookie
+    // Try v2 Bearer token first
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.substring(7);
+        const payload = SessionV2.validateAccessToken(token);
+        const isRevoked = await SessionV2.isTokenRevoked(payload.jti);
+        if (isRevoked) {
+          throw new AppError(401, 'Token revoked', 'TOKEN_REVOKED');
+        }
+
+        req.ssoUser = {
+          sessionId: payload.jti,
+          userId: payload.sub,
+          email: '',
+          firstName: '',
+          lastName: '',
+          userStatus: 'active',
+          systemRole: payload.systemRole,
+        };
+
+        return next();
+      } catch (err: any) {
+        if (err instanceof AppError) throw err;
+        throw new AppError(401, 'Invalid access token', 'INVALID_ACCESS_TOKEN');
+      }
+    }
+
+    // Fallback: SSO cookie-based auth
     let sessionToken = req.cookies?.sso_session;
 
     if (!sessionToken) {
@@ -223,6 +252,31 @@ export async function optionalAuthenticateSSO(
   next: NextFunction
 ): Promise<void> {
   try {
+    // Try v2 Bearer token first
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.substring(7);
+        const payload = SessionV2.validateAccessToken(token);
+        const isRevoked = await SessionV2.isTokenRevoked(payload.jti);
+        if (!isRevoked) {
+          req.ssoUser = {
+            sessionId: payload.jti,
+            userId: payload.sub,
+            email: '',
+            firstName: '',
+            lastName: '',
+            userStatus: 'active',
+            systemRole: payload.systemRole,
+          };
+        }
+      } catch (_) {
+        // Invalid v2 token, continue as anonymous
+      }
+      return next();
+    }
+
+    // Fallback: cookie-based auth
     let sessionToken = req.cookies?.sso_session;
 
     if (!sessionToken) {
