@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { createServer } from './server';
 import { Logger } from './utils/logger';
+import { closeRedis } from './services/redis';
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || 'localhost';
 
@@ -20,12 +21,12 @@ async function bootstrap(): Promise<void> {
     // Graceful shutdown
     process.on('SIGTERM', () => {
       Logger.info('SIGTERM received, shutting down gracefully...');
-      process.exit(0);
+      closeRedis().then(() => process.exit(0));
     });
 
     process.on('SIGINT', () => {
       Logger.info('SIGINT received, shutting down gracefully...');
-      process.exit(0);
+      closeRedis().then(() => process.exit(0));
     });
   } catch (error) {
     Logger.error('Failed to start server:', error);

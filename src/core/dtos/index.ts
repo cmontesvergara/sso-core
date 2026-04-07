@@ -9,6 +9,9 @@ export * from './user.dto';
 // Auth DTOs
 export * from './auth.dto';
 
+// Auth v2 DTOs
+export * from './auth-v2.dto';
+
 // Address DTOs
 export * from './address.dto';
 

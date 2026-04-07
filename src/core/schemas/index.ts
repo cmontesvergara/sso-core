@@ -20,3 +20,6 @@ export * from './otp.schema';
 
 // Email Verification schemas
 export * from './email-verification.schema';
+
+// Auth v2 schemas
+export * from './auth-v2.schema';

@@ -60,6 +60,7 @@ model User {
   authCodes          AuthCode[]
   appSessions        AppSession[]
   userAppAccess      UserAppAccess[]
+  auditLogs          AuditLog[]
 
   @@map("users")
 }
@@ -351,4 +352,23 @@ model UserAppAccess {
   @@index([applicationId])
   @@index([userId, tenantId])
   @@map("user_app_access")
+}
+
+model AuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  action     String   @db.VarChar(100)
+  userId     String?  @map("user_id") @db.Uuid
+  jti        String?  @db.VarChar(255)
+  ipAddress  String?  @map("ip_address") @db.Inet
+  userAgent  String?  @map("user_agent")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
 }

@@ -59,8 +59,8 @@ class JWTService {
     try {
       const decoded = jwt.verify(token, this.publicKey, {
         algorithms: ['RS256'],
-        issuer: process.env.JWT_ISS || 'http://localhost:3567',
-        audience: process.env.JWT_AUD || 'u-sso-api'
+        issuer: process.env.JWT_ISS || 'https://sso.bigso.co',
+        audience: process.env.JWT_AUD || 'https://sso.bigso.co'
       });
       return decoded;
     } catch (err) {

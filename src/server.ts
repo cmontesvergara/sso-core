@@ -1,6 +1,7 @@
+import { NextFunction, Request, Response } from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
-import express, { Express, Request, Response } from 'express';
+import express, { Express } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { Config } from './config';
@@ -22,6 +23,23 @@ import statsRoutes from './routes/stats';
 import { JWT } from './services/jwt';
 import { initPrisma } from './services/prisma';
 import { initSessionSubsystem } from './services/session';
+import { initRedis } from './services/redis';
+import { initRedisSessionRepo } from './repositories/redisSessionRepo';
+import { initRedisAuthCodeRepo } from './repositories/redisAuthCodeRepo';
+import v2Routes from './routes/v2';
+
+function requireRedis(_req: Request, res: Response, next: NextFunction): void {
+  const { isRedisAvailable } = require('./services/redis');
+  if (!isRedisAvailable()) {
+    res.status(503).json({
+      error: 'SERVICE_UNAVAILABLE',
+      message: 'Redis is not connected. v2 API is temporarily unavailable.',
+      timestamp: new Date().toISOString(),
+    });
+    return;
+  }
+  next();
+}
 
 export async function createServer(): Promise<Express> {
   const app = express();
@@ -82,6 +100,32 @@ export async function createServer(): Promise<Express> {
     }
   });
 
+  // Initialize JWT keys before setting up routes
+  await JWT.initKeys();
+
+  // Initialize Prisma client
+  try {
+    await initPrisma();
+  } catch (err) {
+    console.warn('Prisma initialization failed; continuing...', err);
+  }
+
+  // Initialize Redis (v2 session backend) before routes
+  try {
+    await initRedis();
+    await initRedisSessionRepo();
+    await initRedisAuthCodeRepo();
+  } catch (err) {
+    console.warn('Redis initialization failed; v2 API will return 503 until Redis connects.', err);
+  }
+
+  // Initialize v1 session subsystem
+  try {
+    await initSessionSubsystem();
+  } catch (err) {
+    console.warn('Session subsystem failed to init; continue without sessions for now.', err);
+  }
+
   // Rate limiter (global)
   const limiter = rateLimit({
     windowMs: Config.get('rateLimit.windowMs', 60 * 1000), // default 1 minute
@@ -114,6 +158,10 @@ export async function createServer(): Promise<Express> {
 
   app.use('/api/v1', apiV1);
 
+  // API v2 routes (SSO v2 - Redis-backed sessions)
+  // Always register routes; middleware checks Redis availability at runtime
+  app.use('/api/v2', requireRedis, v2Routes);
+
   // 404 handler
   app.use((req: Request, res: Response) => {
     res.status(404).json({
@@ -125,26 +173,6 @@ export async function createServer(): Promise<Express> {
 
   // Error handler (must be last)
   app.use(errorHandler);
-
-  // Initialize JWT keys before returning server (non-blocking if already initialized)
-  try {
-    await JWT.initKeys();
-    // Initialize Prisma client
-    try {
-      await initPrisma();
-    } catch (err) {
-      console.warn('Prisma initialization failed; continuing...', err);
-    }
-    // initialize session subsystem
-    try {
-      await initSessionSubsystem();
-    } catch (err) {
-      console.warn('Session subsystem failed to init; continue without sessions for now.', err);
-    }
-  } catch (err) {
-    console.error('Failed to initialize JWT keystore:', err);
-    throw err;
-  }
 
   return app;
 }

@@ -165,7 +165,7 @@ logging:
     _default: json
 
 # ============================================================
-# API Rate Limiting
+# Rate Limiting
 # ============================================================
 
 rateLimit:
@@ -192,6 +192,30 @@ rateLimit:
       _default: 60000 # 1 minute
     max:
       _default: 60
+
+# ============================================================
+# Redis Configuration (for SSO v2 sessions)
+# ============================================================
+
+redis:
+  host:
+    _default: localhost
+
+  port:
+    _default: 6379
+
+  password: null
+
+# ============================================================
+# SSO v2 Configuration
+# ============================================================
+
+v2:
+  access_token_expiry:
+    _default: 900
+
+  refresh_token_expiry:
+    _default: 604800
 
 # ============================================================
 # Features
