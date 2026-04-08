@@ -20,6 +20,7 @@ export const authorizeV2Schema = Joi.object({
   redirectUri: Joi.string().uri().required(),
   codeChallenge: Joi.string().max(128).required(),
   codeChallengeMethod: Joi.string().valid('S256', 'plain').default('S256'),
+  codeVerifier: Joi.string().max(256).optional(),
   state: Joi.string().max(255).optional(),
   nonce: Joi.string().max(255).optional(),
 });

@@ -172,6 +172,8 @@ class ConfigManager {
         } else if (value && typeof value === 'object' && !Array.isArray(value)) {
           // It's a nested object, continue recursion
           this.applyEnvOverrides(value, fullPath);
+        } else if (envValue.includes(',')) {
+          obj[key] = envValue.split(',').map((v: string) => v.trim());
         } else {
           obj[key] = envValue;
         }

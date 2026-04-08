@@ -150,7 +150,7 @@ router.post(
         throw new AppError(400, 'Validation failed', 'INVALID_INPUT', details);
       }
 
-      const { tenantId, appId, redirectUri, codeChallenge, codeChallengeMethod, state } =
+      const { tenantId, appId, redirectUri, codeChallenge, codeChallengeMethod, codeVerifier, state, nonce } =
         value;
       const userId = req.v2User!.userId;
 
@@ -198,6 +198,28 @@ router.post(
 
       if (state) {
         response.state = state;
+      }
+
+      if (codeChallenge) {
+        const audience = application.audience || application.url || redirectUri;
+        const jwsPayload: Record<string, any> = {
+          code,
+          state: state || undefined,
+          nonce: nonce || undefined,
+          appId,
+          tenantId,
+        };
+
+        if (codeVerifier) {
+          jwsPayload.code_verifier = codeVerifier;
+        }
+
+        const signedPayload = JWT.generateToken(
+          jwsPayload,
+          5 * 60,
+          audience
+        );
+        response.signedPayload = signedPayload;
       }
 
       res.json(response);

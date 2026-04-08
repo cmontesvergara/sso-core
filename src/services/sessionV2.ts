@@ -163,6 +163,8 @@ class SessionV2Service {
       jti,
       tenants: user.tenantMembers.map((tm: any) => ({
         id: tm.tenant.id,
+        name: tm.tenant.name,
+        slug: tm.tenant.slug,
         role: tm.role,
         apps: tm.tenant.tenantApps.map((ta: any) => ta.application.appId),
       })),
