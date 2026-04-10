@@ -214,6 +214,10 @@ router.post(
           jwsPayload.code_verifier = codeVerifier;
         }
 
+        if (application.scope && application.scope.length > 0) {
+          jwsPayload.scope = application.scope;
+        }
+
         const signedPayload = JWT.generateToken(
           jwsPayload,
           5 * 60,
@@ -279,7 +283,7 @@ router.post(
       const session = await SessionV2.createSession(user.id, {
         ip: req.ip,
         userAgent: req.get('user-agent'),
-      });
+      }, { appId: appId });
 
       await AuditLog.logSecurityEvent(
         'V2_EXCHANGE',
@@ -329,7 +333,8 @@ router.post(
       }
 
       try {
-        const newSession = await SessionV2.rotateRefreshToken(refreshToken);
+        const appId = req.body?.appId;
+        const newSession = await SessionV2.rotateRefreshToken(refreshToken, appId ? { appId } : undefined);
 
         await AuditLog.logTokenRefresh(
           newSession.jti,

@@ -126,7 +126,8 @@ class SessionV2Service {
 
   async createSession(
     userId: string,
-    deviceInfo?: { ip?: string; userAgent?: string; fingerprint?: string }
+    deviceInfo?: { ip?: string; userAgent?: string; fingerprint?: string },
+    appContext?: { appId?: string }
   ): Promise<{ accessToken: string; refreshToken: string; jti: string }> {
     const prisma = getPrismaClient();
     const user = await prisma.user.findUnique({
@@ -158,7 +159,7 @@ class SessionV2Service {
     const jti = uuidv4();
     const accessTokenExpiry = Config.get('v2.access_token_expiry', 900);
 
-    const payload = {
+    const payload: Record<string, any> = {
       sub: user.id,
       jti,
       tenants: user.tenantMembers.map((tm: any) => ({
@@ -171,6 +172,15 @@ class SessionV2Service {
       systemRole: user.systemRole,
       deviceFingerprint: deviceInfo?.fingerprint,
     };
+
+    if (appContext?.appId) {
+      const application = await prisma.application.findUnique({
+        where: { appId: appContext.appId },
+      });
+      if (application && application.scope && application.scope.length > 0) {
+        payload.scope = application.scope;
+      }
+    }
 
     const accessToken = JWT.generateToken(payload, accessTokenExpiry);
 
@@ -236,7 +246,7 @@ class SessionV2Service {
     return false;
   }
 
-  async rotateRefreshToken(refreshTokenPlain: string): Promise<{ accessToken: string; refreshToken: string; jti: string }> {
+  async rotateRefreshToken(refreshTokenPlain: string, appContext?: { appId?: string }): Promise<{ accessToken: string; refreshToken: string; jti: string }> {
     const refreshTokenHash = hashToken(refreshTokenPlain);
 
     // Try Redis first (fast path)
@@ -261,7 +271,7 @@ class SessionV2Service {
             await revokePgRefreshTokenById(pgRow.id);
           }
 
-          return await this.createSession(tokenData.userId);
+          return await this.createSession(tokenData.userId, undefined, appContext);
         }
         // Token not found in Redis, fall through to PG
       }
@@ -291,7 +301,7 @@ class SessionV2Service {
 
     await revokePgRefreshTokenById(row.id);
 
-    return await this.createSession(row.userId);
+    return await this.createSession(row.userId, undefined, appContext);
   }
 
   async revokeSession(jti: string, userId?: string): Promise<void> {

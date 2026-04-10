@@ -284,8 +284,9 @@ model Application {
   logoUrl     String?  @map("logo_url")
   backendUrl  String?  @map("backend_url")
   isActive    Boolean  @default(true) @map("is_active")
-  audience    String?  @db.VarChar(255)
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+   audience    String?  @db.VarChar(255)
+   scope       String[] @default([])
+   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   tenantApps    TenantApp[]
