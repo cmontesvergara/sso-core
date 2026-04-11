@@ -127,7 +127,7 @@ class SessionV2Service {
   async createSession(
     userId: string,
     deviceInfo?: { ip?: string; userAgent?: string; fingerprint?: string },
-    appContext?: { appId?: string }
+    appContext?: { appId?: string; tenantId?: string }
   ): Promise<{ accessToken: string; refreshToken: string; jti: string }> {
     const prisma = getPrismaClient();
     const user = await prisma.user.findUnique({
@@ -172,6 +172,11 @@ class SessionV2Service {
       systemRole: user.systemRole,
       deviceFingerprint: deviceInfo?.fingerprint,
     };
+
+    // Include selected tenantId if provided (from exchange v2)
+    if (appContext?.tenantId) {
+      payload.tenantId = appContext.tenantId;
+    }
 
     if (appContext?.appId) {
       const application = await prisma.application.findUnique({

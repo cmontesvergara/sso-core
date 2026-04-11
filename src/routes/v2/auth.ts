@@ -283,7 +283,7 @@ router.post(
       const session = await SessionV2.createSession(user.id, {
         ip: req.ip,
         userAgent: req.get('user-agent'),
-      }, { appId: appId });
+      }, { appId: appId, tenantId: codeData.tenantId });
 
       await AuditLog.logSecurityEvent(
         'V2_EXCHANGE',
