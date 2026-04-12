@@ -488,28 +488,28 @@ router.post(
         console.error('Error resolving permissions for verify-session:', err);
       }
 
-      // Valid session
-      // res.json({
-      //   success: true,
-      //   valid: true,
-      //   user: {},
-      //   currentTenant: {
-      //     tenantId: appSession.tenant.id,
-      //     name: appSession.tenant.name,
-      //     slug: appSession.tenant.slug,
-      //     role: appSession.role,
-      //     permissions: permissions,
-      //   },
-      //   relatedTenants: {
-      //     tenantId: appSession.tenant.id,
-      //     name: appSession.tenant.name,
-      //     slug: appSession.tenant.slug,
-      //     role: appSession.role,
-      //     permissions: permissions,
-      //   },
-      //   appId: appSession.appId,
-      //   expiresAt: appSession.expiresAt.toISOString(),
-      // });
+      const response = {
+        success: true,
+        valid: true,
+        user: {},
+        currentTenant: {
+          tenantId: appSession.tenant.id,
+          name: appSession.tenant.name,
+          slug: appSession.tenant.slug,
+          role: appSession.role,
+          permissions: permissions,
+        },
+        relatedTenants: {
+          tenantId: appSession.tenant.id,
+          name: appSession.tenant.name,
+          slug: appSession.tenant.slug,
+          role: appSession.role,
+          permissions: permissions,
+        },
+        appId: appSession.appId,
+        expiresAt: appSession.expiresAt.toISOString(),
+      }
+      console.log('Verify session response:', response);
       res.json({
         "success": true,
         "user": {
