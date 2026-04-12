@@ -194,9 +194,7 @@ class SessionV2Service {
       const application = await prisma.application.findUnique({
         where: { appId: appContext.appId },
       });
-      if (application && application.scope && application.scope.length > 0) {
-        payload.scope = application.scope;
-      }
+      payload.scope = application?.scope || []
     }
 
     const accessToken = JWT.generateToken(payload, accessTokenExpiry);
