@@ -1,33 +1,33 @@
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { Config } from '../config';
-import { Logger } from '../utils/logger';
-import { isRedisAvailable } from '../services/redis';
-import { getPrismaClient } from './prisma';
-import { JWT } from './jwt';
 import {
-  saveRedisSession,
-  revokeRedisSession,
-  isRedisSessionRevoked,
-  revokeAllRedisUserSessions,
-  getRedisRefreshToken,
   deleteRedisRefreshToken,
-  markRefreshTokenFamilyUsed,
+  getRedisRefreshToken,
+  isRedisSessionRevoked,
   isRefreshTokenFamilyUsed,
+  markRefreshTokenFamilyUsed,
+  revokeAllRedisUserSessions,
+  revokeRedisSession,
   saveRedisRefreshToken,
+  saveRedisSession,
 } from '../repositories/redisSessionRepo';
 import {
-  createSSOSession as createPgSession,
-  findSSOSessionByToken as findPgSessionByToken,
-  deleteSSOSession as deletePgSession,
-  deleteAllSSOSessionsForUser as deleteAllPgSessionsForUser,
-} from '../repositories/ssoSessionRepo.prisma';
-import {
-  saveRefreshToken as savePgRefreshToken,
   findRefreshTokenByHash as findPgRefreshTokenByHash,
-  revokeRefreshTokenById as revokePgRefreshTokenById,
   revokeAllRefreshTokensForUser as revokeAllPgRefreshTokensForUser,
+  revokeRefreshTokenById as revokePgRefreshTokenById,
+  saveRefreshToken as savePgRefreshToken,
 } from '../repositories/refreshTokenRepo.prisma';
+import {
+  createSSOSession as createPgSession,
+  deleteAllSSOSessionsForUser as deleteAllPgSessionsForUser,
+  deleteSSOSession as deletePgSession,
+  findSSOSessionByToken as findPgSessionByToken,
+} from '../repositories/ssoSessionRepo.prisma';
+import { isRedisAvailable } from '../services/redis';
+import { Logger } from '../utils/logger';
+import { JWT } from './jwt';
+import { getPrismaClient } from './prisma';
 
 const PEPPER = process.env.REFRESH_TOKEN_PEPPER || 'change-me-pepper';
 const V2_PREFIX = 'v2_';
@@ -49,7 +49,7 @@ export { SessionV2Error };
 
 class SessionV2Service {
   private static instance: SessionV2Service;
-  private constructor() {}
+  private constructor() { }
 
   static getInstance(): SessionV2Service {
     if (!SessionV2Service.instance) {
@@ -128,25 +128,34 @@ class SessionV2Service {
     userId: string,
     deviceInfo?: { ip?: string; userAgent?: string; fingerprint?: string },
     appContext?: { appId?: string; tenantId?: string }
-  ): Promise<{ accessToken: string; refreshToken: string; jti: string }> {
+  ): Promise<{ accessToken: string; refreshToken: string; jti: string; tenants: Array<{ id: string; name: string; slug: string; role: string }> }> {
     const prisma = getPrismaClient();
+    console.log('Creating session for userId:', userId, 'appContext:', appContext);
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        tenantMembers: {
-          include: {
-            tenant: {
-              include: {
-                tenantApps: {
-                  where: { isEnabled: true },
-                  include: { application: true },
-                },
+    });
+    const tenantMembers = await prisma.tenantMember.findMany({
+      where: {
+        userId: userId,
+        tenant: {
+          tenantApps: {
+            some: {
+              application: {
+                appId: appContext?.appId,
               },
+              isEnabled: true,
             },
           },
         },
       },
+      include: {
+        tenant: true,
+      },
     });
+
+    console.log('Tenant members found:', tenantMembers);
+
+
 
     if (!user) {
       throw new SessionV2Error('User not found', 'USER_NOT_FOUND');
@@ -158,17 +167,15 @@ class SessionV2Service {
 
     const jti = uuidv4();
     const accessTokenExpiry = Config.get('v2.access_token_expiry', 900);
-
+    const tenants = tenantMembers.map((tm: any) => ({
+      id: tm.tenant.id,
+      name: tm.tenant.name,
+      slug: tm.tenant.slug,
+      role: tm.role,
+    }))
     const payload: Record<string, any> = {
       sub: user.id,
       jti,
-      tenants: user.tenantMembers.map((tm: any) => ({
-        id: tm.tenant.id,
-        name: tm.tenant.name,
-        slug: tm.tenant.slug,
-        role: tm.role,
-        apps: tm.tenant.tenantApps.map((ta: any) => ta.application.appId),
-      })),
       systemRole: user.systemRole,
       deviceFingerprint: deviceInfo?.fingerprint,
     };
@@ -179,6 +186,7 @@ class SessionV2Service {
     }
 
     if (appContext?.appId) {
+      payload.appId = appContext.appId;
       const application = await prisma.application.findUnique({
         where: { appId: appContext.appId },
       });
@@ -208,7 +216,8 @@ class SessionV2Service {
 
     Logger.info('Session v2 created', { jti, userId: user.id });
 
-    return { accessToken, refreshToken, jti };
+
+    return { accessToken, refreshToken, jti, tenants };
   }
 
   validateAccessToken(token: string): any {
@@ -295,7 +304,7 @@ class SessionV2Service {
       if (row.userId) {
         await revokeAllPgRefreshTokensForUser(row.userId);
         await deleteAllPgSessionsForUser(row.userId);
-        try { await revokeAllRedisUserSessions(row.userId); } catch (_) {}
+        try { await revokeAllRedisUserSessions(row.userId); } catch (_) { }
       }
       throw new SessionV2Error('Token reuse detected - all sessions revoked', 'TOKEN_REUSE_DETECTED');
     }
@@ -315,7 +324,7 @@ class SessionV2Service {
       if (isRedisAvailable()) {
         await revokeRedisSession(jti, userId);
       }
-    } catch (_) {}
+    } catch (_) { }
 
     await deletePgSession(`${V2_PREFIX}${jti}`);
 
@@ -328,7 +337,7 @@ class SessionV2Service {
       if (isRedisAvailable()) {
         await revokeAllRedisUserSessions(userId);
       }
-    } catch (_) {}
+    } catch (_) { }
 
     const pgCount = await deleteAllPgSessionsForUser(userId);
     await revokeAllPgRefreshTokensForUser(userId);

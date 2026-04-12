@@ -1,25 +1,24 @@
+import argon2 from 'argon2';
 import { NextFunction, Request, Response, Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { Config } from '../../config';
-import { AppError } from '../../middleware/errorHandler';
-import { authenticateV2AccessToken } from '../../middleware/v2Auth';
-import { SessionV2, SessionV2Error } from '../../services/sessionV2';
-import { AuthCodeV2 } from '../../services/authCodeV2';
-import { AuditLog } from '../../services/auditLog';
-import { JWT } from '../../services/jwt';
-import { OTP } from '../../services/otp';
-import { findApplicationByAppId } from '../../repositories/applicationRepo.prisma';
-import { findTenantMember } from '../../repositories/tenantRepo.prisma';
-import { findTenantById } from '../../repositories/tenantRepo.prisma';
-import { findUserByEmail, findUserByNuid } from '../../repositories/userRepo.prisma';
-import { userHasAppAccess } from '../../repositories/userAppAccessRepo.prisma';
-import { findTenantApp } from '../../repositories/tenantAppRepo.prisma';
-import argon2 from 'argon2';
 import {
-  loginV2Schema,
   authorizeV2Schema,
   exchangeV2Schema,
+  loginV2Schema,
 } from '../../core/schemas/auth-v2.schema';
+import { AppError } from '../../middleware/errorHandler';
+import { authenticateV2AccessToken } from '../../middleware/v2Auth';
+import { findApplicationByAppId } from '../../repositories/applicationRepo.prisma';
+import { findTenantApp } from '../../repositories/tenantAppRepo.prisma';
+import { findTenantById, findTenantMember } from '../../repositories/tenantRepo.prisma';
+import { userHasAppAccess } from '../../repositories/userAppAccessRepo.prisma';
+import { findUserByEmail, findUserByNuid } from '../../repositories/userRepo.prisma';
+import { AuditLog } from '../../services/auditLog';
+import { AuthCodeV2 } from '../../services/authCodeV2';
+import { JWT } from '../../services/jwt';
+import { OTP } from '../../services/otp';
+import { SessionV2, SessionV2Error } from '../../services/sessionV2';
 
 const router = Router();
 
@@ -313,6 +312,7 @@ router.post(
           slug: tenant.slug,
           role: tenantMember?.role,
         },
+        tenants: session.tenants,
       });
     } catch (error) {
       next(error);
