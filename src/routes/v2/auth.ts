@@ -94,31 +94,27 @@ router.post('/login', loginLimiter, async (req: Request, res: Response, next: Ne
       ip: req.ip,
       userAgent: req.get('user-agent'),
     };
+    if (!req.body.appId) {
+      console.warn('===> No appId provided in login request, using default appId from config');
+    }
+    if (!Config.get('sso.defaulttenantid')) {
+      console.warn('===> No tenantId provided in login request, using default tenantId from config');
+    }
 
-    const session = await SessionV2.createSession(user.id, device);
+    const appId = req.body.appId || Config.get('default_app_id');
+    const tenantId = Config.get('default_tenant_id');
+
+    const session = await SessionV2.createSsoSession(user.id, device, {
+      appId,
+      tenantId,
+    });
 
     await AuditLog.logLogin(user.id, req.ip, req.get('user-agent'));
 
-    const refreshTokenCookieOptions: any = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/api/v2/auth/refresh',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    };
-
-    if (process.env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN) {
-      refreshTokenCookieOptions.domain = process.env.COOKIE_DOMAIN;
-    }
-
-    res.cookie('v2_refresh_token', session.refreshToken, refreshTokenCookieOptions);
-
     res.json({
       success: true,
-      tokens: {
-        accessToken: session.accessToken,
-        expiresIn: Config.get('v2.access_token_expiry', 900),
-      },
+      ssoToken: session.accessToken,
+      expiresIn: 15 * 60,
       user: {
         userId: user.id,
         email: user.email,
@@ -152,6 +148,13 @@ router.post(
       const { tenantId, appId, redirectUri, codeChallenge, codeChallengeMethod, codeVerifier, state, nonce } =
         value;
       const userId = req.v2User!.userId;
+      const sessionAppId = req.v2User!.appId;
+
+      console.log('------', sessionAppId, appId);
+
+      if (sessionAppId !== appId) {
+        throw new AppError(403, 'App mismatch. Cannot authorize for a different app than the login session', 'APP_MISMATCH');
+      }
 
       const tenantMember = await findTenantMember(tenantId, userId);
       if (!tenantMember) {
@@ -264,34 +267,33 @@ router.post(
         throw new AppError(401, err.message || 'Invalid auth code', 'INVALID_AUTH_CODE');
       }
 
-      const user = await (await import('../../repositories/userRepo.prisma')).findUserById(
-        codeData.userId
-      );
-      if (!user) {
-        throw new AppError(404, 'User not found', 'USER_NOT_FOUND');
-      }
-      if (user.userStatus !== 'active') {
-        throw new AppError(403, 'Account not active', 'ACCOUNT_NOT_ACTIVE');
-      }
+
 
       const tenant = await findTenantById(codeData.tenantId);
       if (!tenant) {
         throw new AppError(404, 'Tenant not found', 'TENANT_NOT_FOUND');
       }
 
-      const session = await SessionV2.createSession(user.id, {
-        ip: req.ip,
-        userAgent: req.get('user-agent'),
-      }, { appId: appId, tenantId: codeData.tenantId });
+      const session = await SessionV2.createAppSession(
+        codeData.userId,
+        { ip: req.ip, userAgent: req.get('user-agent'), },
+        { appId: appId, tenantId: codeData.tenantId });
 
       await AuditLog.logSecurityEvent(
         'V2_EXCHANGE',
-        user.id,
+        codeData.userId,
         { tenantId: codeData.tenantId, appId },
         req.ip
       );
 
-      const tenantMember = await findTenantMember(codeData.tenantId, user.id);
+      let userInformation: {
+        [key: string]: any;
+      } = session.user;
+
+      delete userInformation.createdAt
+      delete userInformation.updatedAt
+      delete userInformation.passwordHash
+
 
       res.json({
         success: true,
@@ -300,19 +302,12 @@ router.post(
           refreshToken: session.refreshToken,
           expiresIn: Config.get('v2.access_token_expiry', 900),
         },
-        user: {
-          userId: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
+        user: userInformation,
+        currentTenant: {
+          ...session.tenants.find(t => t.id === codeData.tenantId),
+          permissions: session.permissions
         },
-        tenant: {
-          tenantId: codeData.tenantId,
-          name: tenant.name,
-          slug: tenant.slug,
-          role: tenantMember?.role,
-        },
-        tenants: session.tenants,
+        relatedTenants: session.tenants,
       });
     } catch (error) {
       next(error);
@@ -386,21 +381,15 @@ router.post(
 
 router.post('/logout', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { revokeAll = false } = req.body || {};
     const authHeader = req.headers.authorization;
 
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
       try {
         const payload = SessionV2.validateAccessToken(token);
-
-        if (revokeAll) {
-          await SessionV2.revokeAllUserSessions(payload.sub);
-          await AuditLog.logLogout(payload.sub, undefined, req.ip, req.get('user-agent'));
-        } else {
-          await SessionV2.revokeSession(payload.jti, payload.sub);
-          await AuditLog.logTokenRevoke(payload.sub, payload.jti, req.ip);
-        }
+        const sessionType = payload.type === 'sso' ? 'sso' : 'app';
+        await SessionV2.revokeSession(payload.jti, payload.sub, sessionType);
+        await AuditLog.logTokenRevoke(payload.sub, payload.jti, req.ip);
       } catch (_) {
         // Token may be expired or invalid; continue cleanup
       }

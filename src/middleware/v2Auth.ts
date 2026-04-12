@@ -5,13 +5,12 @@ import { AppError } from './errorHandler';
 interface V2User {
   userId: string;
   jti: string;
-  tenants: Array<{
-    id: string;
-    role: string;
-    apps: string[];
-  }>;
+  type: 'sso' | 'app';
+  appId?: string;
+  tenantId?: string;
   systemRole: string;
   deviceFingerprint?: string;
+  scope?: string[];
 }
 
 declare module 'express-serve-static-core' {
@@ -36,7 +35,8 @@ export async function authenticateV2AccessToken(
     try {
       const payload = SessionV2.validateAccessToken(token);
 
-      const isRevoked = await SessionV2.isTokenRevoked(payload.jti);
+      const sessionType = payload.type === 'sso' ? 'sso' : 'app';
+      const isRevoked = await SessionV2.isTokenRevoked(payload.jti, sessionType);
       if (isRevoked) {
         throw new AppError(401, 'Token has been revoked', 'TOKEN_REVOKED');
       }
@@ -44,9 +44,12 @@ export async function authenticateV2AccessToken(
       req.v2User = {
         userId: payload.sub,
         jti: payload.jti,
-        tenants: payload.tenants,
+        type: payload.type,
+        appId: payload.appId,
+        tenantId: payload.tenantId,
         systemRole: payload.systemRole,
         deviceFingerprint: payload.deviceFingerprint,
+        scope: payload.scope,
       };
 
       next();

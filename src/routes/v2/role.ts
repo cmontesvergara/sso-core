@@ -16,7 +16,7 @@ router.get(
       const appId = req.query.appId as string;
       const userId = req.v2User!.userId;
       const systemRole = req.v2User!.systemRole;
-      const tenants = req.v2User!.tenants;
+      const tokenTenantId = req.v2User!.tenantId;
 
       if (!appId) {
         throw new AppError(400, 'appId query parameter is required', 'MISSING_APP_ID');
@@ -29,22 +29,17 @@ router.get(
 
       const isSystemAdmin = ['super_admin', 'system_admin'].includes(systemRole?.toLowerCase());
 
-      if (!isSystemAdmin) {
-        const hasAppAccess = tenants.some((t) => t.apps?.includes(appId));
-        if (!hasAppAccess) {
-          throw new AppError(403, 'Application not accessible for this user', 'APP_NOT_IN_TOKEN');
-        }
+      if (!isSystemAdmin && !tokenTenantId) {
+        throw new AppError(403, 'Tenant ID required in session', 'MISSING_TENANT');
       }
 
       const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/i.test(roleId);
 
       if (!isUuid) {
-        const tenant = tenants.find((t) => t.role === roleId && t.apps?.includes(appId));
-        if (!tenant) {
-          throw new AppError(404, `Role "${roleId}" not found in user's tenants for app "${appId}"`, 'ROLE_NOT_FOUND');
+        if (!tokenTenantId) {
+          throw new AppError(400, 'Tenant ID not found in session', 'MISSING_TENANT');
         }
-
-        const roleRecord = await findRoleByTenantAndName(tenant.id, roleId);
+        const roleRecord = await findRoleByTenantAndName(tokenTenantId, roleId);
         if (!roleRecord) {
           throw new AppError(404, `Role "${roleId}" not found in tenant`, 'ROLE_NOT_FOUND');
         }

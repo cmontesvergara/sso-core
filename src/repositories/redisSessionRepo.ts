@@ -1,12 +1,14 @@
+import { Config } from '../config';
+import type { RedisRefreshTokenData, RedisSessionData } from '../core/dtos/auth-v2.dto';
 import { getRedisClient } from '../services/redis';
 import { Logger } from '../utils/logger';
-import { Config } from '../config';
-import type { RedisSessionData, RedisRefreshTokenData } from '../core/dtos/auth-v2.dto';
 
-const SESSION_PREFIX = 'v2:session:';
+const SSO_SESSION_PREFIX = 'sso_v2:session:';
+const APP_SESSION_PREFIX = 'app_v2:session:';
 const REFRESH_PREFIX = 'v2:refresh:';
 const REVOKED_PREFIX = 'v2:revoked:';
 const USER_SESSIONS_PREFIX = 'v2:user_sessions:';
+const PERMISSIONS_PREFIX = 'v2:permissions:';
 
 function getAccessTokenExpiry(): number {
   return Config.get('v2.access_token_expiry', 900);
@@ -24,10 +26,12 @@ export async function saveRedisSession(
   jti: string,
   userId: string,
   data: Omit<RedisSessionData, 'userId' | 'createdAt'>,
-  ttlSeconds?: number
+  ttlSeconds?: number,
+  sessionType: 'sso' | 'app' = 'app'
 ): Promise<void> {
   const redis = getRedisClient();
   const ttl = ttlSeconds ?? getAccessTokenExpiry();
+  const prefix = sessionType === 'sso' ? SSO_SESSION_PREFIX : APP_SESSION_PREFIX;
   const sessionData: RedisSessionData = {
     userId,
     ...data,
@@ -35,24 +39,27 @@ export async function saveRedisSession(
   };
 
   const multi = redis.multi();
-  multi.setex(`${SESSION_PREFIX}${jti}`, ttl, JSON.stringify(sessionData));
+  multi.setex(`${prefix}${jti}`, ttl, JSON.stringify(sessionData));
   multi.sadd(`${USER_SESSIONS_PREFIX}${userId}`, jti);
   await multi.exec();
 }
 
-export async function getRedisSession(jti: string): Promise<RedisSessionData | null> {
+export async function getRedisSession(jti: string, sessionType: 'sso' | 'app' = 'app'): Promise<RedisSessionData | null> {
   const redis = getRedisClient();
-  const data = await redis.get(`${SESSION_PREFIX}${jti}`);
+  const prefix = sessionType === 'sso' ? SSO_SESSION_PREFIX : APP_SESSION_PREFIX;
+  const data = await redis.get(`${prefix}${jti}`);
   return data ? JSON.parse(data) : null;
 }
 
-export async function revokeRedisSession(jti: string, userId?: string): Promise<void> {
+export async function revokeRedisSession(jti: string, userId?: string, sessionType: 'sso' | 'app' = 'app'): Promise<void> {
   const redis = getRedisClient();
   const ttl = getAccessTokenExpiry();
+  const prefix = sessionType === 'sso' ? SSO_SESSION_PREFIX : APP_SESSION_PREFIX;
 
   const multi = redis.multi();
   multi.setex(`${REVOKED_PREFIX}${jti}`, ttl, '1');
-  multi.del(`${SESSION_PREFIX}${jti}`);
+  multi.del(`${prefix}${jti}`);
+  multi.del(`${PERMISSIONS_PREFIX}${jti}`);
 
   if (userId) {
     multi.srem(`${USER_SESSIONS_PREFIX}${userId}`, jti);
@@ -83,7 +90,8 @@ export async function revokeAllRedisUserSessions(userId: string): Promise<number
 
   for (const jti of jtis) {
     multi.setex(`${REVOKED_PREFIX}${jti}`, ttl, '1');
-    multi.del(`${SESSION_PREFIX}${jti}`);
+    multi.del(`${SSO_SESSION_PREFIX}${jti}`);
+    multi.del(`${APP_SESSION_PREFIX}${jti}`);
   }
 
   multi.del(`${USER_SESSIONS_PREFIX}${userId}`);
@@ -125,4 +133,25 @@ export async function isRefreshTokenFamilyUsed(familyId: string): Promise<boolea
   const redis = getRedisClient();
   const used = await redis.get(`${REFRESH_PREFIX}family:${familyId}`);
   return used !== null;
+}
+
+export async function cachePermissions(
+  jti: string,
+  permissions: Array<{ resource: string; action: string }>,
+  ttlSeconds?: number
+): Promise<void> {
+  const redis = getRedisClient();
+  const ttl = ttlSeconds ?? getAccessTokenExpiry();
+  await redis.setex(`${PERMISSIONS_PREFIX}${jti}`, ttl, JSON.stringify(permissions));
+}
+
+export async function getCachedPermissions(jti: string): Promise<string[] | null> {
+  const redis = getRedisClient();
+  const data = await redis.get(`${PERMISSIONS_PREFIX}${jti}`);
+  return data ? JSON.parse(data) : null;
+}
+
+export async function revokeCachedPermissions(jti: string): Promise<void> {
+  const redis = getRedisClient();
+  await redis.del(`${PERMISSIONS_PREFIX}${jti}`);
 }
