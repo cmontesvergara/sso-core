@@ -193,6 +193,12 @@ rateLimit:
     max:
       _default: 60
 
+  session:
+    windowMs:
+      _default: 60000 # 1 minute
+    max:
+      _default: 30
+
 # ============================================================
 # Redis Configuration (for SSO v2 sessions)
 # ============================================================

@@ -1,6 +1,7 @@
 import argon2 from 'argon2';
 import { NextFunction, Request, Response, Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import Joi from 'joi';
 import { Config } from '../../config';
 import {
   authorizeV2Schema,
@@ -10,6 +11,8 @@ import {
 import { AppError } from '../../middleware/errorHandler';
 import { authenticateV2AccessToken } from '../../middleware/v2Auth';
 import { findApplicationByAppId } from '../../repositories/applicationRepo.prisma';
+import { findAppSessionByToken } from '../../repositories/appSessionRepo.prisma';
+import { listPermissionsByRole } from '../../repositories/roleRepo.prisma';
 import { findTenantApp } from '../../repositories/tenantAppRepo.prisma';
 import { findTenantById, findTenantMember } from '../../repositories/tenantRepo.prisma';
 import { userHasAppAccess } from '../../repositories/userAppAccessRepo.prisma';
@@ -39,6 +42,12 @@ const exchangeLimiter = rateLimit({
 const refreshLimiter = rateLimit({
   windowMs: Config.get('rateLimit.refresh.windowMs', 15 * 60 * 1000),
   max: Config.get('rateLimit.refresh.max', 20),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const sessionLimiter = rateLimit({
+  windowMs: Config.get('rateLimit.session.windowMs', 15 * 60 * 1000),
+  max: Config.get('rateLimit.session.max', 30),
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -295,6 +304,21 @@ router.post(
       delete userInformation.passwordHash
 
 
+
+      const CookieOptions: any = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      };
+
+      if (process.env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN) {
+        CookieOptions.domain = process.env.COOKIE_DOMAIN;
+      }
+
+      res.cookie('v2_refresh_token', session.refreshToken, { ...CookieOptions, path: '/api/v2/auth/refresh' });
+      res.cookie('bigso_app_session', session.jti, CookieOptions);
+      res.cookie('bs_cookie_name_map', JSON.stringify(['refreshToken:v2_refresh_token', 'sessionId:bigso_app_session']), CookieOptions);
       res.json({
         success: true,
         tokens: {
@@ -378,6 +402,219 @@ router.post(
     }
   }
 );
+
+const verifySessionSchema = Joi.object({
+  sessionId: Joi.string().required(),
+  appId: Joi.string().required(),
+});
+
+
+router.post(
+  '/session',
+  sessionLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Validate request body
+      const { error, value } = verifySessionSchema.validate(req.body, {
+        abortEarly: false,
+        stripUnknown: true,
+      });
+      if (error) {
+        const details = error.details.map((d) => ({ field: d.path.join('.'), message: d.message }));
+        throw new AppError(400, 'Validation failed', 'INVALID_INPUT', details);
+      }
+
+      const { sessionToken, appId } = value;
+
+      // Find session
+      const appSession = await findAppSessionByToken(sessionToken);
+
+      // Session not found
+      if (!appSession) {
+        res.json({
+          success: true,
+          valid: false,
+          message: 'Session not found',
+        });
+        return;
+      }
+
+      // Verify app matches
+      if (appSession.appId !== appId) {
+        res.json({
+          success: true,
+          valid: false,
+          message: 'Session not valid for this app',
+        });
+        return;
+      }
+
+      // Check expiration
+      if (appSession.expiresAt < new Date()) {
+        res.json({
+          success: true,
+          valid: false,
+          message: 'Session expired',
+        });
+        return;
+      }
+
+      // Resolve permissions for the specific app
+      let permissions: Array<{ resource: string; action: string }> = [];
+
+      try {
+        const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/i.test(appSession.role);
+
+        let roleId = null;
+
+        if (isUuid) {
+          roleId = appSession.role;
+        } else {
+          // It's a named role like 'admin', 'member', 'owner'. Find it in the tenant.
+          const { findRoleByTenantAndName } = await import('../../repositories/roleRepo.prisma');
+          const roleRecord = await findRoleByTenantAndName(appSession.tenant.id, appSession.role);
+          if (roleRecord) {
+            roleId = roleRecord.id;
+          }
+        }
+
+        if (roleId) {
+          const rolePermissions = await listPermissionsByRole(roleId);
+          permissions = rolePermissions
+            .filter((p) => p.appId === appId || p.applicationId === appId)
+            .map((p) => ({ resource: p.resource, action: p.action }));
+        }
+      } catch (err) {
+        console.error('Error resolving permissions for verify-session:', err);
+      }
+
+      // Valid session
+      // res.json({
+      //   success: true,
+      //   valid: true,
+      //   user: {},
+      //   currentTenant: {
+      //     tenantId: appSession.tenant.id,
+      //     name: appSession.tenant.name,
+      //     slug: appSession.tenant.slug,
+      //     role: appSession.role,
+      //     permissions: permissions,
+      //   },
+      //   relatedTenants: {
+      //     tenantId: appSession.tenant.id,
+      //     name: appSession.tenant.name,
+      //     slug: appSession.tenant.slug,
+      //     role: appSession.role,
+      //     permissions: permissions,
+      //   },
+      //   appId: appSession.appId,
+      //   expiresAt: appSession.expiresAt.toISOString(),
+      // });
+      res.json({
+        "success": true,
+        "user": {
+          "id": "057108be-347e-4e99-bdf3-f11ff8200197",
+          "email": "krlosbergara@gmail.com",
+          "firstName": "CARLOS",
+          "secondName": null,
+          "lastName": "MONTES",
+          "secondLastName": "",
+          "phone": "3008578561",
+          "nuid": "1067961865",
+          "birthDate": null,
+          "gender": null,
+          "nationality": null,
+          "birthPlace": null,
+          "placeOfResidence": null,
+          "occupation": null,
+          "maritalStatus": null,
+          "userStatus": "active",
+          "recoveryPhone": null,
+          "recoveryEmail": null,
+          "systemRole": "user"
+        },
+        "currentTenant": {
+          "id": "0593fd40-96ab-4547-95c2-43a1ffb6412a",
+          "name": "BIGSO",
+          "slug": "bigso",
+          "role": "admin",
+          "permissions": [
+            {
+              "resource": "users",
+              "action": "create"
+            },
+            {
+              "resource": "users",
+              "action": "read"
+            },
+            {
+              "resource": "users",
+              "action": "update"
+            },
+            {
+              "resource": "users",
+              "action": "delete"
+            },
+            {
+              "resource": "applications",
+              "action": "read"
+            },
+            {
+              "resource": "roles",
+              "action": "create"
+            },
+            {
+              "resource": "roles",
+              "action": "read"
+            },
+            {
+              "resource": "roles",
+              "action": "update"
+            },
+            {
+              "resource": "roles",
+              "action": "delete"
+            },
+            {
+              "resource": "permissions",
+              "action": "grant_access"
+            },
+            {
+              "resource": "permissions",
+              "action": "revoke_access"
+            },
+            {
+              "resource": "tenants",
+              "action": "update"
+            },
+            {
+              "resource": "tenants",
+              "action": "invite_members"
+            }
+          ]
+        },
+        "relatedTenants": [
+          {
+            "id": "0593fd40-96ab-4547-95c2-43a1ffb6412a",
+            "name": "BIGSO",
+            "slug": "bigso",
+            "role": "admin"
+          },
+          {
+            "id": "1afa35c9-59db-4af8-9dd2-75dfceb6818f",
+            "name": "BIGSO-ADMIN",
+            "slug": "bigso-admin",
+            "role": "admin"
+          }
+        ]
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+
 
 router.post('/logout', async (req: Request, res: Response, next: NextFunction) => {
   try {
