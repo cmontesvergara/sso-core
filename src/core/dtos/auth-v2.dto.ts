@@ -64,8 +64,9 @@ export interface RedisSessionData {
   ip?: string;
   userAgent?: string;
   createdAt: number;
-  role?: string;
-  permissions?: Array<{ resource: string; action: string }>;
+  user?: any;
+  currentTenant?: any;
+  relatedTenants?: any;
 }
 
 export interface RedisRefreshTokenData {

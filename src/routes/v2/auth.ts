@@ -1,7 +1,6 @@
 import argon2 from 'argon2';
 import { NextFunction, Request, Response, Router } from 'express';
 import rateLimit from 'express-rate-limit';
-import Joi from 'joi';
 import { Config } from '../../config';
 import {
   authorizeV2Schema,
@@ -11,8 +10,8 @@ import {
 import { AppError } from '../../middleware/errorHandler';
 import { authenticateV2AccessToken } from '../../middleware/v2Auth';
 import { findApplicationByAppId } from '../../repositories/applicationRepo.prisma';
-import { findAppSessionByToken } from '../../repositories/appSessionRepo.prisma';
-import { listPermissionsByRole } from '../../repositories/roleRepo.prisma';
+import { AppSessionWithRelations, findAppSessionByToken } from '../../repositories/appSessionRepo.prisma';
+import { getRedisSession } from '../../repositories/redisSessionRepo';
 import { findTenantApp } from '../../repositories/tenantAppRepo.prisma';
 import { findTenantById, findTenantMember } from '../../repositories/tenantRepo.prisma';
 import { userHasAppAccess } from '../../repositories/userAppAccessRepo.prisma';
@@ -22,6 +21,7 @@ import { AuthCodeV2 } from '../../services/authCodeV2';
 import { JWT } from '../../services/jwt';
 import { OTP } from '../../services/otp';
 import { SessionV2, SessionV2Error } from '../../services/sessionV2';
+import { RedisSessionData } from '../../types';
 
 const router = Router();
 
@@ -403,10 +403,7 @@ router.post(
   }
 );
 
-const verifySessionSchema = Joi.object({
-  sessionId: Joi.string().required(),
-  appId: Joi.string().required(),
-});
+
 
 
 router.post(
@@ -414,23 +411,36 @@ router.post(
   sessionLimiter,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Validate request body
-      const { error, value } = verifySessionSchema.validate(req.body, {
-        abortEarly: false,
-        stripUnknown: true,
-      });
-      if (error) {
-        const details = error.details.map((d) => ({ field: d.path.join('.'), message: d.message }));
-        throw new AppError(400, 'Validation failed', 'INVALID_INPUT', details);
+      const jwt = req.headers.authorization?.substring(7) as string;
+      const jwtDecoded = JWT.verifyToken(jwt) as any;
+      const jti = jwtDecoded.jti as string;
+      let sessionFromCache: RedisSessionData | null;
+      let sessionFromPg: AppSessionWithRelations | null = null;
+
+      sessionFromCache = await getRedisSession(jti, 'app');
+
+      if (sessionFromCache) {
+        let userInformation: {
+          [key: string]: any;
+        } = sessionFromCache.user;
+
+        delete userInformation.createdAt
+        delete userInformation.updatedAt
+        delete userInformation.passwordHash
+
+        res.json({
+          success: true,
+          user: userInformation,
+          currentTenant: sessionFromCache.currentTenant,
+          relatedTenants: sessionFromCache.relatedTenants,
+        });
       }
 
-      const { sessionToken, appId } = value;
+      if (!sessionFromCache) {
+        sessionFromPg = await findAppSessionByToken(jti) as AppSessionWithRelations;
+      }
 
-      // Find session
-      const appSession = await findAppSessionByToken(sessionToken);
-
-      // Session not found
-      if (!appSession) {
+      if (!sessionFromPg) {
         res.json({
           success: true,
           valid: false,
@@ -439,174 +449,13 @@ router.post(
         return;
       }
 
-      // Verify app matches
-      if (appSession.appId !== appId) {
-        res.json({
-          success: true,
-          valid: false,
-          message: 'Session not valid for this app',
-        });
-        return;
-      }
 
-      // Check expiration
-      if (appSession.expiresAt < new Date()) {
-        res.json({
-          success: true,
-          valid: false,
-          message: 'Session expired',
-        });
-        return;
-      }
 
-      // Resolve permissions for the specific app
-      let permissions: Array<{ resource: string; action: string }> = [];
+      console.log('Session found:', sessionFromPg);
 
-      try {
-        const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/i.test(appSession.role);
-
-        let roleId = null;
-
-        if (isUuid) {
-          roleId = appSession.role;
-        } else {
-          // It's a named role like 'admin', 'member', 'owner'. Find it in the tenant.
-          const { findRoleByTenantAndName } = await import('../../repositories/roleRepo.prisma');
-          const roleRecord = await findRoleByTenantAndName(appSession.tenant.id, appSession.role);
-          if (roleRecord) {
-            roleId = roleRecord.id;
-          }
-        }
-
-        if (roleId) {
-          const rolePermissions = await listPermissionsByRole(roleId);
-          permissions = rolePermissions
-            .filter((p) => p.appId === appId || p.applicationId === appId)
-            .map((p) => ({ resource: p.resource, action: p.action }));
-        }
-      } catch (err) {
-        console.error('Error resolving permissions for verify-session:', err);
-      }
-
-      const response = {
-        success: true,
-        valid: true,
-        user: {},
-        currentTenant: {
-          tenantId: appSession.tenant.id,
-          name: appSession.tenant.name,
-          slug: appSession.tenant.slug,
-          role: appSession.role,
-          permissions: permissions,
-        },
-        relatedTenants: {
-          tenantId: appSession.tenant.id,
-          name: appSession.tenant.name,
-          slug: appSession.tenant.slug,
-          role: appSession.role,
-          permissions: permissions,
-        },
-        appId: appSession.appId,
-        expiresAt: appSession.expiresAt.toISOString(),
-      }
-      console.log('Verify session response:', response);
       res.json({
-        "success": true,
-        "user": {
-          "id": "057108be-347e-4e99-bdf3-f11ff8200197",
-          "email": "krlosbergara@gmail.com",
-          "firstName": "CARLOS",
-          "secondName": null,
-          "lastName": "MONTES",
-          "secondLastName": "",
-          "phone": "3008578561",
-          "nuid": "1067961865",
-          "birthDate": null,
-          "gender": null,
-          "nationality": null,
-          "birthPlace": null,
-          "placeOfResidence": null,
-          "occupation": null,
-          "maritalStatus": null,
-          "userStatus": "active",
-          "recoveryPhone": null,
-          "recoveryEmail": null,
-          "systemRole": "user"
-        },
-        "currentTenant": {
-          "id": "0593fd40-96ab-4547-95c2-43a1ffb6412a",
-          "name": "BIGSO",
-          "slug": "bigso",
-          "role": "admin",
-          "permissions": [
-            {
-              "resource": "users",
-              "action": "create"
-            },
-            {
-              "resource": "users",
-              "action": "read"
-            },
-            {
-              "resource": "users",
-              "action": "update"
-            },
-            {
-              "resource": "users",
-              "action": "delete"
-            },
-            {
-              "resource": "applications",
-              "action": "read"
-            },
-            {
-              "resource": "roles",
-              "action": "create"
-            },
-            {
-              "resource": "roles",
-              "action": "read"
-            },
-            {
-              "resource": "roles",
-              "action": "update"
-            },
-            {
-              "resource": "roles",
-              "action": "delete"
-            },
-            {
-              "resource": "permissions",
-              "action": "grant_access"
-            },
-            {
-              "resource": "permissions",
-              "action": "revoke_access"
-            },
-            {
-              "resource": "tenants",
-              "action": "update"
-            },
-            {
-              "resource": "tenants",
-              "action": "invite_members"
-            }
-          ]
-        },
-        "relatedTenants": [
-          {
-            "id": "0593fd40-96ab-4547-95c2-43a1ffb6412a",
-            "name": "BIGSO",
-            "slug": "bigso",
-            "role": "admin"
-          },
-          {
-            "id": "1afa35c9-59db-4af8-9dd2-75dfceb6818f",
-            "name": "BIGSO-ADMIN",
-            "slug": "bigso-admin",
-            "role": "admin"
-          }
-        ]
+        success: true,
+        ...sessionFromPg
       });
     } catch (error) {
       next(error);

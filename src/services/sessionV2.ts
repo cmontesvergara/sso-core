@@ -199,7 +199,6 @@ class SessionV2Service {
 
     const accessToken = JWT.generateToken(payload, accessTokenExpiry);
 
-    // Obtener el rol del tenant para el contexto actual
     let tenantRole: string | undefined;
     let roleId: string | undefined;
 
@@ -219,6 +218,7 @@ class SessionV2Service {
         }
       }
     }
+    console.log('Tenant role:', tenantRole, 'Role ID:', roleId);
 
     const refreshToken = crypto.randomBytes(64).toString('hex');
     const refreshTokenHash = hashToken(refreshToken);
@@ -234,13 +234,19 @@ class SessionV2Service {
 
     await this.writeAppSessionToPg(jti, user.id, deviceInfo, accessTokenExpiry, appContext);
     await this.writeRefreshToPg(user.id, jti, refreshTokenHash, refreshExpirySeconds, deviceInfo);
-
+    const response = {
+      user,
+      currentTenant: {
+        ...tenants.find(t => t.id === appContext?.tenantId),
+        permissions
+      },
+      relatedTenants: tenants,
+    }
     try {
       if (isRedisAvailable()) {
         await this.writeAppSessionToRedis(jti, user.id, deviceInfo, accessTokenExpiry, {
-          tenantId: appContext?.tenantId,
-          role: tenantRole,
-          permissions,
+          ...appContext,
+          ...response
         });
         await this.writeRefreshToRedis(refreshTokenHash, user.id, jti, familyId, refreshExpirySeconds);
 
@@ -435,7 +441,7 @@ class SessionV2Service {
   ): Promise<void> {
     const expiry = ttl ?? Config.get('v2.access_token_expiry', 900);
     await createAppPgSession({
-      session_token: `${APP_V2_PREFIX}${jti}`,
+      session_token: jti,
       user_id: userId,
       app_id: appContext?.appId ?? '',
       tenant_id: appContext?.tenantId ?? '',
@@ -451,16 +457,14 @@ class SessionV2Service {
     userId: string,
     deviceInfo?: { ip?: string; userAgent?: string; fingerprint?: string },
     ttl?: number,
-    sessionData?: { tenantId?: string; role?: string; permissions?: Array<{ resource: string; action: string }> }
+    sessionData?: any
   ): Promise<void> {
     const expiry = ttl ?? Config.get('v2.access_token_expiry', 900);
     await saveRedisSession(jti, userId, {
       ip: deviceInfo?.ip,
       userAgent: deviceInfo?.userAgent,
       deviceFingerprint: deviceInfo?.fingerprint,
-      tenantId: sessionData?.tenantId,
-      role: sessionData?.role,
-      permissions: sessionData?.permissions,
+      ...sessionData,
     }, expiry, 'app');
   }
 

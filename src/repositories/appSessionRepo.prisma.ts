@@ -18,7 +18,7 @@ interface CreateAppSessionInput {
   expires_at: Date;
 }
 
-interface AppSessionWithRelations {
+export interface AppSessionWithRelations {
   id: string;
   sessionToken: string;
   appId: string;
