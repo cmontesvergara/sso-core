@@ -22,6 +22,8 @@ import tenantRoutes from './routes/tenant';
 import userRoutes from './routes/user';
 import utilRoutes from './routes/util';
 import v2Routes from './routes/v2';
+import { getContainer } from './core/container-config';
+import { initializeSecurity } from './core/security/init';
 import { JWT } from './services/jwt';
 import { initPrisma } from './services/prisma';
 import { initRedis } from './services/redis';
@@ -32,6 +34,12 @@ export async function createServer(): Promise<Express> {
 
   // Load configuration
   await Config.load();
+
+  // Initialize security validations (PEPPER, JWT keys, rate limits)
+  initializeSecurity();
+
+  // Initialize DI container (available for routes that need it)
+  getContainer();
 
   // Trust proxy
   app.set('trust proxy', 1);
@@ -121,13 +129,9 @@ export async function createServer(): Promise<Express> {
   });
   app.use(limiter);
 
-  // API v1 routes
+  // API v1 routes (legacy - kept for backward compatibility during migration)
   const apiV1 = express.Router();
 
-  // import auth routes after config is loaded (so route-level config like rate limits can read Config)
-  const authModule = await import('./routes/auth');
-  const authRoutes = authModule.default;
-  apiV1.use('/auth', authRoutes);
   apiV1.use('/docs', docsRoutes);
   apiV1.use('/session', sessionRoutes);
   apiV1.use('/user', userRoutes);

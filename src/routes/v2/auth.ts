@@ -1,4 +1,3 @@
-import argon2 from 'argon2';
 import { NextFunction, Request, Response, Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { Config } from '../../config';
@@ -15,13 +14,15 @@ import { getRedisSession } from '../../repositories/redisSessionRepo';
 import { findTenantApp } from '../../repositories/tenantAppRepo.prisma';
 import { findTenantById, findTenantMember } from '../../repositories/tenantRepo.prisma';
 import { userHasAppAccess } from '../../repositories/userAppAccessRepo.prisma';
-import { findUserByEmail, findUserByNuid } from '../../repositories/userRepo.prisma';
 import { AuditLog } from '../../services/auditLog';
 import { AuthCodeV2 } from '../../services/authCodeV2';
+import { AuthV2 } from '../../services/authV2.legacy';
 import { JWT } from '../../services/jwt';
-import { OTP } from '../../services/otp';
-import { SessionV2, SessionV2Error } from '../../services/sessionV2';
+import { SessionV2, SessionValidationError as SessionV2Error } from '../../services/sessionV2.legacy';
 import { RedisSessionData } from '../../types';
+import { Logger } from '../../utils/logger';
+import { UserMapperStatic } from '../../core/mappers/user.mapper';
+import { COOKIE_NAMES, COOKIE_MAP_VALUE, COOKIE_PATHS, getRefreshTokenCookieOptions } from '../../constants/cookies';
 
 const router = Router();
 
@@ -65,73 +66,21 @@ router.post('/login', loginLimiter, async (req: Request, res: Response, next: Ne
 
     const { email, nuid, password, deviceInfo } = value;
 
-    let user;
-    if (email) {
-      user = await findUserByEmail(email);
-    } else if (nuid) {
-      user = await findUserByNuid(nuid);
-    }
-
-    if (!user) {
-      throw new AppError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
-    }
-
-    const isPasswordValid = await argon2.verify(user.passwordHash, password);
-    if (!isPasswordValid) {
-      throw new AppError(401, 'Invalid credentials', 'INVALID_CREDENTIALS');
-    }
-
-    if (user.userStatus !== 'active') {
-      const encodedUserId = Buffer.from(user.id).toString('base64');
-      throw new AppError(403, 'Account is not active', 'ACCOUNT_NOT_ACTIVE', [
-        { userId: encodedUserId },
-      ]);
-    }
-
-    const has2FA = await OTP.isOTPEnabled(user.id);
-    if (has2FA) {
-      const tempToken = JWT.generateTwoFactorToken(user.id);
-      res.json({
-        success: true,
-        requiresTwoFactor: true,
-        tempToken,
-      });
-      return;
-    }
-
-    const device = deviceInfo || {
-      ip: req.ip,
-      userAgent: req.get('user-agent'),
-    };
     if (!req.body.appId) {
-      console.warn('===> No appId provided in login request, using default appId from config');
-    }
-    if (!Config.get('sso.defaulttenantid')) {
-      console.warn('===> No tenantId provided in login request, using default tenantId from config');
+      Logger.warn('No appId provided in login request, using default appId from config');
     }
 
-    const appId = req.body.appId || Config.get('default_app_id');
-    const tenantId = Config.get('default_tenant_id');
-
-    const session = await SessionV2.createSsoSession(user.id, device, {
-      appId,
-      tenantId,
+    const result = await AuthV2.login({
+      email,
+      nuid,
+      password,
+      appId: req.body.appId || Config.get('default_app_id'),
+      tenantId: Config.get('default_tenant_id'),
+      ip: deviceInfo?.ip || req.ip,
+      userAgent: deviceInfo?.userAgent || req.get('user-agent'),
     });
 
-    await AuditLog.logLogin(user.id, req.ip, req.get('user-agent'));
-
-    res.json({
-      success: true,
-      ssoToken: session.accessToken,
-      expiresIn: 15 * 60,
-      user: {
-        userId: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        systemRole: user.systemRole,
-      },
-    });
+    res.json(result);
   } catch (error) {
     next(error);
   }
@@ -295,30 +244,17 @@ router.post(
         req.ip
       );
 
-      let userInformation: {
-        [key: string]: any;
-      } = session.user;
+      const userInformation = UserMapperStatic.toSafeObject(session.user as any);
 
-      delete userInformation.createdAt
-      delete userInformation.updatedAt
-      delete userInformation.passwordHash
+      const cookieOptions = getRefreshTokenCookieOptions();
 
-
-
-      const CookieOptions: any = {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      };
-
-      if (process.env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN) {
-        CookieOptions.domain = process.env.COOKIE_DOMAIN;
-      }
-
-      res.cookie('v2_refresh_token', session.refreshToken, { ...CookieOptions, path: '/api/v2/auth/refresh' });
-      res.cookie('bigso_app_session', session.jti, CookieOptions);
-      res.cookie('bs_cookie_name_map', JSON.stringify(['refreshToken:v2_refresh_token', 'sessionId:bigso_app_session']), CookieOptions);
+      res.cookie(COOKIE_NAMES.REFRESH_TOKEN, session.refreshToken, cookieOptions);
+      res.cookie(COOKIE_NAMES.APP_SESSION, session.jti, {
+        ...cookieOptions,
+        path: COOKIE_PATHS.APP_SESSION,
+        sameSite: 'lax' as const,
+      });
+      res.cookie(COOKIE_NAMES.COOKIE_MAP, JSON.stringify(COOKIE_MAP_VALUE), cookieOptions);
       res.json({
         success: true,
         tokens: {
@@ -328,7 +264,7 @@ router.post(
         },
         user: userInformation,
         currentTenant: {
-          ...session.tenants.find(t => t.id === codeData.tenantId),
+          ...session.tenants.find((t: any) => t.id === codeData.tenantId),
           permissions: session.permissions
         },
         relatedTenants: session.tenants,
@@ -345,7 +281,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const refreshToken =
-        req.cookies?.['v2_refresh_token'] || req.body?.refreshToken;
+        req.cookies?.[COOKIE_NAMES.REFRESH_TOKEN] || req.body?.refreshToken;
 
       if (!refreshToken) {
         throw new AppError(401, 'Missing refresh token', 'MISSING_REFRESH_TOKEN');
@@ -361,19 +297,9 @@ router.post(
           req.ip
         );
 
-        const refreshTokenCookieOptions: any = {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
-          path: '/api/v2/auth/refresh',
-          maxAge: 7 * 24 * 60 * 60 * 1000,
-        };
+        const cookieOptions = getRefreshTokenCookieOptions();
 
-        if (process.env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN) {
-          refreshTokenCookieOptions.domain = process.env.COOKIE_DOMAIN;
-        }
-
-        res.cookie('v2_refresh_token', newSession.refreshToken, refreshTokenCookieOptions);
+        res.cookie(COOKIE_NAMES.REFRESH_TOKEN, newSession.refreshToken, cookieOptions);
 
         res.json({
           success: true,
@@ -385,12 +311,7 @@ router.post(
       } catch (err: any) {
         if (err instanceof SessionV2Error) {
           if (err.code === 'TOKEN_REUSE_DETECTED') {
-            res.clearCookie('v2_refresh_token', {
-              httpOnly: true,
-              secure: process.env.NODE_ENV === 'production',
-              sameSite: 'strict',
-              path: '/api/v2/auth/refresh',
-            });
+            res.clearCookie(COOKIE_NAMES.REFRESH_TOKEN, getRefreshTokenCookieOptions());
             throw new AppError(401, err.message, 'SECURITY_VIOLATION');
           }
           throw new AppError(401, err.message, err.code);
@@ -420,13 +341,7 @@ router.post(
       sessionFromCache = await getRedisSession(jti, 'app');
 
       if (sessionFromCache) {
-        let userInformation: {
-          [key: string]: any;
-        } = sessionFromCache.user;
-
-        delete userInformation.createdAt
-        delete userInformation.updatedAt
-        delete userInformation.passwordHash
+        const userInformation = UserMapperStatic.toSafeObject(sessionFromCache.user as any);
 
         res.json({
           success: true,
@@ -434,6 +349,7 @@ router.post(
           currentTenant: sessionFromCache.currentTenant,
           relatedTenants: sessionFromCache.relatedTenants,
         });
+        return;
       }
 
       if (!sessionFromCache) {
@@ -449,13 +365,15 @@ router.post(
         return;
       }
 
+      Logger.debug('Session found', { jti, userId: sessionFromPg.user.id });
 
-
-      console.log('Session found:', sessionFromPg);
+      const userInformation = UserMapperStatic.toSafeObject(sessionFromPg.user as any);
 
       res.json({
         success: true,
-        ...sessionFromPg
+        user: userInformation,
+        currentTenant: sessionFromPg.tenant,
+        relatedTenants: [sessionFromPg.tenant],
       });
     } catch (error) {
       next(error);
@@ -481,11 +399,8 @@ router.post('/logout', async (req: Request, res: Response, next: NextFunction) =
       }
     }
 
-    res.clearCookie('v2_refresh_token', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/api/v2/auth/refresh',
+    res.clearCookie(COOKIE_NAMES.REFRESH_TOKEN, {
+      ...getRefreshTokenCookieOptions(),
       domain: process.env.COOKIE_DOMAIN,
     });
 

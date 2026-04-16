@@ -73,3 +73,70 @@ export function excludeSensitiveUserFields<User extends PrismaUser, Key extends 
 export function sanitizeUser(user: PrismaUser): Omit<PrismaUser, 'passwordHash'> {
   return excludeSensitiveUserFields(user, ['passwordHash']);
 }
+
+/**
+ * Interfaz para DTO público de usuario (sin datos sensibles)
+ */
+export interface UserPublicDTO {
+  userId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  systemRole: string;
+}
+
+/**
+ * Interfaz UserRow para compatibilidad con repositories
+ */
+export interface UserRow {
+  id: string;
+  email: string;
+  passwordHash: string;
+  firstName: string;
+  secondName: string | null;
+  lastName: string;
+  secondLastName: string | null;
+  phone: string;
+  nuid: string;
+  userStatus: string;
+  systemRole: 'super_admin' | 'system_admin' | 'user';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Mapper para transformar UserRow a DTOs seguros para exposición
+ * Versión estática para uso en services sin dependencias de Prisma
+ */
+export class UserMapperStatic {
+  /**
+   * Transforma UserRow a DTO público (sin datos sensibles)
+   */
+  static toPublicDTO(user: UserRow): UserPublicDTO {
+    return {
+      userId: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      systemRole: user.systemRole,
+    };
+  }
+
+  /**
+   * Elimina campos sensibles de UserRow
+   * @returns Objeto sin passwordHash, createdAt, updatedAt
+   */
+  static toSafeObject(
+    user: UserRow
+  ): Omit<UserRow, 'passwordHash' | 'createdAt' | 'updatedAt'> {
+    const { passwordHash, createdAt, updatedAt, ...safe } = user;
+    return safe;
+  }
+
+  /**
+   * Verifica que el usuario tenga campos requeridos
+   */
+  static isValid(user: UserRow | null): user is UserRow {
+    return user !== null && user.id !== undefined;
+  }
+}

@@ -150,13 +150,28 @@ export class SSOSessionService {
 
   /**
    * Destroy SSO session (logout)
-   * 
+   *
    * @param sessionToken - Session token to destroy
    */
   async destroySession(sessionToken: string): Promise<void> {
     await deleteSSOSession(sessionToken);
     Logger.info('SSO session destroyed', {
       token: sessionToken.substring(0, 15) + '...',
+    });
+  }
+
+  /**
+   * Destroy SSO session by JTI (JWT ID)
+   * Used for hybrid v1/v2 logout with Bearer tokens
+   *
+   * @param jti - JWT ID to destroy
+   */
+  async destroySessionByJti(jti: string): Promise<void> {
+    // Try to find session by JTI (stored in sessionToken for v2 sessions)
+    // For v1 sessions, JTI may not match; this is expected
+    await deleteSSOSession(jti);
+    Logger.info('SSO session destroyed by JTI', {
+      jti: jti.substring(0, 15) + '...',
     });
   }
 

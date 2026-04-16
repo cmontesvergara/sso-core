@@ -2,6 +2,8 @@ import fs from 'fs';
 import jwt from 'jsonwebtoken';
 import jose from 'node-jose';
 import path from 'path';
+import { validateKeysOrThrow } from '../core/security/jwt-keys-validator';
+
 const KID = process.env.JWT_KID || 'sso-key-2025';
 
 class JWTService {
@@ -15,6 +17,10 @@ class JWTService {
   private constructor() {
     const privateKeyPath = process.env.PRIVATE_KEY_PATH || path.resolve(__dirname, '../../keys/private.pem');
     const publicKeyPath = process.env.PUBLIC_KEY_PATH || path.resolve(__dirname, '../../keys/public.pem');
+
+    // Validate keys before reading
+    validateKeysOrThrow(privateKeyPath, publicKeyPath);
+
     this.privateKey = fs.readFileSync(privateKeyPath);
     this.publicKey = fs.readFileSync(publicKeyPath);
   }

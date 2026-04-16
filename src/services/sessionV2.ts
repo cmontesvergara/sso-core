@@ -36,8 +36,12 @@ import { isRedisAvailable } from '../services/redis';
 import { Logger } from '../utils/logger';
 import { JWT } from './jwt';
 import { getPrismaClient } from './prisma';
+import { validatePepperOrThrow } from '../core/security/pepper-validator';
 
-const PEPPER = process.env.REFRESH_TOKEN_PEPPER || 'change-me-pepper';
+// Validate PEPPER at startup
+validatePepperOrThrow(process.env.REFRESH_TOKEN_PEPPER);
+
+const PEPPER: string = process.env.REFRESH_TOKEN_PEPPER!;
 const SSO_V2_PREFIX = 'sso_v2_';
 const APP_V2_PREFIX = 'app_v2_';
 
