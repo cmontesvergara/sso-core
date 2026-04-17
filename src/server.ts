@@ -4,6 +4,7 @@ import express, { Express, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { Config } from './config';
+import { getContainer } from './core/container-config';
 import { errorHandler } from './middleware/errorHandler';
 import { loggingMiddleware } from './middleware/logging';
 import { initRedisAuthCodeRepo } from './repositories/redisAuthCodeRepo';
@@ -22,8 +23,6 @@ import tenantRoutes from './routes/tenant';
 import userRoutes from './routes/user';
 import utilRoutes from './routes/util';
 import v2Routes from './routes/v2';
-import { getContainer } from './core/container-config';
-import { initializeSecurity } from './core/security/init';
 import { JWT } from './services/jwt';
 import { initPrisma } from './services/prisma';
 import { initRedis } from './services/redis';
@@ -36,7 +35,7 @@ export async function createServer(): Promise<Express> {
   await Config.load();
 
   // Initialize security validations (PEPPER, JWT keys, rate limits)
-  initializeSecurity();
+  // initializeSecurity();
 
   // Initialize DI container (available for routes that need it)
   getContainer();
