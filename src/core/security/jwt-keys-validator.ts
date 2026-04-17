@@ -13,6 +13,7 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { Config } from '../../config';
 
 interface KeyValidationResult {
   isValid: boolean;
@@ -244,8 +245,9 @@ export function validateKeysOrThrow(
   privateKeyPath?: string,
   publicKeyPath?: string
 ): void {
-  const defaultPrivateKeyPath = privateKeyPath || path.resolve(__dirname, '../../keys/private.pem');
-  const defaultPublicKeyPath = publicKeyPath || path.resolve(__dirname, '../../keys/public.pem');
+  // Use paths from config.yaml, with fallback to relative paths for development
+  const defaultPrivateKeyPath = privateKeyPath || Config.get('jwt.private_key_path') || path.resolve(__dirname, '../../keys/private.pem');
+  const defaultPublicKeyPath = publicKeyPath || Config.get('jwt.public_key_path') || path.resolve(__dirname, '../../keys/public.pem');
 
   const result = validateKeyPair(defaultPrivateKeyPath, defaultPublicKeyPath);
 

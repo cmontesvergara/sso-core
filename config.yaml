@@ -83,8 +83,8 @@ jwt:
     _mandatory: true
     _default: sso-key-2026
 
-  private_key_path: null
-  public_key_path: null
+  private_key_path: /app/keys/private.pem
+  public_key_path: /app/keys/public.pem
 
 # ============================================================
 # Token Validity (in seconds)
@@ -179,7 +179,7 @@ rateLimit:
     windowMs:
       _default: 900000 # 15 minutes
     max:
-      _default: 10
+      _default: 4
 
   refresh:
     windowMs:
