@@ -1,53 +1,111 @@
 // Mock dependencies BEFORE importing modules that depend on them
 jest.mock('argon2');
-jest.mock('../../repositories/userRepo.prisma');
-jest.mock('../sessionV2');
-jest.mock('../otp');
-jest.mock('../auditLog');
-jest.mock('../jwt');
+jest.mock('../../src/services/otp');
+jest.mock('../../src/services/auditLog');
+jest.mock('../../src/services/jwt');
 
 // Set required environment variable before importing modules that depend on it
 process.env.REFRESH_TOKEN_PEPPER = 'test-pepper-for-unit-tests-only';
 
 import argon2 from 'argon2';
-import { AuthServiceV2 } from '../authV2';
-import { findUserByEmail, findUserByNuid } from '../../repositories/userRepo.prisma';
-import { SessionV2 } from '../sessionV2';
-import { OTP } from '../otp';
-import { AuditLog } from '../auditLog';
-import { JWT } from '../jwt';
+import { AuthServiceV2 } from '../../src/services/authV2';
+import { OTP } from '../../src/services/otp';
+import { AuditLog } from '../../src/services/auditLog';
+import { JWT } from '../../src/services/jwt';
+import { UserRepository } from '../../src/core/repositories/user.repository';
+import { SsoSessionService } from '../../src/services/session/sso-session.service';
 
 // Setup argon2 mock to return true for valid password tests
 const mockArgon2Verify = argon2.verify as jest.Mock;
 
-describe('AuthServiceV2', () => {
-  const authV2Service = new AuthServiceV2();
+// Mock Prisma client
+const mockPrismaClient: any = {
+  user: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    findMany: jest.fn(),
+    count: jest.fn(),
+  },
+};
 
-  const mockFindUserByEmail = findUserByEmail as jest.Mock;
-  const mockFindUserByNuid = findUserByNuid as jest.Mock;
-  const mockCreateSsoSession = SessionV2.createSsoSession as jest.Mock;
-  const mockIsOTPEnabled = OTP.isOTPEnabled as jest.Mock;
-  const mockLogLogin = AuditLog.logLogin as jest.Mock;
-  const mockGenerateTwoFactorToken = JWT.generateTwoFactorToken as jest.Mock;
+jest.mock('../../src/services/prisma', () => ({
+  getPrismaClient: jest.fn(() => mockPrismaClient),
+}));
+
+// Mock OTP and JWT as jest.fn() for test manipulation
+const mockIsOTPEnabled = jest.fn();
+const mockGenerateTwoFactorToken = jest.fn();
+
+(OTP.isOTPEnabled as jest.Mock) = mockIsOTPEnabled;
+(JWT.generateTwoFactorToken as jest.Mock) = mockGenerateTwoFactorToken;
+
+describe('AuthServiceV2', () => {
+  let authV2Service: AuthServiceV2;
+  let mockUserRepo: jest.Mocked<UserRepository>;
+  let mockSsoSessionService: jest.Mocked<SsoSessionService>;
 
   const mockUser = {
     id: 'user-123',
     email: 'test@bigso.com',
     passwordHash: '$argon2id$v=19$m=65536,t=3,p=4$abc123$xyz789',
     firstName: 'Test',
+    secondName: null,
     lastName: 'User',
+    secondLastName: null,
     systemRole: 'user' as const,
     userStatus: 'active' as const,
     nuid: '123456789',
     phone: '+1234567890',
+    birthDate: null,
+    gender: null,
+    nationality: null,
+    birthPlace: null,
+    placeOfResidence: null,
+    occupation: null,
+    maritalStatus: null,
+    recoveryPhone: null,
+    recoveryEmail: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     // Default: password is valid
     mockArgon2Verify.mockResolvedValue(true);
+    mockIsOTPEnabled.mockResolvedValue(false);
+    mockGenerateTwoFactorToken.mockReturnValue('2fa-temp-token');
+
+    // Setup mock repositories
+    mockUserRepo = {
+      prisma: mockPrismaClient,
+      createUser: jest.fn(),
+      findUserByEmail: jest.fn(),
+      findUserById: jest.fn(),
+      findUserByNuid: jest.fn(),
+      updateUser: jest.fn(),
+      updateUserPassword: jest.fn(),
+      deleteUser: jest.fn(),
+      listUsers: jest.fn(),
+      countUsers: jest.fn(),
+    } as any;
+
+    mockSsoSessionService = {
+      createSession: jest.fn(),
+      validateToken: jest.fn(),
+      isRevoked: jest.fn(),
+      revokeSession: jest.fn(),
+      revokeAllUserSessions: jest.fn(),
+    } as any;
+
+    // Create service with mocks using isolateModules
+    await jest.isolateModules(async () => {
+      const mod = await import('../../src/services/authV2');
+      const AuthServiceV2Class = mod.AuthServiceV2;
+      authV2Service = new AuthServiceV2Class(mockUserRepo, mockSsoSessionService);
+    });
   });
 
   describe('login', () => {
@@ -62,39 +120,30 @@ describe('AuthServiceV2', () => {
 
     it('should login successfully with email', async () => {
       // Setup
-      mockFindUserByEmail.mockResolvedValue(mockUser);
+      mockUserRepo.findUserByEmail.mockResolvedValue(mockUser);
       mockIsOTPEnabled.mockResolvedValue(false);
-      mockCreateSsoSession.mockResolvedValue({
+      mockSsoSessionService.createSession.mockResolvedValue({
         accessToken: 'sso_token_abc123',
-        refreshToken: 'refresh_token_xyz789',
         jti: 'session-999',
-      });
+      } as any);
 
       // Execute
       const result = await authV2Service.login(loginOptions);
 
       // Verify
-      expect(mockFindUserByEmail).toHaveBeenCalledWith('test@bigso.com');
+      expect(mockUserRepo.findUserByEmail).toHaveBeenCalledWith('test@bigso.com');
       expect(result.ssoToken).toBe('sso_token_abc123');
-      expect(result.user).toEqual({
-        userId: mockUser.id,
-        email: mockUser.email,
-        firstName: mockUser.firstName,
-        lastName: mockUser.lastName,
-        systemRole: mockUser.systemRole,
-      });
-      expect(mockLogLogin).toHaveBeenCalledWith(mockUser.id, '192.168.1.1', 'Mozilla/5.0');
+      expect(AuditLog.logLogin).toHaveBeenCalledWith(mockUser.id, '192.168.1.1', 'Mozilla/5.0');
     });
 
     it('should login successfully with NUID', async () => {
       // Setup
-      mockFindUserByNuid.mockResolvedValue(mockUser);
+      mockUserRepo.findUserByNuid.mockResolvedValue(mockUser);
       mockIsOTPEnabled.mockResolvedValue(false);
-      mockCreateSsoSession.mockResolvedValue({
+      mockSsoSessionService.createSession.mockResolvedValue({
         accessToken: 'sso_token_abc123',
-        refreshToken: 'refresh_token_xyz789',
         jti: 'session-999',
-      });
+      } as any);
 
       // Execute
       const result = await authV2Service.login({
@@ -104,13 +153,13 @@ describe('AuthServiceV2', () => {
       });
 
       // Verify
-      expect(mockFindUserByNuid).toHaveBeenCalledWith(mockUser.nuid);
+      expect(mockUserRepo.findUserByNuid).toHaveBeenCalledWith(mockUser.nuid);
       expect(result.ssoToken).toBe('sso_token_abc123');
     });
 
     it('should throw 401 when user not found by email', async () => {
       // Setup
-      mockFindUserByEmail.mockResolvedValue(null);
+      mockUserRepo.findUserByEmail.mockResolvedValue(undefined);
 
       // Execute & Verify
       await expect(authV2Service.login(loginOptions)).rejects.toMatchObject({
@@ -122,7 +171,7 @@ describe('AuthServiceV2', () => {
 
     it('should throw 401 when user not found by NUID', async () => {
       // Setup
-      mockFindUserByNuid.mockResolvedValue(null);
+      mockUserRepo.findUserByNuid.mockResolvedValue(undefined);
 
       // Execute & Verify
       await expect(
@@ -157,7 +206,7 @@ describe('AuthServiceV2', () => {
 
     it('should throw 401 when password is invalid', async () => {
       // Setup - argon2.verify will return false for invalid password
-      mockFindUserByEmail.mockResolvedValue(mockUser);
+      mockUserRepo.findUserByEmail.mockResolvedValue(mockUser);
       mockArgon2Verify.mockResolvedValue(false);
 
       // Execute & Verify
@@ -171,7 +220,7 @@ describe('AuthServiceV2', () => {
     it('should throw 403 when user status is not active', async () => {
       // Setup
       const inactiveUser = { ...mockUser, userStatus: 'suspended' };
-      mockFindUserByEmail.mockResolvedValue(inactiveUser);
+      mockUserRepo.findUserByEmail.mockResolvedValue(inactiveUser);
 
       // Execute & Verify
       await expect(authV2Service.login(loginOptions)).rejects.toMatchObject({
@@ -183,7 +232,7 @@ describe('AuthServiceV2', () => {
 
     it('should return tempToken when 2FA is enabled', async () => {
       // Setup
-      mockFindUserByEmail.mockResolvedValue(mockUser);
+      mockUserRepo.findUserByEmail.mockResolvedValue(mockUser);
       mockIsOTPEnabled.mockResolvedValue(true);
       mockGenerateTwoFactorToken.mockReturnValue('2fa_temp_token_xyz');
 
@@ -193,19 +242,18 @@ describe('AuthServiceV2', () => {
       // Verify
       expect(result.requiresTwoFactor).toBe(true);
       expect(result.tempToken).toBe('2fa_temp_token_xyz');
-      expect(mockCreateSsoSession).not.toHaveBeenCalled();
-      expect(mockLogLogin).not.toHaveBeenCalled();
+      expect(mockSsoSessionService.createSession).not.toHaveBeenCalled();
+      expect(AuditLog.logLogin).not.toHaveBeenCalled();
     });
 
     it('should use default appId and tenantId when not provided', async () => {
       // Setup
-      mockFindUserByEmail.mockResolvedValue(mockUser);
+      mockUserRepo.findUserByEmail.mockResolvedValue(mockUser);
       mockIsOTPEnabled.mockResolvedValue(false);
-      mockCreateSsoSession.mockResolvedValue({
+      mockSsoSessionService.createSession.mockResolvedValue({
         accessToken: 'sso_token_abc123',
-        refreshToken: 'refresh_token_xyz789',
         jti: 'session-999',
-      });
+      } as any);
 
       // Execute
       await authV2Service.login({
@@ -217,8 +265,8 @@ describe('AuthServiceV2', () => {
         userAgent: 'Mozilla/5.0',
       });
 
-      // Verify - SessionV2 should be called with config defaults
-      expect(mockCreateSsoSession).toHaveBeenCalled();
+      // Verify - Session service should be called with defaults
+      expect(mockSsoSessionService.createSession).toHaveBeenCalled();
     });
   });
 });

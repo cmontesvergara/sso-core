@@ -1,4 +1,4 @@
-import { Validator } from '../validator';
+import { Validator } from '../../src/utils/validator';
 
 describe('Validator', () => {
   it('should validate required field', () => {

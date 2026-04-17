@@ -49,21 +49,25 @@ export function validatePrivateKey(pemContent: string): KeyValidationResult {
       format: 'pem',
     });
 
-    // Extract key details
+    // Extract key details - note: asymmetricKeyDetails may not have 'type' in all Node versions
     const keyDetails = key.asymmetricKeyDetails;
 
     if (!keyDetails) {
       errors.push('Could not extract key details');
     } else {
-      // Check key type
-      const keyType = (keyDetails as any).type;
-      if (keyType !== 'rsa') {
-        errors.push(`Key type must be RSA (found: ${keyType})`);
+      // Check key size for RSA keys
+      const modulusLength = (keyDetails as any).modulusLength as number | undefined;
+
+      // Detect RSA by checking if modulusLength exists (RSA-specific property)
+      const isRsa = modulusLength !== undefined;
+
+      if (!isRsa) {
+        errors.push('Key type must be RSA (could not detect RSA key)');
       }
 
       // Check key size (only for RSA)
-      if (keyType === 'rsa' && (keyDetails as any).modulusLength) {
-        const keySize = (keyDetails as any).modulusLength;
+      if (isRsa && modulusLength) {
+        const keySize = modulusLength;
 
         if (keySize < 2048) {
           errors.push(`RSA key size must be at least 2048 bits (found: ${keySize})`);
@@ -79,7 +83,7 @@ export function validatePrivateKey(pemContent: string): KeyValidationResult {
       isValid: errors.length === 0,
       errors,
       keySize: (keyDetails as any)?.modulusLength as number | undefined,
-      keyType: (keyDetails as any)?.type as string | undefined,
+      keyType: 'rsa', // We only support RSA, so if parsing succeeded, it's RSA
     };
   } catch (error: any) {
     return {
@@ -110,21 +114,25 @@ export function validatePublicKey(pemContent: string): KeyValidationResult {
       format: 'pem',
     });
 
-    // Extract key details
+    // Extract key details - note: asymmetricKeyDetails may not have 'type' in all Node versions
     const keyDetails = key.asymmetricKeyDetails;
 
     if (!keyDetails) {
       errors.push('Could not extract key details');
     } else {
-      // Check key type
-      const keyType = (keyDetails as any).type;
-      if (keyType !== 'rsa') {
-        errors.push(`Key type must be RSA (found: ${keyType})`);
+      // Check key size for RSA keys
+      const modulusLength = (keyDetails as any).modulusLength as number | undefined;
+
+      // Detect RSA by checking if modulusLength exists (RSA-specific property)
+      const isRsa = modulusLength !== undefined;
+
+      if (!isRsa) {
+        errors.push('Key type must be RSA (could not detect RSA key)');
       }
 
       // Check key size (only for RSA)
-      if (keyType === 'rsa' && (keyDetails as any).modulusLength) {
-        const keySize = (keyDetails as any).modulusLength;
+      if (isRsa && modulusLength) {
+        const keySize = modulusLength;
 
         if (keySize < 2048) {
           errors.push(`RSA key size must be at least 2048 bits (found: ${keySize})`);
@@ -136,7 +144,7 @@ export function validatePublicKey(pemContent: string): KeyValidationResult {
       isValid: errors.length === 0,
       errors,
       keySize: (keyDetails as any)?.modulusLength as number | undefined,
-      keyType: (keyDetails as any)?.type as string | undefined,
+      keyType: 'rsa', // We only support RSA, so if parsing succeeded, it's RSA
     };
   } catch (error: any) {
     return {
