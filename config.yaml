@@ -83,8 +83,8 @@ jwt:
     _mandatory: true
     _default: sso-key-2026
 
-  private_key_path: /app/keys/private.pem
-  public_key_path: /app/keys/public.pem
+  private_key_path: /app/dist/keys/private.pem
+  public_key_path: /app/dist/keys/public.pem
 
 # ============================================================
 # Token Validity (in seconds)
