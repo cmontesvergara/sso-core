@@ -1,6 +1,8 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { Config } from '../../config';
+import { COOKIE_MAP_VALUE, COOKIE_NAMES, COOKIE_PATHS, getRefreshTokenCookieOptions } from '../../constants/cookies';
+import { UserMapperStatic } from '../../core/mappers/user.mapper';
 import {
   authorizeV2Schema,
   exchangeV2Schema,
@@ -21,8 +23,6 @@ import { JWT } from '../../services/jwt';
 import { SessionV2, SessionValidationError as SessionV2Error } from '../../services/sessionV2.legacy';
 import { RedisSessionData } from '../../types';
 import { Logger } from '../../utils/logger';
-import { UserMapperStatic } from '../../core/mappers/user.mapper';
-import { COOKIE_NAMES, COOKIE_MAP_VALUE, COOKIE_PATHS, getRefreshTokenCookieOptions } from '../../constants/cookies';
 
 const router = Router();
 
