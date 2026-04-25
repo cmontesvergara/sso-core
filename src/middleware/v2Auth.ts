@@ -1,6 +1,12 @@
 import { NextFunction, Request, Response } from 'express';
-import { SessionV2, SessionV2Error } from '../services/sessionV2';
+import { getContainer } from '../core/container-config';
+import { SessionValidationError } from '../services/session/app-session.service';
+import { RefreshTokenValidationError } from '../services/session/refresh-token.service';
+import { TokenValidatorService } from '../services/session/token-validator.service';
 import { AppError } from './errorHandler';
+
+// Service instance from container
+const tokenValidator = () => getContainer().get<TokenValidatorService>('TokenValidatorService');
 
 interface V2User {
   userId: string;
@@ -24,19 +30,36 @@ export async function authenticateV2AccessToken(
   res: Response,
   next: NextFunction
 ): Promise<void> {
+  const { Logger } = await import('../utils/logger');
+  Logger.debug('[v2Auth] authenticateV2AccessToken called', { path: req.path, method: req.method });
+
   try {
     const authHeader = req.headers.authorization;
+    Logger.debug('[v2Auth] Authorization header', { hasAuth: !!authHeader, startsWithBearer: authHeader?.startsWith('Bearer ') });
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new AppError(401, 'Missing access token', 'MISSING_ACCESS_TOKEN');
     }
 
     const token = authHeader.substring(7);
+    Logger.debug('[v2Auth] Token extracted', { tokenPreview: token.substring(0, 30) + '...' });
 
     try {
-      const payload = SessionV2.validateAccessToken(token);
+      Logger.debug('[v2Auth] Calling tokenValidator...');
+      const validation = await tokenValidator().validateToken(token, req.path.includes('authorize') ? 'sso' : 'app');
+      Logger.debug('[v2Auth] Validation result', { isValid: validation.isValid, error: validation.error });
 
+      if (!validation.isValid || !validation.decoded) {
+        throw new AppError(401, 'Invalid access token', validation.error || 'INVALID_ACCESS_TOKEN');
+      }
+
+      const payload = validation.decoded;
       const sessionType = payload.type === 'sso' ? 'sso' : 'app';
-      const isRevoked = await SessionV2.isTokenRevoked(payload.jti, sessionType);
+      Logger.debug('[v2Auth] Token valid, checking revocation', { jti: payload.jti, sessionType });
+
+      const isRevoked = await tokenValidator().isTokenRevoked(payload.jti, sessionType);
+      Logger.debug('[v2Auth] Revocation check result', { isRevoked });
+
       if (isRevoked) {
         throw new AppError(401, 'Token has been revoked', 'TOKEN_REVOKED');
       }
@@ -52,9 +75,11 @@ export async function authenticateV2AccessToken(
         scope: payload.scope,
       };
 
+      Logger.debug('[v2Auth] Authentication successful', { userId: payload.sub, type: payload.type });
       next();
     } catch (error: any) {
-      if (error instanceof SessionV2Error) {
+      Logger.debug('[v2Auth] Error in validation', { error: error.message, code: error.code });
+      if (error instanceof RefreshTokenValidationError || error instanceof SessionValidationError) {
         throw new AppError(401, error.message, error.code);
       }
       if (error instanceof AppError) throw error;

@@ -67,6 +67,9 @@ export interface RedisSessionData {
   user?: any;
   currentTenant?: any;
   relatedTenants?: any;
+  tokens: {
+    accessToken: string
+  }
 }
 
 export interface RedisRefreshTokenData {

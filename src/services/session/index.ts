@@ -16,3 +16,6 @@ export { RefreshTokenService, RefreshTokenValidationError } from './refresh-toke
 export { TokenValidatorService } from './token-validator.service';
 export { SessionRevokerService } from './session-revoker.service';
 export { RedisSessionService } from './redis-session.service';
+
+// Re-export SessionValidationError as SessionV2Error for backward compatibility
+export { SessionValidationError as SessionV2Error } from './app-session.service';

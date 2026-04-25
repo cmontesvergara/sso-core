@@ -1,8 +1,8 @@
-import { JWT } from '../jwt';
 import { Config } from '../../config';
 import { SessionRepository } from '../../core/repositories/session.repository';
-import { RedisSessionService } from './redis-session.service';
 import { Logger } from '../../utils/logger';
+import { JWT } from '../jwt';
+import { RedisSessionService } from './redis-session.service';
 
 interface TokenValidationResult {
   isValid: boolean;
@@ -18,24 +18,29 @@ interface TokenValidationResult {
  * Single Responsibility: Only token validation
  */
 export class TokenValidatorService {
-  private readonly SSO_V2_PREFIX = 'sso_v2_';
+  // private readonly SSO_V2_PREFIX = 'sso_v2_';
   private readonly APP_V2_PREFIX = 'app_v2_';
 
   constructor(
     private sessionRepo: SessionRepository,
     private redisService: RedisSessionService
-  ) {}
+  ) { }
 
   /**
    * Validate and decode a JWT token
    * Checks signature, expiration, issuer, and revocation status
    */
   async validateToken(token: string, sessionType: 'sso' | 'app' = 'app'): Promise<TokenValidationResult> {
+    Logger.debug('[TokenValidator] Starting token validation', { sessionType, tokenPreview: token.substring(0, 20) + '...' });
+
     try {
       // Verify JWT signature and expiration
+      Logger.debug('[TokenValidator] Verifying JWT signature...');
       const decoded = JWT.verifyToken(token) as any;
+      Logger.debug('[TokenValidator] JWT decoded successfully', { jti: decoded?.jti, sub: decoded?.sub, type: decoded?.type });
 
       if (!decoded || !decoded.sub || !decoded.jti) {
+        Logger.debug('[TokenValidator] Invalid token structure', { hasSub: !!decoded?.sub, hasJti: !!decoded?.jti });
         return {
           isValid: false,
           error: 'INVALID_TOKEN_STRUCTURE',
@@ -44,7 +49,9 @@ export class TokenValidatorService {
 
       // Validate issuer
       const expectedIss = Config.get('jwt.iss', 'sso.bigso.co');
+      Logger.debug('[TokenValidator] Validating issuer', { expected: expectedIss, actual: decoded.iss });
       if (decoded.iss !== expectedIss) {
+        Logger.debug('[TokenValidator] Invalid issuer');
         return {
           isValid: false,
           error: 'INVALID_TOKEN_ISSUER',
@@ -52,7 +59,10 @@ export class TokenValidatorService {
       }
 
       // Check revocation status
+      Logger.debug('[TokenValidator] Checking revocation status', { jti: decoded.jti, sessionType });
       const isRevoked = await this.isTokenRevoked(decoded.jti, sessionType);
+      Logger.debug('[TokenValidator] Revocation check result', { isRevoked });
+
       if (isRevoked) {
         return {
           isValid: false,
@@ -60,6 +70,7 @@ export class TokenValidatorService {
         };
       }
 
+      Logger.debug('[TokenValidator] Token validation successful');
       return {
         isValid: true,
         decoded,
@@ -67,6 +78,7 @@ export class TokenValidatorService {
         jti: decoded.jti,
       };
     } catch (error: any) {
+      Logger.error('[TokenValidator] Token validation error', { error: error.message, name: error.name });
       if (error.name === 'TokenExpiredError') {
         return {
           isValid: false,
@@ -74,7 +86,6 @@ export class TokenValidatorService {
         };
       }
 
-      Logger.debug('Token validation failed', { error: error.message });
       return {
         isValid: false,
         error: 'INVALID_TOKEN',
@@ -86,29 +97,60 @@ export class TokenValidatorService {
    * Check if a token has been revoked
    */
   async isTokenRevoked(jti: string, sessionType: 'sso' | 'app' = 'app'): Promise<boolean> {
+    Logger.debug('[TokenValidator.isTokenRevoked] Starting revocation check', { jti, sessionType });
+
     // Check Redis first (fast path)
-    try {
-      if (this.redisService.isAvailable()) {
+    const redisAvailable = this.redisService.isAvailable();
+    Logger.debug('[TokenValidator.isTokenRevoked] Redis availability', { redisAvailable });
+
+    if (redisAvailable) {
+      try {
+        Logger.debug('[TokenValidator.isTokenRevoked] Checking Redis...');
+        const exist = await this.redisService.getSession(jti, sessionType);
         const revoked = await this.redisService.isSessionRevoked(jti);
-        if (revoked) return true;
+        Logger.debug('[TokenValidator.isTokenRevoked] Redis check result', { revoked });
+        if (!exist || (exist && revoked)) {
+          Logger.debug('[TokenValidator.isTokenRevoked] Token revoked in Redis');
+          return true;
+        } else {
+          return false;
+        }
+
+      } catch (error: any) {
+        Logger.warn('[TokenValidator.isTokenRevoked] Redis check failed', { error: error.message });
+        // Fall through to PostgreSQL
       }
-    } catch (_) {
-      // Fall through to PostgreSQL
+    } else if (sessionType === 'sso') {
+      return true; // Si Redis no está disponible, consideramos los tokens SSO como revocados para evitar riesgos de seguridad
     }
 
-    // Check PostgreSQL
-    const tokenKey = sessionType === 'sso'
-      ? `${this.SSO_V2_PREFIX}${jti}`
-      : `${this.APP_V2_PREFIX}${jti}`;
+    if (sessionType === 'app') {
+      // Check PostgreSQL
+      const tokenKey = `${this.APP_V2_PREFIX}${jti}`;
+      Logger.debug('[TokenValidator.isTokenRevoked] Checking PostgreSQL', { tokenKey });
 
-    const session = sessionType === 'sso'
-      ? await this.sessionRepo.findSSOSessionByToken(tokenKey)
-      : await this.sessionRepo.findAppSessionByToken(tokenKey);
+      try {
+        const session = await this.sessionRepo.findAppSessionByToken(tokenKey);
+        Logger.debug('[TokenValidator.isTokenRevoked] PostgreSQL result', { sessionFound: !!session });
 
-    if (!session) return true;
-    if (new Date(session.expiresAt) < new Date()) return true;
+        if (!session) {
+          Logger.debug('[TokenValidator.isTokenRevoked] Session not found in PostgreSQL');
+          return true;
+        }
+        if (new Date(session.expiresAt) < new Date()) {
+          Logger.debug('[TokenValidator.isTokenRevoked] Session expired in PostgreSQL', { expiresAt: session.expiresAt });
+          return true;
+        }
 
-    return false;
+        Logger.debug('[TokenValidator.isTokenRevoked] Token not revoked');
+        return false;
+      } catch (error: any) {
+        Logger.error('[TokenValidator.isTokenRevoked] PostgreSQL check failed', { error: error.message });
+        throw error;
+      }
+    }
+    return true
+
   }
 
   /**

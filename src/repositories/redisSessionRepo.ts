@@ -3,8 +3,8 @@ import type { RedisRefreshTokenData, RedisSessionData } from '../core/dtos/auth-
 import { getRedisClient } from '../services/redis';
 import { Logger } from '../utils/logger';
 
-const SSO_SESSION_PREFIX = 'sso_v2:session:';
-const APP_SESSION_PREFIX = 'app_v2:session:';
+const SSO_SESSION_PREFIX = 'session:sso:';
+const APP_SESSION_PREFIX = 'session:app:';
 const REFRESH_PREFIX = 'v2:refresh:';
 const REVOKED_PREFIX = 'v2:revoked:';
 const USER_SESSIONS_PREFIX = 'v2:user_sessions:';

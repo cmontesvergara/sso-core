@@ -1,4 +1,4 @@
-import { isRedisAvailable, getRedisClient } from '../redis';
+import { getRedisClient, isRedisAvailable } from '../redis';
 
 interface SessionData {
   ip?: string;
@@ -86,9 +86,24 @@ export class RedisSessionService {
    * Check if a session is revoked
    */
   async isSessionRevoked(jti: string): Promise<boolean> {
-    const redis = getRedisClient();
-    const revoked = await redis.get(`${this.REVOKED_PREFIX}${jti}`);
-    return revoked === '1';
+    const { Logger } = await import('../../utils/logger');
+    Logger.debug('[RedisSessionService.isSessionRevoked] Starting check', { jti });
+
+    try {
+      const redis = getRedisClient();
+      Logger.debug('[RedisSessionService.isSessionRevoked] Got Redis client');
+
+      const key = `${this.REVOKED_PREFIX}${jti}`;
+      Logger.debug('[RedisSessionService.isSessionRevoked] Checking key', { key });
+
+      const revoked = await redis.get(key);
+      Logger.debug('[RedisSessionService.isSessionRevoked] Redis result', { revoked, isRevoked: revoked === '1' });
+
+      return revoked === '1';
+    } catch (error: any) {
+      Logger.error('[RedisSessionService.isSessionRevoked] Error', { jti, error: error.message });
+      throw error;
+    }
   }
 
   /**

@@ -1,10 +1,10 @@
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { Config } from '../../config';
-import { Logger } from '../../utils/logger';
 import { RefreshTokenRepository } from '../../core/repositories/refresh-token.repository';
-import { RedisSessionService } from './redis-session.service';
+import { Logger } from '../../utils/logger';
 import { AppSessionService } from './app-session.service';
+import { RedisSessionService } from './redis-session.service';
 
 interface DeviceInfo {
   ip?: string;
@@ -13,6 +13,7 @@ interface DeviceInfo {
 
 interface AppContext {
   appId?: string;
+  tenantId?: string;
 }
 
 /**
@@ -26,7 +27,7 @@ export class RefreshTokenService {
   constructor(
     private refreshRepo: RefreshTokenRepository,
     private redisService: RedisSessionService,
-    private appSessionService: AppSessionService
+    private appSessionService: AppSessionService,
   ) {
     const pepper = process.env.REFRESH_TOKEN_PEPPER;
     if (!pepper) {
@@ -99,11 +100,12 @@ export class RefreshTokenService {
     jti: string;
   }> {
     const refreshTokenHash = this.hashToken(refreshTokenPlain);
-
+    console.log('----Rotating refresh token', { refreshTokenHash, appContext });
     // Try Redis first (fast path)
     try {
       if (this.redisService.isAvailable()) {
         const tokenData = await this.redisService.getRefreshToken(refreshTokenHash);
+        console.log('----Token data from Redis', { tokenData });
 
         if (tokenData) {
           // Check for token reuse (security violation)
@@ -125,21 +127,29 @@ export class RefreshTokenService {
           await this.redisService.markRefreshTokenFamilyUsed(tokenData.familyId);
 
           // Also revoke in PostgreSQL for consistency
-          const pgRow = await this.refreshRepo.findRefreshTokenByHash(refreshTokenHash);
-          if (pgRow) {
-            await this.refreshRepo.revokeRefreshTokenById(pgRow.id);
-          }
+          // const pgRow = await this.refreshRepo.findRefreshTokenByHash(refreshTokenHash);
+          // if (pgRow) {
+          //   await this.refreshRepo.revokeRefreshTokenById(pgRow.id);
+          // }
 
           // Create new session
+          const userRepo = (await import('../../core/repositories/user.repository')).UserRepository;
+          const { getPrismaClient } = await import('../prisma');
+          const userRepository = new userRepo(getPrismaClient());
+          const user = await userRepository.findUserById(tokenData.userId);
+          if (!user) {
+            throw new RefreshTokenValidationError('User not found', 'USER_NOT_FOUND');
+          }
           return await this.appSessionService.createSession(
             tokenData.userId,
-            { id: tokenData.userId } as any,
+            user,
             undefined,
             appContext
           );
         }
       }
     } catch (err) {
+      console.error('Error during refresh token rotation (Redis)', err);
       if (err instanceof RefreshTokenValidationError) throw err;
       Logger.warn('Redis read failed during refresh, falling back to PG', { error: err });
     }

@@ -1,8 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Config } from '../../config';
+import { SessionRepository } from '../../core/repositories/session.repository';
 import { Logger } from '../../utils/logger';
 import { JWT } from '../jwt';
-import { SessionRepository } from '../../core/repositories/session.repository';
 import { RedisSessionService } from './redis-session.service';
 
 interface DeviceInfo {
@@ -34,7 +34,7 @@ export class SsoSessionService {
   constructor(
     private sessionRepo: SessionRepository,
     private redisService: RedisSessionService
-  ) {}
+  ) { }
 
   /**
    * Create a new SSO session
@@ -77,16 +77,20 @@ export class SsoSessionService {
 
     const accessToken = JWT.generateToken(payload, ssoTokenExpiry);
 
-    // Write to PostgreSQL
-    await this.writeSessionToPg(jti, userId, deviceInfo, ssoTokenExpiry);
-
-    // Write to Redis (best effort)
+    let savedOnRedis = false;
     try {
       if (this.redisService.isAvailable()) {
         await this.writeSessionToRedis(jti, userId, deviceInfo, ssoTokenExpiry);
+        savedOnRedis = true;
       }
     } catch (err) {
       Logger.warn('Redis write failed for SSO session, stored in PG only', { jti, error: err });
+    }
+
+    if (!savedOnRedis) {
+      // this session have short life then only save in redis, but if redis is not available save in pg
+      await this.writeSessionToPg(jti, userId, deviceInfo, ssoTokenExpiry);
+
     }
 
     Logger.info('SSO Session created', { jti, userId });

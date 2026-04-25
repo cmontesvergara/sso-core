@@ -1,16 +1,16 @@
 import argon2 from 'argon2';
-import { OTP } from './otp';
-import { JWT } from './jwt';
-import { AuditLog } from './auditLog';
-import { AppError } from '../middleware/errorHandler';
-import { Logger } from '../utils/logger';
 import { UserMapperStatic, UserPublicDTO } from '../core/mappers/user.mapper';
 import { UserRepository } from '../core/repositories/user.repository';
-import { SsoSessionService } from './session/sso-session.service';
+import { AppError } from '../middleware/errorHandler';
+import { Logger } from '../utils/logger';
+import { AuditLog } from './auditLog';
+import { JWT } from './jwt';
+import { OTP } from './otp';
 import { AppSessionService } from './session/app-session.service';
 import { RefreshTokenService } from './session/refresh-token.service';
-import { TokenValidatorService } from './session/token-validator.service';
 import { SessionRevokerService } from './session/session-revoker.service';
+import { SsoSessionService } from './session/sso-session.service';
+import { TokenValidatorService } from './session/token-validator.service';
 
 /**
  * Resultado del login v2
@@ -95,7 +95,7 @@ export class AuthServiceV2 {
       user.id,
       user,
       { ip, userAgent },
-      { appId, tenantId }
+      { appId, tenantId } // DELETE BECAUSE IS SSO SESION AND ONLY IS USED BY SSO FRONT
     );
 
     // 6. Audit log

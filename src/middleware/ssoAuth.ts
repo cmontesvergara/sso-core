@@ -5,7 +5,11 @@ import { findAppSessionByToken } from '../repositories/appSessionRepo.prisma';
 import { getActiveSSOSessionsForUser } from '../repositories/ssoSessionRepo.prisma';
 import { getAppSessionTokenFromCookies } from '../utils/cookieUtils';
 import { Config } from '../config';
-import { SessionV2 } from '../services/sessionV2';
+import { getContainer } from '../core/container-config';
+import { TokenValidatorService } from '../services/session/token-validator.service';
+
+// Service instance from container
+const tokenValidator = () => getContainer().get<TokenValidatorService>('TokenValidatorService');
 
 /**
  * Extend Express Request to include SSO user context
@@ -126,8 +130,12 @@ export async function authenticateSSO(
     if (authHeader && authHeader.startsWith('Bearer ')) {
       try {
         const token = authHeader.substring(7);
-        const payload = SessionV2.validateAccessToken(token);
-        const isRevoked = await SessionV2.isTokenRevoked(payload.jti);
+        const validation = await tokenValidator().validateToken(token);
+        if (!validation.isValid || !validation.decoded) {
+          throw new AppError(401, 'Invalid access token', validation.error || 'INVALID_ACCESS_TOKEN');
+        }
+        const payload = validation.decoded;
+        const isRevoked = await tokenValidator().isTokenRevoked(payload.jti, payload.type || 'app');
         if (isRevoked) {
           throw new AppError(401, 'Token revoked', 'TOKEN_REVOKED');
         }
@@ -257,18 +265,21 @@ export async function optionalAuthenticateSSO(
     if (authHeader && authHeader.startsWith('Bearer ')) {
       try {
         const token = authHeader.substring(7);
-        const payload = SessionV2.validateAccessToken(token);
-        const isRevoked = await SessionV2.isTokenRevoked(payload.jti);
-        if (!isRevoked) {
-          req.ssoUser = {
-            sessionId: payload.jti,
-            userId: payload.sub,
-            email: '',
-            firstName: '',
-            lastName: '',
-            userStatus: 'active',
-            systemRole: payload.systemRole,
-          };
+        const validation = await tokenValidator().validateToken(token);
+        if (validation.isValid && validation.decoded) {
+          const payload = validation.decoded;
+          const isRevoked = await tokenValidator().isTokenRevoked(payload.jti, payload.type || 'app');
+          if (!isRevoked) {
+            req.ssoUser = {
+              sessionId: payload.jti,
+              userId: payload.sub,
+              email: '',
+              firstName: '',
+              lastName: '',
+              userStatus: 'active',
+              systemRole: payload.systemRole,
+            };
+          }
         }
       } catch (_) {
         // Invalid v2 token, continue as anonymous

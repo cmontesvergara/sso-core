@@ -1,11 +1,11 @@
-import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
+import { v4 as uuidv4 } from 'uuid';
 import { Config } from '../../config';
+import { SessionRepository } from '../../core/repositories/session.repository';
 import { Logger } from '../../utils/logger';
 import { JWT } from '../jwt';
-import { SessionRepository } from '../../core/repositories/session.repository';
-import { RedisSessionService } from './redis-session.service';
 import { getPrismaClient } from '../prisma';
+import { RedisSessionService } from './redis-session.service';
 
 interface DeviceInfo {
   ip?: string;
@@ -36,7 +36,7 @@ export class AppSessionService {
   constructor(
     private sessionRepo: SessionRepository,
     private redisService: RedisSessionService
-  ) {}
+  ) { }
 
   /**
    * Create a new App session with access token, refresh token, and user data
@@ -140,15 +140,25 @@ export class AppSessionService {
 
     // Generate refresh token
     const refreshToken = crypto.randomBytes(64).toString('hex');
+    const refreshTokenHash = crypto.createHmac('sha256', process.env.REFRESH_TOKEN_PEPPER || '').update(refreshToken).digest('hex');
 
-    // Get permissions for the role
+    // Get permissions for the role - FILTRADOS POR APLICACIÓN
     let permissions: Array<{ resource: string; action: string }> = [];
-    if (roleId) {
+    if (roleId && appContext?.appId) {
+      // Obtener la aplicación para obtener su ID interno
+      const application = await prisma.application.findUnique({
+        where: { appId: appContext.appId },
+      });
       const rolePermissions = await prisma.permission.findMany({
-        where: { roleId },
-        select: { resource: true, action: true },
+        where: {
+          roleId,
+          applicationId: application?.id, // ✅ Filtrar por aplicación
+        },
+        select: { resource: true, action: true, applicationId: true },
       });
       permissions = rolePermissions.map((p) => ({ resource: p.resource, action: p.action }));
+    } else {
+      console.log('[AppSessionService] No roleId or appId - skipping permission fetch. roleId:', roleId, 'appId:', appContext?.appId);
     }
 
     // Write session to PostgreSQL
@@ -163,7 +173,22 @@ export class AppSessionService {
             permissions,
           },
           relatedTenants: tenants,
+          user,
+          tokens: {//TODO: en ves de guardar para enviarlo en el session, usar el refresh token y renovarlo
+            accessToken
+          }
         });
+
+        await this.redisService.saveRefreshToken(
+          refreshTokenHash,
+          {
+            userId,
+            jti,
+            familyId: uuidv4(),
+            createdAt: Math.floor(Date.now() / 1000),
+          },
+          Config.get('v2.refresh_token_expiry', 7 * 24 * 60 * 60)
+        );
 
         // Cache permissions
         if (permissions.length > 0) {
