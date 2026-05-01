@@ -1,10 +1,11 @@
-import { User } from '../../../domain/entities/User';
+import { User, UserTenantMembership } from '../../../domain/entities/User';
 import { IUserRepository } from '../../../domain/repositories/IUserRepository';
 import { UserId } from '../../../domain/value-objects/UserId';
 import { Email } from '../../../domain/value-objects/Email';
 import { PasswordHash } from '../../../domain/value-objects/PasswordHash';
 import { NUID } from '../../../domain/value-objects/NUID';
 import { TenantId } from '../../../domain/value-objects/TenantId';
+import { RoleName } from '../../../domain/value-objects/RoleName';
 import { PrismaClient } from '@prisma/client';
 
 /**
@@ -18,34 +19,32 @@ export class PrismaUserRepository implements IUserRepository {
   async findById(id: UserId): Promise<User | null> {
     const user = await this.prisma.user.findUnique({
       where: { id: id.value },
+      include: { tenantMembers: true },
     });
-
     return user ? this.mapToDomain(user) : null;
   }
 
   async findByEmail(email: Email): Promise<User | null> {
     const user = await this.prisma.user.findUnique({
       where: { email: email.value },
+      include: { tenantMembers: true },
     });
-
     return user ? this.mapToDomain(user) : null;
   }
 
   async findByNUID(nuid: NUID): Promise<User | null> {
     const user = await this.prisma.user.findUnique({
       where: { nuid: nuid.value },
+      include: { tenantMembers: true },
     });
-
     return user ? this.mapToDomain(user) : null;
   }
 
   async findByTenant(tenantId: TenantId): Promise<User[]> {
-    // Query users through tenantMembers relation
     const members = await this.prisma.tenantMember.findMany({
       where: { tenantId: tenantId.value },
-      include: { user: true },
+      include: { user: { include: { tenantMembers: true } } },
     });
-
     return members.map((m: any) => this.mapToDomain(m.user));
   }
 
@@ -134,6 +133,15 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   private mapToDomain(prismaUser: any): User {
+    // Map tenant memberships when loaded via include
+    const tenantMemberships: UserTenantMembership[] = (prismaUser.tenantMembers ?? []).map(
+      (m: any) => ({
+        tenantId: TenantId.create(m.tenantId),
+        role:     RoleName.create(m.role),
+        joinedAt: m.createdAt ?? new Date(),
+      })
+    );
+
     return new User(
       UserId.create(prismaUser.id),
       Email.createUnsafe(prismaUser.email),
@@ -143,9 +151,7 @@ export class PrismaUserRepository implements IUserRepository {
       PasswordHash.createUnsafe(prismaUser.passwordHash),
       prismaUser.userStatus,
       prismaUser.systemRole ?? 'user',
-      // Required field
       prismaUser.phone || '',
-      // Optional fields
       prismaUser.secondName || null,
       prismaUser.secondLastName || null,
       prismaUser.birthDate || null,
@@ -157,9 +163,8 @@ export class PrismaUserRepository implements IUserRepository {
       prismaUser.maritalStatus || null,
       prismaUser.recoveryPhone || null,
       prismaUser.recoveryEmail || null,
-      // Relations (would need to be loaded separately)
-      [],
-      [],
+      [],                   // addresses — not needed, load on demand
+      tenantMemberships,    // ← now properly loaded from DB
       prismaUser.createdAt,
       prismaUser.updatedAt,
       prismaUser.lastLoginAt

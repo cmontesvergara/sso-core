@@ -118,9 +118,9 @@ export class AppSession extends SessionBase {
     id: SessionId,
     sessionToken: string,
     userId: UserId,
-    tenantId: TenantId,
-    appId: string,
-    role: string,
+    private readonly _tenantId: TenantId,
+    private readonly _appId: string,
+    private readonly _role: string,
     ip: string | null,
     userAgent: string | null,
     expiresAt: Date,
@@ -133,17 +133,15 @@ export class AppSession extends SessionBase {
   }
 
   get tenantId(): TenantId {
-    // SSOSessions don't have tenantId, AppSessions do
-    // This getter is specific to AppSession
-    return (this as any)._tenantId;
+    return this._tenantId;
   }
 
   get appId(): string {
-    return (this as any)._appId;
+    return this._appId;
   }
 
   get role(): string {
-    return (this as any)._role;
+    return this._role;
   }
 
   get ssoSessionId(): string | undefined {

@@ -84,9 +84,9 @@ export class AuthController {
     try {
       const result = await this.exchangeCodeUseCase.execute({
         code: req.body.code,
-        codeVerifier: req.body.code_verifier,
-        redirectUri: req.body.redirect_uri,
-        appId: req.body.app_id ?? req.body.appId,
+        codeVerifier: req.body.codeVerifier,
+        redirectUri: req.body.redirectUri,
+        appId: req.body.appId,
       });
       res.status(200).json(result);
     } catch (err) {
@@ -107,10 +107,10 @@ export class AuthController {
       const result = await this.authorizeUseCase.execute({
         sessionId,
         tenantId: req.body.tenantId,
-        appId: req.body.appId ?? req.body.app_id,
-        redirectUri: req.body.redirectUri ?? req.body.redirect_uri,
-        codeChallenge: req.body.codeChallenge ?? req.body.code_challenge,
-        codeChallengeMethod: req.body.codeChallengeMethod ?? req.body.code_challenge_method,
+        appId: req.body.appId,
+        redirectUri: req.body.redirectUri,
+        codeChallenge: req.body.codeChallenge,
+        codeChallengeMethod: req.body.codeChallengeMethod,
         state: req.body.state,
         nonce: req.body.nonce,
       });

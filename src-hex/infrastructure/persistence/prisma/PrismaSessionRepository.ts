@@ -92,7 +92,7 @@ export class PrismaSessionRepository implements ISessionRepository {
       // AppSession
       await this.prisma.appSession.create({
         data: {
-          id: session.id.value,
+          // id: session.id.value,
           sessionToken: session.sessionToken,
           userId: session.userId.value,
           tenantId: (session as AppSession).tenantId.value,

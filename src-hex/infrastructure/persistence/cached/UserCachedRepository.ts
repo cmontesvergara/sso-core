@@ -1,10 +1,11 @@
-import { User } from '../../../domain/entities/User';
+import { User, UserTenantMembership } from '../../../domain/entities/User';
 import { IUserRepository } from '../../../domain/repositories/IUserRepository';
 import { UserId } from '../../../domain/value-objects/UserId';
 import { Email } from '../../../domain/value-objects/Email';
 import { PasswordHash } from '../../../domain/value-objects/PasswordHash';
 import { NUID } from '../../../domain/value-objects/NUID';
 import { TenantId } from '../../../domain/value-objects/TenantId';
+import { RoleName } from '../../../domain/value-objects/RoleName';
 import { RedisCacheService } from '../redis/RedisCacheService';
 import { RedisKeyFactory } from '../redis/RedisKeyFactoryService';
 
@@ -23,13 +24,13 @@ interface UserSnapshot {
   nuid:             string;
   firstName:        string;
   lastName:         string;
-  passwordHash:     string;   // argon2 hash — safe to cache
+  passwordHash:     string;
   userStatus:       string;
   systemRole:       string;
   phone:            string;
   secondName:       string | null;
   secondLastName:   string | null;
-  birthDate:        string | null; // ISO
+  birthDate:        string | null;
   gender:           string | null;
   nationality:      string | null;
   birthPlace:       string | null;
@@ -38,9 +39,11 @@ interface UserSnapshot {
   maritalStatus:    string | null;
   recoveryPhone:    string | null;
   recoveryEmail:    string | null;
-  createdAt:        string; // ISO
-  updatedAt:        string; // ISO
-  lastLoginAt:      string | null; // ISO
+  createdAt:        string;
+  updatedAt:        string;
+  lastLoginAt:      string | null;
+  /** Tenant memberships — required for canAccessTenant() to work on cache hit */
+  tenantMemberships: Array<{ tenantId: string; role: string; joinedAt: string }>;
 }
 
 /**
@@ -237,10 +240,21 @@ export class UserCachedRepository implements IUserRepository {
       createdAt:        user.createdAt.toISOString(),
       updatedAt:        user.updatedAt.toISOString(),
       lastLoginAt:      user.lastLoginAt?.toISOString() ?? null,
+      tenantMemberships: user.tenantMemberships.map(m => ({
+        tenantId: m.tenantId.value,
+        role:     m.role.value,
+        joinedAt: m.joinedAt.toISOString(),
+      })),
     };
   }
 
   private fromSnapshot(snap: UserSnapshot): User {
+    const tenantMemberships: UserTenantMembership[] = (snap.tenantMemberships ?? []).map(m => ({
+      tenantId: TenantId.create(m.tenantId),
+      role:     RoleName.create(m.role),
+      joinedAt: new Date(m.joinedAt),
+    }));
+
     return new User(
       UserId.create(snap.id),
       Email.createUnsafe(snap.email),
@@ -262,8 +276,8 @@ export class UserCachedRepository implements IUserRepository {
       snap.maritalStatus,
       snap.recoveryPhone,
       snap.recoveryEmail,
-      [],  // addresses — not cached, load on demand
-      [],  // tenantMemberships — not cached, load on demand
+      [],                  // addresses — not cached, load on demand
+      tenantMemberships,   // ← restored from snapshot
       new Date(snap.createdAt),
       new Date(snap.updatedAt),
       snap.lastLoginAt ? new Date(snap.lastLoginAt) : undefined

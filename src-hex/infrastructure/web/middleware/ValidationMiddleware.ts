@@ -79,11 +79,14 @@ export const validateRefresh = validate(
  */
 export const validateExchange = validate(
   Joi.object({
-    code:          Joi.string().required(),
-    redirect_uri:  Joi.string().uri().required(),
-    app_id:        Joi.string().trim().required(),
-    code_verifier: Joi.string(),  // optional — PKCE
+    code:         Joi.string().required(),
+    redirectUri:  Joi.string().uri().required(),
+    appId:        Joi.string().trim().required(),
+    codeVerifier: Joi.string(),  // optional — PKCE
   })
+  .rename('redirect_uri', 'redirectUri', { ignoreUndefined: true, override: true })
+  .rename('app_id', 'appId', { ignoreUndefined: true, override: true })
+  .rename('code_verifier', 'codeVerifier', { ignoreUndefined: true, override: true })
 );
 
 /**
@@ -100,6 +103,10 @@ export const validateAuthorize = validate(
     state:               Joi.string(),
     nonce:               Joi.string(),
   })
+  .rename('app_id', 'appId', { ignoreUndefined: true, override: true })
+  .rename('redirect_uri', 'redirectUri', { ignoreUndefined: true, override: true })
+  .rename('code_challenge', 'codeChallenge', { ignoreUndefined: true, override: true })
+  .rename('code_challenge_method', 'codeChallengeMethod', { ignoreUndefined: true, override: true })
 );
 
 /**

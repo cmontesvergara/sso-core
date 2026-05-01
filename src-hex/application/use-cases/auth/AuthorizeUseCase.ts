@@ -1,3 +1,4 @@
+import { randomUUID, randomBytes } from 'crypto';
 import { IAuthCodeRepository } from '../../../domain/repositories/IAuthCodeRepository';
 import { IApplicationRepository } from '../../../domain/repositories/IApplicationRepository';
 import { ITenantRepository } from '../../../domain/repositories/ITenantRepository';
@@ -108,7 +109,7 @@ export class AuthorizeUseCase {
       input.codeChallengeMethod ?? null,
       input.state ?? null,
       input.nonce ?? null,
-      input.sessionId
+      null // ssoSessionId omitted because input.sessionId is a token string, not a UUID
     );
 
     await this.authCodeRepository.save(authCode);
@@ -147,15 +148,13 @@ export class AuthorizeUseCase {
   }
 
   private generateCode(): string {
+    // 48 chars from URL-safe alphabet — cryptographically random
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-    let code = '';
-    for (let i = 0; i < 48; i++) {
-      code += chars[Math.floor(Math.random() * chars.length)];
-    }
-    return code;
+    const bytes = randomBytes(48);
+    return Array.from(bytes).map(b => chars[b % chars.length]).join('');
   }
 
   private generateId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    return randomUUID(); // valid UUID v4 — required by Prisma UUID column
   }
 }
