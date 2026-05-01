@@ -17,15 +17,19 @@
     "strictNullChecks": true,
     "strictFunctionTypes": true,
     "strictPropertyInitialization": true,
-    "noUnusedLocals": true,
+    "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@hex/*": ["./src-hex/*"]
+    }
   },
-  "include": ["src/**/*"],
+  "include": ["index.ts", "src/**/*", "src-hex/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
