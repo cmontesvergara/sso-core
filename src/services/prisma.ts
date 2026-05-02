@@ -8,13 +8,13 @@ let prismaInstance: PrismaClient | null = null;
  * Build DATABASE_URL from individual config values
  */
 function buildDatabaseUrl(): string {
-  const type = Config.get('database.type');
-  const host = Config.get('database.host');
-  const port = Config.get('database.port');
-  const name = Config.get('database.name');
-  const user = Config.get('database.user');
-  const password = Config.get('database.password');
-  const ssl = Config.get('database.ssl');
+  const type = Config.get('database.type') || process.env.DATABASE_TYPE || 'postgresql';
+  const host = Config.get('database.host') || process.env.DATABASE_HOST;
+  const port = Config.get('database.port') || process.env.DATABASE_PORT || '5432';
+  const name = Config.get('database.name') || process.env.DATABASE_NAME;
+  const user = Config.get('database.user') || process.env.DATABASE_USER;
+  const password = Config.get('database.password') || process.env.DATABASE_PASSWORD;
+  const ssl = Config.get('database.ssl') ?? (process.env.DATABASE_SSL === 'true');
 
   if (!host || !port || !name || !user || !password) {
     throw new Error('Missing required database configuration');
