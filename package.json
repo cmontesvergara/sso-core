@@ -2,8 +2,8 @@
   "name": "bigso-sso-core",
   "version": "1.0.0",
   "description": "Open-source authentication provider - Node.js with Express implementation",
-  "main": "dist/src/index.js",
-  "types": "dist/src/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "start": "SSO_MODE=legacy node dist/index.js",

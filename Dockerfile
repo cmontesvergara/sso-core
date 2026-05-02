@@ -26,6 +26,7 @@ RUN npx prisma generate
 # Copy source code
 COPY src ./src
 COPY src-hex ./src-hex
+COPY index.ts ./
 
 # Build TypeScript
 RUN npm run build
