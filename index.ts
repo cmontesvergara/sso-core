@@ -9,7 +9,7 @@ async function main(): Promise<void> {
     const { bootstrap } = await import('./src-hex/interfaces/http/Bootstrap');
     await bootstrap();
   } else {
-    const { bootstrap } = await import('./src/bootstrap');
+    const { bootstrap } = await import('./src-hex/interfaces/http/Bootstrap');
     await bootstrap();
   }
 }
