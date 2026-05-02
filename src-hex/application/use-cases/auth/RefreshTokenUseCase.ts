@@ -1,11 +1,14 @@
 import { IRefreshTokenRepository } from '../../../domain/repositories/IRefreshTokenRepository';
 import { ISessionRepository } from '../../../domain/repositories/ISessionRepository';
+import crypto from 'crypto';
 import { ITokenService } from '../../ports/output/ITokenService';
 import { IAuditService } from '../../ports/output/IAuditService';
 import { IEventBus } from '../../ports/output/IEventBus';
 import { IHashService } from '../../ports/output/IHashService';
 import { RefreshTokenInput } from '../../dto/input/RefreshTokenInput';
 import { TokenResult } from '../../dto/output/TokenResult';
+import { LoginResult } from '../../dto/output/LoginResult';
+import { getPrismaClient } from '../../../../src/services/prisma';
 import { TokenRefreshedEvent } from '../../../domain/events/AuthEvents';
 import { RefreshToken } from '../../../domain/entities/RefreshToken';
 import { AppSession } from '../../../domain/entities/Session';
@@ -29,7 +32,7 @@ export class RefreshTokenUseCase {
     private hashService: IHashService
   ) { }
 
-  async execute(input: RefreshTokenInput): Promise<TokenResult> {
+  async execute(input: RefreshTokenInput): Promise<LoginResult> {
     // 1. Validate refresh token
     const claims = await this.tokenService.validateRefreshToken(input.refreshToken);
     if (!claims) {
@@ -53,7 +56,13 @@ export class RefreshTokenUseCase {
       throw new InvalidCredentialsError('Token has been revoked');
     }
 
-    // 4. Create new app session
+    // 4. Fetch user to populate session metadata
+    const prisma = getPrismaClient();
+    const user = await prisma.user.findUnique({
+      where: { id: refreshToken.userId.value },
+    });
+
+    // 5. Create new app session
     const sessionToken = `app_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const now = new Date();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
@@ -67,7 +76,7 @@ export class RefreshTokenUseCase {
       refreshToken.userId,
       tenantId,
       input.appId || 'default',
-      'user', // Default role
+      user?.systemRole || 'user',
       null, // ip
       null, // userAgent
       expiresAt,
@@ -82,7 +91,7 @@ export class RefreshTokenUseCase {
     // 6. Create new refresh token (rotation)
     const newTokenHash = this.hashToken(tokens.refreshToken);
     const newRefreshToken = refreshToken.createRotation(
-      RefreshTokenId.create(`rt_${Date.now()}`),
+      RefreshTokenId.create(crypto.randomUUID()),
       newTokenHash,
       new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
     );
@@ -107,12 +116,93 @@ export class RefreshTokenUseCase {
       sessionId: session.id.value,
     });
 
+    // 10. Fetch legacy response enrichment data (tenants and permissions)
+    let tenants: any[] = [];
+    let permissions: Array<{ resource: string; action: string }> = [];
+
+    if (user) {
+      // Fetch tenant memberships
+      const tenantMembers = await prisma.tenantMember.findMany({
+        where: {
+          userId: user.id,
+          tenant: input.appId ? {
+            tenantApps: {
+              some: {
+                application: { appId: input.appId },
+                isEnabled: true,
+              },
+            },
+          } : undefined,
+        },
+        include: { tenant: true },
+      });
+
+      tenants = tenantMembers.map((tm: any) => ({
+        id: tm.tenant.id,
+        name: tm.tenant.name,
+        slug: tm.tenant.slug,
+        role: tm.role,
+      }));
+
+      // Generate permissions
+      const activeTenantId = input.tenantId || session.tenantId.value;
+      const currentTenantMember = tenantMembers.find((tm: any) => tm.tenantId === activeTenantId);
+      
+      if (currentTenantMember && input.appId) {
+        const roleRecord = await prisma.role.findFirst({
+          where: {
+            tenantId: activeTenantId,
+            name: currentTenantMember.role,
+          },
+        });
+        
+        if (roleRecord) {
+          const application = await prisma.application.findUnique({
+            where: { appId: input.appId },
+          });
+          
+          if (application) {
+            const rolePermissions = await prisma.permission.findMany({
+              where: {
+                roleId: roleRecord.id,
+                applicationId: application.id,
+              },
+              select: { resource: true, action: true },
+            });
+            permissions = rolePermissions.map((p: any) => ({ resource: p.resource, action: p.action }));
+          }
+        }
+      }
+    }
+
+    const userInformation = user ? {
+      id: user.id,
+      email: user.email,
+      nuid: user.nuid,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      fullName: `${user.firstName} ${user.lastName}`,
+      userStatus: user.userStatus,
+      systemRole: user.systemRole,
+    } : null;
+
     return {
       success: true,
+      tokens: {
+        jti: sessionToken,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresIn: tokens.expiresIn,
+      },
+      user: userInformation,
+      currentTenant: {
+        ...tenants.find((t: any) => t.id === (input.tenantId || session.tenantId.value)),
+        permissions,
+      },
+      relatedTenants: tenants,
+      expiresIn: tokens.expiresIn, // flat for safety
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      expiresIn: tokens.expiresIn,
-      tokenType: 'Bearer',
     };
   }
 

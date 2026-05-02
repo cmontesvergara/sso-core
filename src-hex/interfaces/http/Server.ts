@@ -1,11 +1,11 @@
-import express, { Express, Request, Response } from 'express';
-import helmet from 'helmet';
-import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import cors from 'cors';
+import express, { Express, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
 import { Container } from '../../infrastructure/config/Container';
-import { createRouter } from '../../infrastructure/web/routes/index';
 import { errorHandlerMiddleware } from '../../infrastructure/web/middleware/ErrorHandlerMiddleware';
+import { createRouter } from '../../infrastructure/web/routes/index';
 
 /**
  * createHexServer
@@ -50,12 +50,26 @@ export async function createHexServer(container: Container): Promise<Express> {
     res.json({ status: 'OK', mode: 'hexagonal', timestamp: new Date().toISOString() });
   });
 
+  // JWKS endpoint (Publicly accessible globally for CORS)
+  app.get('/.well-known/jwks.json', (_req: Request, res: Response) => {
+    try {
+      const jwksProvider = container.get<any>('JwksProvider');
+      const jwksString = jwksProvider.getJwksString();
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'public, max-age=3600, immutable');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.end(jwksString);
+    } catch (err: any) {
+      res.status(500).json({ error: 'JWKS not initialized', message: err.message });
+    }
+  });
+
   app.get('/ready', (_req: Request, res: Response) => {
     res.json({ status: 'OK', mode: 'hexagonal', timestamp: new Date().toISOString() });
   });
 
   // ── API v3 (hexagonal) ───────────────────────────────────────────────────
-  app.use('/api/v3', createRouter(container));
+  app.use('/api/v2', createRouter(container));
 
   // ── 404 ──────────────────────────────────────────────────────────────────
   app.use((req: Request, res: Response) => {

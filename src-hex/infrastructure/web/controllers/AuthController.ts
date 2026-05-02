@@ -4,6 +4,7 @@ import { LogoutUseCase } from '../../../application/use-cases/auth/LogoutUseCase
 import { RefreshTokenUseCase } from '../../../application/use-cases/auth/RefreshTokenUseCase';
 import { ExchangeCodeUseCase } from '../../../application/use-cases/auth/ExchangeCodeUseCase';
 import { AuthorizeUseCase } from '../../../application/use-cases/auth/AuthorizeUseCase';
+import { GetSessionContextUseCase } from '../../../application/use-cases/auth/GetSessionContextUseCase';
 import { SessionId } from '../../../domain/value-objects/SessionId';
 import { LoginInput } from '../../../application/dto/input/LoginInput';
 import { DeviceFingerprint } from '../../../domain/value-objects/DeviceFingerprint';
@@ -19,7 +20,8 @@ export class AuthController {
     private logoutUseCase: LogoutUseCase,
     private refreshTokenUseCase: RefreshTokenUseCase,
     private exchangeCodeUseCase: ExchangeCodeUseCase,
-    private authorizeUseCase: AuthorizeUseCase
+    private authorizeUseCase: AuthorizeUseCase,
+    private getSessionContextUseCase: GetSessionContextUseCase
   ) { }
 
   /**
@@ -85,7 +87,6 @@ export class AuthController {
       const result = await this.exchangeCodeUseCase.execute({
         code: req.body.code,
         codeVerifier: req.body.codeVerifier,
-        redirectUri: req.body.redirectUri,
         appId: req.body.appId,
       });
       res.status(200).json(result);
@@ -115,6 +116,21 @@ export class AuthController {
         nonce: req.body.nonce,
       });
 
+      res.status(200).json(result);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  /**
+   * POST /api/v3/auth/session
+   */
+  session = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const result = await this.getSessionContextUseCase.execute({
+        sessionId: req.body.sessionId,
+        appId: req.body.appId,
+      });
       res.status(200).json(result);
     } catch (err) {
       next(err);

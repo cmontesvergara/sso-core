@@ -72,6 +72,9 @@ const passwordHasher = {
   verify: jest.fn().mockResolvedValue(true),
 };
 
+let refreshTokenRepository: any;
+let hashService: any;
+
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
 describe('LoginUseCase', () => {
@@ -95,12 +98,22 @@ describe('LoginUseCase', () => {
     userRepository.update.mockResolvedValue(undefined);
     passwordHasher.verify.mockResolvedValue(true);
     tokenService.generateTokens.mockResolvedValue(mockTokens);
+    refreshTokenRepository = {
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+
+    hashService = {
+      hash: jest.fn().mockReturnValue('mock-hash'),
+    };
+
     loginUseCase = new LoginUseCase(
       userRepository as any,
       sessionRepository as any,
+      refreshTokenRepository as any,
       tokenService as any,
       auditService as any,
       eventBus as any,
+      hashService as any,
       passwordHasher as any
     );
   });

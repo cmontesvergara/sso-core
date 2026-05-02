@@ -80,11 +80,9 @@ export const validateRefresh = validate(
 export const validateExchange = validate(
   Joi.object({
     code:         Joi.string().required(),
-    redirectUri:  Joi.string().uri().required(),
     appId:        Joi.string().trim().required(),
     codeVerifier: Joi.string(),  // optional — PKCE
   })
-  .rename('redirect_uri', 'redirectUri', { ignoreUndefined: true, override: true })
   .rename('app_id', 'appId', { ignoreUndefined: true, override: true })
   .rename('code_verifier', 'codeVerifier', { ignoreUndefined: true, override: true })
 );

@@ -57,6 +57,11 @@ export interface ITokenService {
   validateTempToken(token: string): string | null;
 
   /**
+   * Generate custom signed payload for SSO widget responses
+   */
+  generateSignedPayload(payload: Record<string, any>, audience: string): string;
+
+  /**
    * Revoke token
    */
   revokeToken(tokenId: string): Promise<void>;

@@ -5,6 +5,7 @@ import { UserController } from '../controllers/UserController';
 import { TenantController } from '../controllers/TenantController';
 import { PasswordController } from '../controllers/PasswordController';
 import { VerifySessionUseCase } from '../../../application/use-cases/auth/VerifySessionUseCase';
+import { GetSessionContextUseCase } from '../../../application/use-cases/auth/GetSessionContextUseCase';
 import { ExchangeCodeUseCase } from '../../../application/use-cases/auth/ExchangeCodeUseCase';
 import { AuthorizeUseCase } from '../../../application/use-cases/auth/AuthorizeUseCase';
 import { UpdateUserProfileUseCase, ChangePasswordUseCase } from '../../../application/use-cases/user/UpdateUserUseCase';
@@ -39,9 +40,11 @@ export function createRouter(container: Container): Router {
     container.get('IAuthCodeRepository'),
     container.get('ISessionRepository'),
     container.get('IUserRepository'),
+    container.get('IRefreshTokenRepository'),
     container.get('ITokenService'),
     container.get('IAuditService'),
-    container.get('IEventBus')
+    container.get('IEventBus'),
+    container.get('IHashService')
   );
 
   const authorizeUseCase = new AuthorizeUseCase(
@@ -58,6 +61,12 @@ export function createRouter(container: Container): Router {
     container.get('IUserRepository'),
     container.get('IAuditService'),
     container.get('IEventBus')
+  );
+
+  const getSessionContextUseCase = new GetSessionContextUseCase(
+    container.get('ISessionRepository'),
+    container.get('PrismaClient'),
+    container.get('ITokenService')
   );
 
   const changePasswordUseCase = new ChangePasswordUseCase(
@@ -112,7 +121,8 @@ export function createRouter(container: Container): Router {
     container.get('LogoutUseCase'),
     container.get('RefreshTokenUseCase'),
     exchangeCodeUseCase,
-    authorizeUseCase
+    authorizeUseCase,
+    getSessionContextUseCase
   );
 
   const userController = new UserController(
@@ -140,6 +150,7 @@ export function createRouter(container: Container): Router {
   router.post('/auth/login',           validateLogin,    authController.login);
   router.post('/auth/refresh',          validateRefresh,  authController.refresh);
   router.post('/auth/exchange',         validateExchange, authController.exchange);
+  router.post('/auth/session',          authController.session);
   router.post('/auth/forgot-password',  passwordController.forgotPassword);
   router.post('/auth/reset-password',   passwordController.resetPassword);
   router.post('/users/register',        validateRegister, userController.register);

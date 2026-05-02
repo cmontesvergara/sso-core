@@ -1,14 +1,19 @@
 import { IUserRepository } from '../../../domain/repositories/IUserRepository';
 import { ISessionRepository } from '../../../domain/repositories/ISessionRepository';
 import { ITokenService } from '../../ports/output/ITokenService';
+import crypto from 'crypto';
 import { IAuditService } from '../../ports/output/IAuditService';
 import { IEventBus } from '../../ports/output/IEventBus';
+import { IHashService } from '../../ports/output/IHashService';
+import { IRefreshTokenRepository } from '../../../domain/repositories/IRefreshTokenRepository';
 import { LoginInput } from '../../dto/input/LoginInput';
 import { LoginResult } from '../../dto/output/LoginResult';
 import { UserLoggedInEvent } from '../../../domain/events/AuthEvents';
 import { User } from '../../../domain/entities/User';
 import { SSOSession } from '../../../domain/entities/Session';
+import { RefreshToken } from '../../../domain/entities/RefreshToken';
 import { SessionId } from '../../../domain/value-objects/SessionId';
+import { RefreshTokenId } from '../../../domain/value-objects/Ids';
 import { TenantId } from '../../../domain/value-objects/TenantId';
 import { DeviceFingerprint } from '../../../domain/value-objects/DeviceFingerprint';
 import { Email } from '../../../domain/value-objects/Email';
@@ -29,9 +34,11 @@ export class LoginUseCase {
   constructor(
     private userRepository: IUserRepository,
     private sessionRepository: ISessionRepository,
+    private refreshTokenRepository: IRefreshTokenRepository,
     private tokenService: ITokenService,
     private auditService: IAuditService,
     private eventBus: IEventBus,
+    private hashService: IHashService,
     passwordHasher: IPasswordHasher
   ) {
     this.authService = new AuthenticationService(passwordHasher);
@@ -61,8 +68,18 @@ export class LoginUseCase {
     // 4. Create SSO session
     const session = await this.createSession(user, input);
 
-    // 5. Generate tokens
+    // 5. Generate and save tokens
     const tokens = await this.tokenService.generateTokens(session);
+    
+    const tokenHash = this.hashService.hash(tokens.refreshToken);
+    const refreshTokenEntity = new RefreshToken(
+      RefreshTokenId.create(crypto.randomUUID()),
+      user.id,
+      tokenHash,
+      new Date(),
+      new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+    );
+    await this.refreshTokenRepository.save(refreshTokenEntity);
 
     // 6. Publish event
     const eventTenantId = input.tenantId

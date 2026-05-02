@@ -1,5 +1,20 @@
 import { RefreshTokenUseCase } from '@hex/application/use-cases/auth/RefreshTokenUseCase';
 
+jest.mock('../../../../../src/services/prisma', () => ({
+  getPrismaClient: () => ({
+    user: {
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'user-123',
+        firstName: 'Test',
+        lastName: 'User',
+      }),
+    },
+    tenantMember: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+  }),
+}));
+
 const mockRefreshToken = {
   id: { value: 'rt-001' },
   userId: { value: 'user-123' },

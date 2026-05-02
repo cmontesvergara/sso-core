@@ -1,19 +1,25 @@
 import { IAuthCodeRepository } from '../../../domain/repositories/IAuthCodeRepository';
+import crypto from 'crypto';
 import { ISessionRepository } from '../../../domain/repositories/ISessionRepository';
 import { IUserRepository } from '../../../domain/repositories/IUserRepository';
+import { IRefreshTokenRepository } from '../../../domain/repositories/IRefreshTokenRepository';
 import { ITokenService } from '../../ports/output/ITokenService';
 import { IAuditService } from '../../ports/output/IAuditService';
 import { IEventBus } from '../../ports/output/IEventBus';
+import { IHashService } from '../../ports/output/IHashService';
 import { SessionId } from '../../../domain/value-objects/SessionId';
+import { RefreshTokenId } from '../../../domain/value-objects/Ids';
 import { AppSession } from '../../../domain/entities/Session';
+import { RefreshToken } from '../../../domain/entities/RefreshToken';
+
 import { LoginResult } from '../../dto/output/LoginResult';
 import { InvalidAuthCodeError } from '../../../domain/errors/InvalidAuthCodeError';
 import { UserNotFoundError } from '../../../domain/errors/UserNotFoundError';
+import { getPrismaClient } from '../../../../src/services/prisma';
 
 export interface ExchangeCodeInput {
   code: string;
   codeVerifier?: string;
-  redirectUri: string;
   appId: string;
 }
 
@@ -27,9 +33,11 @@ export class ExchangeCodeUseCase {
     private authCodeRepository: IAuthCodeRepository,
     private sessionRepository: ISessionRepository,
     private userRepository: IUserRepository,
+    private refreshTokenRepository: IRefreshTokenRepository,
     private tokenService: ITokenService,
     private auditService: IAuditService,
-    private _eventBus: IEventBus
+    private eventBus: IEventBus,
+    private hashService: IHashService
   ) {}
 
   async execute(input: ExchangeCodeInput): Promise<LoginResult> {
@@ -44,10 +52,7 @@ export class ExchangeCodeUseCase {
       throw new InvalidAuthCodeError('Auth code has expired or already been used');
     }
 
-    // 3. Validate redirect URI matches
-    if (authCode.redirectUri !== input.redirectUri) {
-      throw new InvalidAuthCodeError('Redirect URI mismatch');
-    }
+
 
     // 4. Verify PKCE verifier
     if (input.codeVerifier !== undefined && !authCode.verifyVerifier(input.codeVerifier)) {
@@ -75,7 +80,7 @@ export class ExchangeCodeUseCase {
       authCode.userId,
       authCode.tenantId,
       input.appId,
-      'user',
+      user.systemRole,
       null,
       null,
       expiresAt,
@@ -85,10 +90,76 @@ export class ExchangeCodeUseCase {
     );
     await this.sessionRepository.save(session);
 
-    // 8. Generate tokens
+    // 8. Generate and save tokens
     const tokens = await this.tokenService.generateTokens(session);
 
-    // 9. Audit
+    const tokenHash = this.hashService.hash(tokens.refreshToken);
+    const refreshTokenEntity = new RefreshToken(
+      RefreshTokenId.create(crypto.randomUUID()),
+      authCode.userId,
+      tokenHash,
+      now,
+      new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) // 7 days
+    );
+    await this.refreshTokenRepository.save(refreshTokenEntity);
+
+    // 9. Fetch legacy response enrichment data
+    const prisma = getPrismaClient();
+    
+    // Fetch tenant memberships with tenant details
+    const tenantMembers = await prisma.tenantMember.findMany({
+      where: {
+        userId: authCode.userId.value,
+        tenant: {
+          tenantApps: {
+            some: {
+              application: { appId: input.appId },
+              isEnabled: true,
+            },
+          },
+        },
+      },
+      include: { tenant: true },
+    });
+
+    const tenants = tenantMembers.map((tm: any) => ({
+      id: tm.tenant.id,
+      name: tm.tenant.name,
+      slug: tm.tenant.slug,
+      role: tm.role,
+    }));
+
+    // Generate permissions for the current tenant
+    let permissions: Array<{ resource: string; action: string }> = [];
+    const currentTenantMember = tenantMembers.find((tm: any) => tm.tenantId === authCode.tenantId.value);
+    
+    if (currentTenantMember) {
+      const roleRecord = await prisma.role.findFirst({
+        where: {
+          tenantId: authCode.tenantId.value,
+          name: currentTenantMember.role,
+        },
+      });
+      
+      if (roleRecord) {
+        const application = await prisma.application.findUnique({
+          where: { appId: input.appId },
+        });
+        
+        if (application) {
+          const rolePermissions = await prisma.permission.findMany({
+            where: {
+              roleId: roleRecord.id,
+              applicationId: application.id,
+            },
+            select: { resource: true, action: true },
+          });
+          permissions = rolePermissions.map((p: any) => ({ resource: p.resource, action: p.action }));
+        }
+      }
+    }
+
+    // 10. Audit
     await this.auditService.log({
       type: 'CODE_EXCHANGED',
       userId: authCode.userId.value,
@@ -96,12 +167,35 @@ export class ExchangeCodeUseCase {
       metadata: { appId: input.appId },
     });
 
+    // Format User Result
+    const userInformation = {
+      id: user.id.value,
+      email: user.email.value,
+      nuid: user.nuid.value,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      fullName: user.fullName,
+      userStatus: user.userStatus,
+      systemRole: user.systemRole,
+    };
+
     return {
       success: true,
+      tokens: {
+        jti: sessionToken,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresIn: tokens.expiresIn,
+      },
+      user: userInformation,
+      currentTenant: {
+        ...tenants.find((t: any) => t.id === authCode.tenantId.value),
+        permissions,
+      },
+      relatedTenants: tenants,
+      expiresIn: tokens.expiresIn, // keeping flat for safety
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      expiresIn: tokens.expiresIn,
-      tokenType: 'Bearer',
     };
   }
 }

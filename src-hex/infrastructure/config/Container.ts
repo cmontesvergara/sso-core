@@ -37,6 +37,7 @@ import { OtpCachedRepository } from '../persistence/cached/OtpCachedRepository';
 import { JwtTokenService } from '../security/JwtTokenService';
 import { Argon2PasswordHasher } from '../security/Argon2PasswordHasher';
 import { HmacSha256HashService } from '../security/HmacHashService';
+import { JwksProvider } from '../security/JwksProvider';
 
 // Infrastructure — external-services
 import { InMemoryEventBus } from '../external-services/events/InMemoryEventBus';
@@ -99,6 +100,7 @@ export class Container {
       process.env.JWT_ISSUER ?? 'sso.bigso.co'
     );
     const hashService = new HmacSha256HashService(); // reads REFRESH_TOKEN_PEPPER from env
+    const jwksProvider = new JwksProvider(loadKey('JWT_PRIVATE_KEY'));
 
     // ── Shared infrastructure for repositories ──────────────────────────
     const keyFactory     = new RedisKeyFactory();
@@ -149,9 +151,11 @@ export class Container {
     const loginUseCase = new LoginUseCase(
       userRepository,
       sessionRepository,
+      refreshTokenRepository,
       tokenService,
       auditService,
       eventBus,
+      hashService,
       passwordHasher
     );
 
@@ -205,6 +209,8 @@ export class Container {
     this.instances.set('ICacheService', cacheService);
     this.instances.set('IPasswordHasher', passwordHasher);
     this.instances.set('ITokenService', tokenService);
+    this.instances.set('IHashService', hashService);
+    this.instances.set('JwksProvider', jwksProvider);
 
     this.instances.set('IUserRepository', userRepository);
     this.instances.set('ISessionRepository', sessionRepository);
@@ -222,6 +228,11 @@ export class Container {
     this.instances.set('RegisterUserUseCase', registerUserUseCase);
     this.instances.set('CreateAppSessionUseCase', createAppSessionUseCase);
     this.instances.set('CreateTenantUseCase', createTenantUseCase);
+  }
+
+  async initialize(): Promise<void> {
+    const jwksProvider = this.get<JwksProvider>('JwksProvider');
+    await jwksProvider.initialize();
   }
 
   get<T>(token: string): T {

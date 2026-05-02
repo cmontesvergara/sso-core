@@ -12,6 +12,7 @@ export async function bootstrap(): Promise<void> {
 
   console.log('🔷 [HEXAGONAL] Initializing container...');
   const container = new Container();
+  await container.initialize();
 
   console.log('🔷 [HEXAGONAL] Building server...');
   const app = await createHexServer(container);

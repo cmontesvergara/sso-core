@@ -140,7 +140,20 @@ export class AuthorizeUseCase {
 
     if (input.codeChallenge) {
       // Short-lived signed JWT wrapping the code metadata — consumed by client
-      const signedPayload = this.tokenService.generateTempToken(userId.value);
+      const targetAudience = application.audience || application.url || input.redirectUri;
+      const jwsPayload: Record<string, any> = {
+        code,
+        appId: input.appId,
+        tenantId: input.tenantId,
+      };
+
+      if (input.state) jwsPayload.state = input.state;
+      if (input.nonce) jwsPayload.nonce = input.nonce;
+      if (application.scope && application.scope.length > 0) {
+        jwsPayload.scope = Array.from(application.scope);
+      }
+
+      const signedPayload = this.tokenService.generateSignedPayload(jwsPayload, targetAudience);
       result.signedPayload = signedPayload;
     }
 

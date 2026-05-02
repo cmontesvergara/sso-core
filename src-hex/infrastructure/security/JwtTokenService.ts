@@ -15,13 +15,17 @@ export class JwtTokenService implements ITokenService {
     private privateKey: string,
     private publicKey: string,
     private issuer: string = 'sso.bigso.co'
-  ) {}
+  ) { }
 
   async generateTokens(session: SSOSession | AppSession): Promise<TokenPair> {
     const now = Math.floor(Date.now() / 1000);
     const expiresIn = 15 * 60; // 15 minutes
 
-    const accessTokenPayload = {
+    const audience = process.env.JWT_AUD || 'https://sso.bigso.co';
+      
+    const keyid = process.env.JWT_KID || 'sso-key-2025';
+
+    const accessTokenPayload: Record<string, any> = {
       sub: session.userId.value,
       jti: session.sessionToken,
       type: 'access',
@@ -29,6 +33,12 @@ export class JwtTokenService implements ITokenService {
       exp: now + expiresIn,
       iss: this.issuer,
     };
+
+    if (session instanceof AppSession) {
+      accessTokenPayload['https://bigso.co/tenant_id'] = session.tenantId.value;
+      accessTokenPayload['https://bigso.co/app_id'] = session.appId;
+      accessTokenPayload['https://bigso.co/role'] = (session as any)._role;
+    }
 
     const refreshTokenPayload = {
       sub: session.userId.value,
@@ -41,10 +51,14 @@ export class JwtTokenService implements ITokenService {
 
     const accessToken = jwt.sign(accessTokenPayload, this.privateKey, {
       algorithm: 'RS256',
+      audience: audience,
+      keyid: keyid,
     });
 
     const refreshToken = jwt.sign(refreshTokenPayload, this.privateKey, {
       algorithm: 'RS256',
+      audience: audience,
+      keyid: keyid,
     });
 
     return {
@@ -57,6 +71,8 @@ export class JwtTokenService implements ITokenService {
   async validateAccessToken(token: string): Promise<TokenClaims> {
     const decoded = jwt.verify(token, this.publicKey, {
       algorithms: ['RS256'],
+      issuer: this.issuer,
+      audience: process.env.JWT_AUD || 'https://sso.bigso.co',
     }) as any;
 
     if (decoded.type !== 'access') {
@@ -75,6 +91,8 @@ export class JwtTokenService implements ITokenService {
   async validateRefreshToken(token: string): Promise<TokenClaims> {
     const decoded = jwt.verify(token, this.publicKey, {
       algorithms: ['RS256'],
+      issuer: this.issuer,
+      audience: process.env.JWT_AUD || 'https://sso.bigso.co',
     }) as any;
 
     if (decoded.type !== 'refresh') {
@@ -100,13 +118,22 @@ export class JwtTokenService implements ITokenService {
       iss: this.issuer,
     };
 
-    return jwt.sign(payload, this.privateKey, { algorithm: 'RS256' });
+    const audience = process.env.JWT_AUD || 'https://sso.bigso.co';
+    const keyid = process.env.JWT_KID || 'sso-key-2025';
+
+    return jwt.sign(payload, this.privateKey, { 
+      algorithm: 'RS256',
+      audience: audience,
+      keyid: keyid,
+    });
   }
 
   validateTempToken(token: string): string | null {
     try {
       const decoded = jwt.verify(token, this.publicKey, {
         algorithms: ['RS256'],
+        issuer: this.issuer,
+        audience: process.env.JWT_AUD || 'https://sso.bigso.co',
       }) as any;
 
       if (decoded.type !== 'temp') {
@@ -117,6 +144,21 @@ export class JwtTokenService implements ITokenService {
     } catch {
       return null;
     }
+  }
+
+  generateSignedPayload(payload: Record<string, any>, audience: string): string {
+    const keyid = process.env.JWT_KID || 'sso-key-2025';
+    
+    // Default expiration for signed payload (5 minutes)
+    const expiresIn = 5 * 60;
+    
+    return jwt.sign(payload, this.privateKey, { 
+      algorithm: 'RS256',
+      expiresIn,
+      audience,
+      keyid,
+      issuer: this.issuer
+    });
   }
 
   async revokeToken(tokenId: string): Promise<void> {

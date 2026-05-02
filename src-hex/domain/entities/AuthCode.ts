@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { AuthCodeId } from '../value-objects/Ids';
 import { UserId } from '../value-objects/UserId';
 import { TenantId } from '../value-objects/TenantId';
@@ -111,9 +112,19 @@ export class AuthCode {
       return true;
     }
 
-    // S256 verification logic would go here
-    // For now, simple comparison
-    return this._codeChallenge === verifier;
+    if (this._codeChallengeMethod === 'S256') {
+      const computed = crypto
+        .createHash('sha256')
+        .update(verifier)
+        .digest('base64url');
+      return computed === this._codeChallenge;
+    }
+
+    if (this._codeChallengeMethod === 'plain') {
+      return verifier === this._codeChallenge;
+    }
+
+    return false;
   }
 
   /**
