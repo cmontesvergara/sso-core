@@ -19,29 +19,53 @@ export class AdminAppResourceUseCases {
     return byAppId ?? null;
   }
 
+  /**
+   * Register resources from an app's /api/sso/resources endpoint.
+   *
+   * Accepts two formats emitted by @bigso/auth-sdk:
+   *   Flat (SDK):    { resource: string; action: string; description?: string }
+   *   Grouped:       { name: string; actions: string[] }
+   */
   async registerAppResources(data: {
     appId: string;
-    resources: Array<{ name: string; actions: string[] }>;
+    resources: Array<
+      | { resource: string; action: string; description?: string }   // flat (SDK)
+      | { name: string; actions: string[] }                          // grouped (legacy)
+    >;
   }) {
     const application = await this.resolveApplication(data.appId);
     if (!application) throw new Error(`Application not found: ${data.appId}`);
 
+    // Normalize to flat pairs
+    const pairs: Array<{ resource: string; action: string }> = [];
+
+    for (const item of data.resources) {
+      if ('resource' in item && 'action' in item) {
+        // Flat SDK format
+        pairs.push({ resource: item.resource, action: item.action });
+      } else if ('name' in item && Array.isArray(item.actions)) {
+        // Grouped format
+        for (const action of item.actions) {
+          pairs.push({ resource: item.name, action });
+        }
+      }
+      // Skip malformed entries silently
+    }
+
     const results: any[] = [];
 
-    for (const resource of data.resources) {
-      for (const action of resource.actions) {
-        const existing = await this.prisma.appResource.findFirst({
-          where: { applicationId: application.id, resource: resource.name, action },
-        });
+    for (const { resource, action } of pairs) {
+      const existing = await this.prisma.appResource.findFirst({
+        where: { applicationId: application.id, resource, action },
+      });
 
-        if (!existing) {
-          const created = await this.prisma.appResource.create({
-            data: { applicationId: application.id, resource: resource.name, action },
-          });
-          results.push(created);
-        } else {
-          results.push(existing);
-        }
+      if (!existing) {
+        const created = await this.prisma.appResource.create({
+          data: { applicationId: application.id, resource, action },
+        });
+        results.push(created);
+      } else {
+        results.push(existing);
       }
     }
 
