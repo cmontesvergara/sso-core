@@ -139,8 +139,26 @@ export class AuthorizeUseCase {
     }
 
     if (input.codeChallenge) {
-      // Short-lived signed JWT wrapping the code metadata — consumed by client
-      const targetAudience = application.audience || application.url || input.redirectUri;
+      // Short-lived signed JWT wrapping the code metadata — consumed by the middleware.
+      // The middleware verifies it with audience = frontendUrl.
+      // We use application.url from the DB (source of truth) — more secure than
+      // trusting input.redirectUri which comes from the client request.
+      let targetAudience: string;
+      if (application.url) {
+        try {
+          targetAudience = new URL(application.url).origin;
+        } catch {
+          targetAudience = application.url;
+        }
+      } else {
+        // Fallback: derive from redirectUri if url not registered in DB
+        try {
+          targetAudience = new URL(input.redirectUri).origin;
+        } catch {
+          targetAudience = input.redirectUri;
+        }
+      }
+
       const jwsPayload: Record<string, any> = {
         code,
         appId: input.appId,
