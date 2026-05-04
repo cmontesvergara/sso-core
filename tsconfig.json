@@ -2,7 +2,9 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
-    "lib": ["ES2020"],
+    "lib": [
+      "ES2020"
+    ],
     "outDir": "./dist",
     "rootDir": "./",
     "strict": true,
@@ -26,10 +28,21 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "paths": {
-      "@/*": ["./src/*"],
-      "@hex/*": ["./src-hex/*"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@hex/*": [
+        "./src-hex/*"
+      ]
     }
   },
-  "include": ["index.ts", "src/**/*", "src-hex/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "include": [
+    "index.ts",
+    "src-hex/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts"
+  ]
 }
