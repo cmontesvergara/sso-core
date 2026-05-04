@@ -8,6 +8,18 @@ export interface GetSessionContextInput {
   appId?: string;
 }
 
+/**
+ * GetSessionContextUseCase
+ *
+ * Handles POST /api/v2/auth/session.
+ * The sessionId is the JTI set in the session cookie — it can be either:
+ *   - A hex v3 session  (UUID format, stored in SSOSession / AppSession tables)
+ *   - A v2 app session  (app_XXXXXXXX format, also stored in AppSession.sessionToken)
+ *
+ * Both are reachable via ISessionRepository (PrismaSessionRepository.findById looks up
+ * by sessionToken in both tables). If the session is not found there, it is genuinely
+ * expired or invalid.
+ */
 export class GetSessionContextUseCase {
   constructor(
     private sessionRepository: ISessionRepository,
@@ -16,20 +28,23 @@ export class GetSessionContextUseCase {
   ) {}
 
   async execute(input: GetSessionContextInput): Promise<any> {
+    if (!input.sessionId) {
+      throw new Error('SessionId cannot be empty');
+    }
+
+    // ── 1. Look up the session (hex repo covers both v3 UUID and v2 app_* tokens) ──
     const sessionId = SessionId.create(input.sessionId);
     const session = await this.sessionRepository.findById(sessionId);
 
     if (!session) {
-      throw new Error('Session not found');
+      // Session truly not found (expired or never existed)
+      return { success: false, valid: false, message: 'Session not found or expired' };
     }
 
-    // Since we don't have a direct method to get raw tokens from just a session id in Hexagonal architecture,
-    // and the SSO Client only needs the metadata (user, tenants, etc.), we don't need to return the tokens here,
-    // OR we could generate a new access token without rotating the refresh token.
-    // For now, let's generate a new token pair just like the legacy /session did (it returned cached tokens, but generating a new one is fine).
+    // ── 2. Generate a fresh access token ─────────────────────────────────────────
     const tokens = await this.tokenService.generateTokens(session);
 
-    // Fetch user and permissions
+    // ── 3. Load user from Prisma (already injected, no src/ needed) ──────────────
     const user = await this.prisma.user.findUnique({
       where: { id: session.userId.value },
     });
@@ -38,58 +53,56 @@ export class GetSessionContextUseCase {
       throw new Error('User not found');
     }
 
-    let tenants: any[] = [];
-    let permissions: Array<{ resource: string; action: string }> = [];
-
-    // Fetch tenant memberships
+    // ── 4. Tenant memberships ─────────────────────────────────────────────────────
     const tenantMembers = await this.prisma.tenantMember.findMany({
       where: {
         userId: user.id,
-        tenant: input.appId ? {
-          tenantApps: {
-            some: {
-              application: { appId: input.appId },
-              isEnabled: true,
-            },
-          },
-        } : undefined,
+        tenant: input.appId
+          ? {
+              tenantApps: {
+                some: {
+                  application: { appId: input.appId },
+                  isEnabled: true,
+                },
+              },
+            }
+          : undefined,
       },
       include: { tenant: true },
     });
 
-    tenants = tenantMembers.map((tm: any) => ({
+    const tenants = tenantMembers.map((tm: any) => ({
       id: tm.tenant.id,
       name: tm.tenant.name,
       domain: tm.tenant.domain,
+      slug: tm.tenant.slug,
       role: tm.role,
     }));
 
-    // Find current tenant
+    // ── 5. Resolve current tenant ─────────────────────────────────────────────────
     const activeTenantId = (session as any).tenantId?.value;
     const currentTenant = tenants.find(t => t.id === activeTenantId) || tenants[0] || null;
 
+    // ── 6. Resolve permissions for current tenant + app ───────────────────────────
+    let permissions: Array<{ resource: string; action: string }> = [];
+
     if (currentTenant && input.appId) {
       const roleRecord = await this.prisma.role.findFirst({
-        where: {
-          tenantId: currentTenant.id,
-          name: currentTenant.role,
-        },
+        where: { tenantId: currentTenant.id, name: currentTenant.role },
       });
-      
       if (roleRecord) {
         const application = await this.prisma.application.findUnique({
           where: { appId: input.appId },
         });
-        
         if (application) {
           const rolePermissions = await this.prisma.permission.findMany({
-            where: {
-              roleId: roleRecord.id,
-              applicationId: application.id,
-            },
+            where: { roleId: roleRecord.id, applicationId: application.id },
             select: { resource: true, action: true },
           });
-          permissions = rolePermissions.map((p: any) => ({ resource: p.resource, action: p.action }));
+          permissions = rolePermissions.map((p: any) => ({
+            resource: p.resource,
+            action: p.action,
+          }));
         }
       }
     }
@@ -98,7 +111,7 @@ export class GetSessionContextUseCase {
       success: true,
       tokens: {
         accessToken: tokens.accessToken,
-        // Refresh token is handled by the browser cookie or other flow, we don't return it here to avoid overwriting.
+        // Refresh token is managed via httpOnly cookie — not returned here
       },
       user: {
         id: user.id,
@@ -107,10 +120,7 @@ export class GetSessionContextUseCase {
         lastName: user.lastName,
         systemRole: user.systemRole,
       },
-      currentTenant: currentTenant ? {
-        ...currentTenant,
-        permissions,
-      } : null,
+      currentTenant: currentTenant ? { ...currentTenant, permissions } : null,
       relatedTenants: tenants,
     };
   }

@@ -1,17 +1,31 @@
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
-import express, { Express, Request, Response } from 'express';
+import express, { Express, Request, Response, RequestHandler } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { Container } from '../../infrastructure/config/Container';
 import { errorHandlerMiddleware } from '../../infrastructure/web/middleware/ErrorHandlerMiddleware';
 import { createRouter } from '../../infrastructure/web/routes/index';
+import { createRoleRouter } from '../../infrastructure/web/routes/role.routes';
+import { createApplicationsRouter } from '../../infrastructure/web/routes/applications.routes';
+import { createApplicationSyncRouter } from '../../infrastructure/web/routes/applicationSync.routes';
+import { createStatsRouter } from '../../infrastructure/web/routes/stats.routes';
+import { createAdminTenantRouter } from '../../infrastructure/web/routes/adminTenant.routes';
+import { createAdminUserRouter } from '../../infrastructure/web/routes/adminUser.routes';
+import { createAppResourceRouter } from '../../infrastructure/web/routes/appResource.routes';
+import { RoleController } from '../../infrastructure/web/controllers/RoleController';
+import { ApplicationsController } from '../../infrastructure/web/controllers/ApplicationsController';
+import { ApplicationSyncController } from '../../infrastructure/web/controllers/ApplicationSyncController';
+import { StatsController } from '../../infrastructure/web/controllers/StatsController';
+import { AdminTenantController } from '../../infrastructure/web/controllers/AdminTenantController';
+import { AdminUserController } from '../../infrastructure/web/controllers/AdminUserController';
+import { AppResourceController } from '../../infrastructure/web/controllers/AppResourceController';
 
 /**
  * createHexServer
  * Builds the Express application for the hexagonal architecture mode.
- * Mounts all routes under /api/v3.
- * Keeps /health and /.well-known/jwks.json compatible with legacy monitors.
+ * All controllers and middlewares are resolved from the Container —
+ * Server.ts is a pure composition root, no business logic here.
  */
 export async function createHexServer(container: Container): Promise<Express> {
   const app = express();
@@ -24,8 +38,8 @@ export async function createHexServer(container: Container): Promise<Express> {
   // CORS
   app.use(
     cors({
-      origin: process.env.CORS_ORIGIN ?? '*',
-      credentials: process.env.CORS_CREDENTIALS === 'true',
+      origin: true,
+      credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     })
   );
@@ -39,22 +53,25 @@ export async function createHexServer(container: Container): Promise<Express> {
   app.use(
     rateLimit({
       windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS ?? '60000', 10),
-      max: parseInt(process.env.RATE_LIMIT_MAX ?? '100', 10),
+      max:      parseInt(process.env.RATE_LIMIT_MAX      ?? '100',   10),
       standardHeaders: true,
-      legacyHeaders: false,
+      legacyHeaders:   false,
     })
   );
 
-  // ── Infrastructure routes (no auth, no rate limit penalty) ───────────────
+  // ── Infrastructure routes (public, no auth) ───────────────────────────────
   app.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'OK', mode: 'hexagonal', timestamp: new Date().toISOString() });
   });
 
-  // JWKS endpoint (Publicly accessible globally for CORS)
+  app.get('/ready', (_req: Request, res: Response) => {
+    res.json({ status: 'OK', mode: 'hexagonal', timestamp: new Date().toISOString() });
+  });
+
+  // JWKS endpoint — publicly accessible, no CORS restriction
   app.get('/.well-known/jwks.json', (_req: Request, res: Response) => {
     try {
-      const jwksProvider = container.get<any>('JwksProvider');
-      const jwksString = jwksProvider.getJwksString();
+      const jwksString = container.get<any>('JwksProvider').getJwksString();
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Cache-Control', 'public, max-age=3600, immutable');
       res.setHeader('Access-Control-Allow-Origin', '*');
@@ -64,18 +81,25 @@ export async function createHexServer(container: Container): Promise<Express> {
     }
   });
 
-  app.get('/ready', (_req: Request, res: Response) => {
-    res.json({ status: 'OK', mode: 'hexagonal', timestamp: new Date().toISOString() });
-  });
-
-  // ── API v3 (hexagonal) ───────────────────────────────────────────────────
+  // ── API v2/v3 (hexagonal auth + app core) ────────────────────────────────
   app.use('/api/v2', createRouter(container));
+
+  // ── API v1 (Admin routes — controllers & requireAuth from Container) ──────
+  const requireAuth = container.get<RequestHandler>('RequireAuth');
+
+  app.use('/api/v1/tenant',       createAdminTenantRouter(container.get<AdminTenantController>('TenantController'), requireAuth));
+  app.use('/api/v1/user',         createAdminUserRouter(container.get<AdminUserController>('AdminUserController'), requireAuth));
+  app.use('/api/v1/applications', createApplicationsRouter(container.get<ApplicationsController>('ApplicationsController'), requireAuth));
+  app.use('/api/v1/applications', createApplicationSyncRouter(container.get<ApplicationSyncController>('ApplicationSyncController'), requireAuth));
+  app.use('/api/v1/role',         createRoleRouter(container.get<RoleController>('RoleController'), requireAuth));
+  app.use('/api/v1/stats',        createStatsRouter(container.get<StatsController>('StatsController'), requireAuth));
+  app.use('/api/v1/app-resources',createAppResourceRouter(container.get<AppResourceController>('AppResourceController'), requireAuth));
 
   // ── 404 ──────────────────────────────────────────────────────────────────
   app.use((req: Request, res: Response) => {
     res.status(404).json({
-      error: 'NotFound',
-      message: `Route ${req.method} ${req.path} not found`,
+      error:     'NotFound',
+      message:   `Route ${req.method} ${req.path} not found`,
       timestamp: new Date().toISOString(),
     });
   });

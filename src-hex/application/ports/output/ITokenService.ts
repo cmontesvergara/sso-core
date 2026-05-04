@@ -21,6 +21,7 @@ export interface TokenClaims {
   type: 'access' | 'refresh';
   tenantId?: string;
   appId?: string;
+  systemRole?: string;
   iat: number;
   exp: number;
 }

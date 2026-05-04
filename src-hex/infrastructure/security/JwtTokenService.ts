@@ -1,10 +1,10 @@
+import jwt from 'jsonwebtoken';
 import {
   ITokenService,
-  TokenPair,
   TokenClaims,
+  TokenPair,
 } from '../../application/ports/output/ITokenService';
-import { SSOSession, AppSession } from '../../domain/entities/Session';
-import jwt from 'jsonwebtoken';
+import { AppSession, SSOSession } from '../../domain/entities/Session';
 
 /**
  * JwtTokenService
@@ -22,7 +22,7 @@ export class JwtTokenService implements ITokenService {
     const expiresIn = 15 * 60; // 15 minutes
 
     const audience = process.env.JWT_AUD || 'https://sso.bigso.co';
-      
+
     const keyid = process.env.JWT_KID || 'sso-key-2025';
 
     const accessTokenPayload: Record<string, any> = {
@@ -85,6 +85,7 @@ export class JwtTokenService implements ITokenService {
       type: decoded.type,
       iat: decoded.iat,
       exp: decoded.exp,
+      systemRole: decoded.systemRole,
     };
   }
 
@@ -105,6 +106,7 @@ export class JwtTokenService implements ITokenService {
       type: decoded.type,
       iat: decoded.iat,
       exp: decoded.exp,
+      systemRole: decoded.systemRole,
     };
   }
 
@@ -121,7 +123,7 @@ export class JwtTokenService implements ITokenService {
     const audience = process.env.JWT_AUD || 'https://sso.bigso.co';
     const keyid = process.env.JWT_KID || 'sso-key-2025';
 
-    return jwt.sign(payload, this.privateKey, { 
+    return jwt.sign(payload, this.privateKey, {
       algorithm: 'RS256',
       audience: audience,
       keyid: keyid,
@@ -148,11 +150,11 @@ export class JwtTokenService implements ITokenService {
 
   generateSignedPayload(payload: Record<string, any>, audience: string): string {
     const keyid = process.env.JWT_KID || 'sso-key-2025';
-    
+
     // Default expiration for signed payload (5 minutes)
     const expiresIn = 5 * 60;
-    
-    return jwt.sign(payload, this.privateKey, { 
+
+    return jwt.sign(payload, this.privateKey, {
       algorithm: 'RS256',
       expiresIn,
       audience,

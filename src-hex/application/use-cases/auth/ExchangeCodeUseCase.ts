@@ -1,21 +1,21 @@
-import { IAuthCodeRepository } from '../../../domain/repositories/IAuthCodeRepository';
 import crypto from 'crypto';
+import { RefreshToken } from '../../../domain/entities/RefreshToken';
+import { AppSession } from '../../../domain/entities/Session';
+import { IAuthCodeRepository } from '../../../domain/repositories/IAuthCodeRepository';
+import { IRefreshTokenRepository } from '../../../domain/repositories/IRefreshTokenRepository';
 import { ISessionRepository } from '../../../domain/repositories/ISessionRepository';
 import { IUserRepository } from '../../../domain/repositories/IUserRepository';
-import { IRefreshTokenRepository } from '../../../domain/repositories/IRefreshTokenRepository';
-import { ITokenService } from '../../ports/output/ITokenService';
+import { RefreshTokenId } from '../../../domain/value-objects/Ids';
+import { SessionId } from '../../../domain/value-objects/SessionId';
 import { IAuditService } from '../../ports/output/IAuditService';
 import { IEventBus } from '../../ports/output/IEventBus';
 import { IHashService } from '../../ports/output/IHashService';
-import { SessionId } from '../../../domain/value-objects/SessionId';
-import { RefreshTokenId } from '../../../domain/value-objects/Ids';
-import { AppSession } from '../../../domain/entities/Session';
-import { RefreshToken } from '../../../domain/entities/RefreshToken';
+import { ITokenService } from '../../ports/output/ITokenService';
 
-import { LoginResult } from '../../dto/output/LoginResult';
+import { PrismaClient } from '@prisma/client';
 import { InvalidAuthCodeError } from '../../../domain/errors/InvalidAuthCodeError';
 import { UserNotFoundError } from '../../../domain/errors/UserNotFoundError';
-import { getPrismaClient } from '../../../../src/services/prisma';
+import { LoginResult } from '../../dto/output/LoginResult';
 
 export interface ExchangeCodeInput {
   code: string;
@@ -37,8 +37,9 @@ export class ExchangeCodeUseCase {
     private tokenService: ITokenService,
     private auditService: IAuditService,
     private eventBus: IEventBus,
-    private hashService: IHashService
-  ) {}
+    private hashService: IHashService,
+    private prisma: PrismaClient,
+  ) { }
 
   async execute(input: ExchangeCodeInput): Promise<LoginResult> {
     // 1. Find auth code
@@ -103,9 +104,9 @@ export class ExchangeCodeUseCase {
     );
     await this.refreshTokenRepository.save(refreshTokenEntity);
 
-    // 9. Fetch legacy response enrichment data
-    const prisma = getPrismaClient();
-    
+    // 9. Fetch enrichment data (tenant memberships + permissions)
+    const prisma = this.prisma;
+
     // Fetch tenant memberships with tenant details
     const tenantMembers = await prisma.tenantMember.findMany({
       where: {
@@ -132,7 +133,7 @@ export class ExchangeCodeUseCase {
     // Generate permissions for the current tenant
     let permissions: Array<{ resource: string; action: string }> = [];
     const currentTenantMember = tenantMembers.find((tm: any) => tm.tenantId === authCode.tenantId.value);
-    
+
     if (currentTenantMember) {
       const roleRecord = await prisma.role.findFirst({
         where: {
@@ -140,12 +141,12 @@ export class ExchangeCodeUseCase {
           name: currentTenantMember.role,
         },
       });
-      
+
       if (roleRecord) {
         const application = await prisma.application.findUnique({
           where: { appId: input.appId },
         });
-        
+
         if (application) {
           const rolePermissions = await prisma.permission.findMany({
             where: {

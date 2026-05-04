@@ -12,6 +12,26 @@ import { UpdateUserProfileUseCase, ChangePasswordUseCase } from '../../../applic
 import { VerifyEmailUseCase } from '../../../application/use-cases/user/VerifyEmailUseCase';
 import { ForgotPasswordUseCase, ResetPasswordUseCase } from '../../../application/use-cases/user/PasswordResetUseCase';
 import { AddUserToTenantUseCase, ChangeUserRoleUseCase } from '../../../application/use-cases/tenant/TenantMemberUseCase';
+
+import { RoleController } from '../controllers/RoleController';
+import { ApplicationsController } from '../controllers/ApplicationsController';
+import { AppResourceController } from '../controllers/AppResourceController';
+import { MetadataController } from '../controllers/MetadataController';
+import { ApplicationSyncController } from '../controllers/ApplicationSyncController';
+import { StatsController } from '../controllers/StatsController';
+import { UtilController } from '../controllers/UtilController';
+import { AdminUserController } from '../controllers/AdminUserController';
+import { AdminTenantController } from '../controllers/AdminTenantController';
+
+import { createRoleRouter } from './role.routes';
+import { createApplicationsRouter } from './applications.routes';
+import { createAppResourceRouter } from './appResource.routes';
+import { createMetadataRouter } from './metadata.routes';
+import { createApplicationSyncRouter } from './applicationSync.routes';
+import { createStatsRouter } from './stats.routes';
+import { createUtilRouter } from './util.routes';
+import { createAdminUserRouter } from './adminUser.routes';
+import { createAdminTenantRouter } from './adminTenant.routes';
 import { createAuthMiddleware } from '../middleware/AuthMiddleware';
 import {
   validateLogin,
@@ -44,7 +64,8 @@ export function createRouter(container: Container): Router {
     container.get('ITokenService'),
     container.get('IAuditService'),
     container.get('IEventBus'),
-    container.get('IHashService')
+    container.get('IHashService'),
+    container.get('PrismaClient')
   );
 
   const authorizeUseCase = new AuthorizeUseCase(
@@ -143,6 +164,16 @@ export function createRouter(container: Container): Router {
     resetPasswordUseCase
   );
 
+  const roleController            = container.get<RoleController>('RoleController');
+  const applicationsController    = container.get<ApplicationsController>('ApplicationsController');
+  const appResourceController     = container.get<AppResourceController>('AppResourceController');
+  const metadataController        = container.get<MetadataController>('MetadataController');
+  const applicationSyncController = container.get<ApplicationSyncController>('ApplicationSyncController');
+  const statsController           = container.get<StatsController>('StatsController');
+  const utilController            = container.get<UtilController>('UtilController');
+  const userLegacyController      = container.get<AdminUserController>('AdminUserController');
+  const tenantLegacyController    = container.get<AdminTenantController>('TenantController');
+
   // ── Auth middleware ───────────────────────────────────────────────────────
   const requireAuth = createAuthMiddleware(verifySessionUseCase);
 
@@ -167,6 +198,19 @@ export function createRouter(container: Container): Router {
   router.post('/tenants',               requireAuth, tenantController.createTenant);
   router.post('/tenants/:tenantId/members',                requireAuth, tenantController.addMember);
   router.patch('/tenants/:tenantId/members/:userId/role',  requireAuth, tenantController.changeRole);
+
+  // ── Migrated v1 routes (Legacy integrations) ───────────────────────────────
+  router.use('/role', createRoleRouter(roleController, requireAuth));
+  router.use('/applications', createApplicationsRouter(applicationsController, requireAuth));
+  router.use('/app-resources', createAppResourceRouter(appResourceController, requireAuth));
+  router.use('/metadata', createMetadataRouter(metadataController, requireAuth));
+  router.use('/applications', createApplicationSyncRouter(applicationSyncController, requireAuth));
+  router.use('/stats', createStatsRouter(statsController, requireAuth));
+  router.use('/util', createUtilRouter(utilController, requireAuth));
+  
+  // Expose remaining legacy endpoints under different paths or same paths
+  router.use('/user', createAdminUserRouter(userLegacyController, requireAuth));
+  router.use('/tenant', createAdminTenantRouter(tenantLegacyController, requireAuth));
 
   return router;
 }
