@@ -1,25 +1,25 @@
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
-import express, { Express, Request, Response, RequestHandler } from 'express';
+import express, { Express, Request, RequestHandler, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { Container } from '../../infrastructure/config/Container';
-import { errorHandlerMiddleware } from '../../infrastructure/web/middleware/ErrorHandlerMiddleware';
-import { createRouter } from '../../infrastructure/web/routes/index';
-import { createRoleRouter } from '../../infrastructure/web/routes/role.routes';
-import { createApplicationsRouter } from '../../infrastructure/web/routes/applications.routes';
-import { createApplicationSyncRouter } from '../../infrastructure/web/routes/applicationSync.routes';
-import { createStatsRouter } from '../../infrastructure/web/routes/stats.routes';
-import { createAdminTenantRouter } from '../../infrastructure/web/routes/adminTenant.routes';
-import { createAdminUserRouter } from '../../infrastructure/web/routes/adminUser.routes';
-import { createAppResourceRouter } from '../../infrastructure/web/routes/appResource.routes';
-import { RoleController } from '../../infrastructure/web/controllers/RoleController';
-import { ApplicationsController } from '../../infrastructure/web/controllers/ApplicationsController';
-import { ApplicationSyncController } from '../../infrastructure/web/controllers/ApplicationSyncController';
-import { StatsController } from '../../infrastructure/web/controllers/StatsController';
 import { AdminTenantController } from '../../infrastructure/web/controllers/AdminTenantController';
 import { AdminUserController } from '../../infrastructure/web/controllers/AdminUserController';
+import { ApplicationsController } from '../../infrastructure/web/controllers/ApplicationsController';
+import { ApplicationSyncController } from '../../infrastructure/web/controllers/ApplicationSyncController';
 import { AppResourceController } from '../../infrastructure/web/controllers/AppResourceController';
+import { RoleController } from '../../infrastructure/web/controllers/RoleController';
+import { StatsController } from '../../infrastructure/web/controllers/StatsController';
+import { errorHandlerMiddleware } from '../../infrastructure/web/middleware/ErrorHandlerMiddleware';
+import { createAdminTenantRouter } from '../../infrastructure/web/routes/adminTenant.routes';
+import { createAdminUserRouter } from '../../infrastructure/web/routes/adminUser.routes';
+import { createApplicationsRouter } from '../../infrastructure/web/routes/applications.routes';
+import { createApplicationSyncRouter } from '../../infrastructure/web/routes/applicationSync.routes';
+import { createAppResourceRouter } from '../../infrastructure/web/routes/appResource.routes';
+import { createRouter } from '../../infrastructure/web/routes/index';
+import { createRoleRouter } from '../../infrastructure/web/routes/role.routes';
+import { createStatsRouter } from '../../infrastructure/web/routes/stats.routes';
 
 /**
  * createHexServer
@@ -38,8 +38,8 @@ export async function createHexServer(container: Container): Promise<Express> {
   // CORS
   app.use(
     cors({
-      origin: true,
-      credentials: true,
+      origin: process.env.CORS_ORIGIN ?? '*',
+      credentials: process.env.CORS_CREDENTIALS === 'true',
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     })
   );
@@ -53,9 +53,9 @@ export async function createHexServer(container: Container): Promise<Express> {
   app.use(
     rateLimit({
       windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS ?? '60000', 10),
-      max:      parseInt(process.env.RATE_LIMIT_MAX      ?? '100',   10),
+      max: parseInt(process.env.RATE_LIMIT_MAX ?? '100', 10),
       standardHeaders: true,
-      legacyHeaders:   false,
+      legacyHeaders: false,
     })
   );
 
@@ -87,19 +87,19 @@ export async function createHexServer(container: Container): Promise<Express> {
   // ── API v1 (Admin routes — controllers & requireAuth from Container) ──────
   const requireAuth = container.get<RequestHandler>('RequireAuth');
 
-  app.use('/api/v1/tenant',       createAdminTenantRouter(container.get<AdminTenantController>('TenantController'), requireAuth));
-  app.use('/api/v1/user',         createAdminUserRouter(container.get<AdminUserController>('AdminUserController'), requireAuth));
+  app.use('/api/v1/tenant', createAdminTenantRouter(container.get<AdminTenantController>('TenantController'), requireAuth));
+  app.use('/api/v1/user', createAdminUserRouter(container.get<AdminUserController>('AdminUserController'), requireAuth));
   app.use('/api/v1/applications', createApplicationsRouter(container.get<ApplicationsController>('ApplicationsController'), requireAuth));
   app.use('/api/v1/applications', createApplicationSyncRouter(container.get<ApplicationSyncController>('ApplicationSyncController'), requireAuth));
-  app.use('/api/v1/role',         createRoleRouter(container.get<RoleController>('RoleController'), requireAuth));
-  app.use('/api/v1/stats',        createStatsRouter(container.get<StatsController>('StatsController'), requireAuth));
-  app.use('/api/v1/app-resources',createAppResourceRouter(container.get<AppResourceController>('AppResourceController'), requireAuth));
+  app.use('/api/v1/role', createRoleRouter(container.get<RoleController>('RoleController'), requireAuth));
+  app.use('/api/v1/stats', createStatsRouter(container.get<StatsController>('StatsController'), requireAuth));
+  app.use('/api/v1/app-resources', createAppResourceRouter(container.get<AppResourceController>('AppResourceController'), requireAuth));
 
   // ── 404 ──────────────────────────────────────────────────────────────────
   app.use((req: Request, res: Response) => {
     res.status(404).json({
-      error:     'NotFound',
-      message:   `Route ${req.method} ${req.path} not found`,
+      error: 'NotFound',
+      message: `Route ${req.method} ${req.path} not found`,
       timestamp: new Date().toISOString(),
     });
   });
