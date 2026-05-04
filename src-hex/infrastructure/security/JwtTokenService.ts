@@ -21,7 +21,23 @@ export class JwtTokenService implements ITokenService {
     const now = Math.floor(Date.now() / 1000);
     const expiresIn = 15 * 60; // 15 minutes
 
-    const audience = process.env.JWT_AUD || 'https://sso.bigso.co';
+    // Audience: always includes the SSO base audience.
+    // For AppSession tokens, also spread:
+    //   - audience field (comma-separated): "https://api.ordamy.com,https://ordamy.bigso.co"
+    //   - url (frontend origin)
+    //   - backendUrl (API origin)
+    const baseAudience = process.env.JWT_AUD || 'https://sso.bigso.co';
+    const appAudiences: string[] =
+      session instanceof AppSession
+        ? [
+            ...(session.audience
+              ? session.audience.split(',').map((a) => a.trim()).filter(Boolean)
+              : []),
+            ...(session.url       ? [session.url]       : []),
+            ...(session.backendUrl ? [session.backendUrl] : []),
+          ]
+        : [];
+    const audience: string[] = [baseAudience, ...appAudiences];
 
     const keyid = process.env.JWT_KID || 'sso-key-2025';
 

@@ -126,7 +126,10 @@ export class AppSession extends SessionBase {
     expiresAt: Date,
     createdAt: Date,
     lastActivityAt: Date,
-    private readonly _ssoSessionId?: string
+    private readonly _ssoSessionId?: string,
+    private readonly _audience?: string,
+    private readonly _url?: string,
+    private readonly _backendUrl?: string
   ) {
     super(id, sessionToken, userId, ip, userAgent, expiresAt, createdAt, lastActivityAt);
     Object.freeze(this);
@@ -148,6 +151,21 @@ export class AppSession extends SessionBase {
     return this._ssoSessionId;
   }
 
+  /** The app's audience claim from the database (e.g. 'https://api.ordamy.com'). */
+  get audience(): string | undefined {
+    return this._audience;
+  }
+
+  /** The app's frontend URL from the database. */
+  get url(): string | undefined {
+    return this._url;
+  }
+
+  /** The app's backend URL from the database. */
+  get backendUrl(): string | undefined {
+    return this._backendUrl;
+  }
+
   /**
    * Create a copy with updated last activity
    */
@@ -164,7 +182,10 @@ export class AppSession extends SessionBase {
       this._expiresAt,
       this._createdAt,
       timestamp,
-      this._ssoSessionId
+      this._ssoSessionId,
+      this._audience,
+      this._url,
+      this._backendUrl
     );
   }
 }

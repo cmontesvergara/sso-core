@@ -70,7 +70,15 @@ export class ExchangeCodeUseCase {
     const usedCode = authCode.markAsUsed();
     await this.authCodeRepository.update(usedCode);
 
-    // 7. Create app session
+    // 7. Create app session — also fetch the app's audience claim from the DB
+    const appRecord = await this.prisma.application.findUnique({
+      where: { appId: input.appId },
+      select: { audience: true, id: true, url: true, backendUrl: true },
+    });
+    const appAudience  = appRecord?.audience   ?? undefined;
+    const appUrl       = appRecord?.url        ?? undefined;
+    const appBackendUrl = appRecord?.backendUrl ?? undefined;
+
     const sessionToken = `app_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 15 * 60 * 1000); // 15 min
@@ -87,7 +95,10 @@ export class ExchangeCodeUseCase {
       expiresAt,
       now,
       now,
-      authCode.ssoSessionId ?? undefined
+      authCode.ssoSessionId ?? undefined,
+      appAudience,
+      appUrl,
+      appBackendUrl
     );
     await this.sessionRepository.save(session);
 
@@ -143,16 +154,11 @@ export class ExchangeCodeUseCase {
       });
 
       if (roleRecord) {
-        const application = await prisma.application.findUnique({
-          where: { appId: input.appId },
-        });
-
-        if (application) {
-          const rolePermissions = await prisma.permission.findMany({
-            where: {
-              roleId: roleRecord.id,
-              applicationId: application.id,
-            },
+        // Use already-fetched appRecord.id to avoid a second DB query
+        const applicationId = appRecord?.id;
+        if (applicationId) {
+          const rolePermissions = await this.prisma.permission.findMany({
+            where: { roleId: roleRecord.id, applicationId },
             select: { resource: true, action: true },
           });
           permissions = rolePermissions.map((p: any) => ({ resource: p.resource, action: p.action }));
