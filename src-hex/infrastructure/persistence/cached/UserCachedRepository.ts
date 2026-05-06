@@ -249,9 +249,11 @@ export class UserCachedRepository implements IUserRepository {
   }
 
   private fromSnapshot(snap: UserSnapshot): User {
+    // Use createUnsafe: tenant roles are dynamic (custom per tenant).
+    // The same data was already validated when first loaded from DB.
     const tenantMemberships: UserTenantMembership[] = (snap.tenantMemberships ?? []).map(m => ({
       tenantId: TenantId.create(m.tenantId),
-      role:     RoleName.create(m.role),
+      role:     RoleName.createUnsafe(m.role),
       joinedAt: new Date(m.joinedAt),
     }));
 
