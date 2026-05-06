@@ -134,10 +134,12 @@ export class PrismaUserRepository implements IUserRepository {
 
   private mapToDomain(prismaUser: any): User {
     // Map tenant memberships when loaded via include
+    // Use createUnsafe: tenant roles are dynamic (custom per tenant) and validated at DB level,
+    // not against a fixed domain enum.
     const tenantMemberships: UserTenantMembership[] = (prismaUser.tenantMembers ?? []).map(
       (m: any) => ({
         tenantId: TenantId.create(m.tenantId),
-        role:     RoleName.create(m.role),
+        role:     RoleName.createUnsafe(m.role),
         joinedAt: m.createdAt ?? new Date(),
       })
     );
