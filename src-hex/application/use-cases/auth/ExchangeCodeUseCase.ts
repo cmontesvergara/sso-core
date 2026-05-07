@@ -11,6 +11,7 @@ import { IAuditService } from '../../ports/output/IAuditService';
 import { IEventBus } from '../../ports/output/IEventBus';
 import { IHashService } from '../../ports/output/IHashService';
 import { ITokenService } from '../../ports/output/ITokenService';
+import { SessionEnrichmentService } from '../../services/SessionEnrichmentService';
 
 import { PrismaClient } from '@prisma/client';
 import { InvalidAuthCodeError } from '../../../domain/errors/InvalidAuthCodeError';
@@ -39,6 +40,7 @@ export class ExchangeCodeUseCase {
     private eventBus: IEventBus,
     private hashService: IHashService,
     private prisma: PrismaClient,
+    private sessionEnrichmentService: SessionEnrichmentService,
   ) { }
 
   async execute(input: ExchangeCodeInput): Promise<LoginResult> {

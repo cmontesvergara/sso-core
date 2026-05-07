@@ -2,6 +2,7 @@ import { ISessionRepository } from '../../../domain/repositories/ISessionReposit
 import { ITokenService } from '../../ports/output/ITokenService';
 import { PrismaClient } from '@prisma/client';
 import { SessionId } from '../../../domain/value-objects/SessionId';
+import { AppSession } from '../../../domain/entities/Session';
 
 export interface GetSessionContextInput {
   sessionId: string;
@@ -42,6 +43,9 @@ export class GetSessionContextUseCase {
     }
 
     // ── 2. Generate a fresh access token ─────────────────────────────────────────
+    // NOTE: We re-issue an access token from the stored session so the client always
+    // has a valid Bearer token after calling /session.  The refresh token is NOT
+    // rotated here — rotation only happens through the explicit /refresh endpoint.
     const tokens = await this.tokenService.generateTokens(session);
 
     // ── 3. Load user from Prisma (already injected, no src/ needed) ──────────────
@@ -111,7 +115,9 @@ export class GetSessionContextUseCase {
       success: true,
       tokens: {
         accessToken: tokens.accessToken,
-        // Refresh token is managed via httpOnly cookie — not returned here
+        expiresIn: tokens.expiresIn,
+        // refreshToken is intentionally omitted — it lives in the httpOnly cookie
+        // and is only rotated via the explicit POST /refresh endpoint.
       },
       user: {
         id: user.id,

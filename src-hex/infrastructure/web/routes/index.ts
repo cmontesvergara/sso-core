@@ -8,6 +8,7 @@ import { VerifySessionUseCase } from '../../../application/use-cases/auth/Verify
 import { GetSessionContextUseCase } from '../../../application/use-cases/auth/GetSessionContextUseCase';
 import { ExchangeCodeUseCase } from '../../../application/use-cases/auth/ExchangeCodeUseCase';
 import { AuthorizeUseCase } from '../../../application/use-cases/auth/AuthorizeUseCase';
+import { SessionEnrichmentService } from '../../../application/services/SessionEnrichmentService';
 import { UpdateUserProfileUseCase, ChangePasswordUseCase } from '../../../application/use-cases/user/UpdateUserUseCase';
 import { VerifyEmailUseCase } from '../../../application/use-cases/user/VerifyEmailUseCase';
 import { ForgotPasswordUseCase, ResetPasswordUseCase } from '../../../application/use-cases/user/PasswordResetUseCase';
@@ -56,6 +57,10 @@ export function createRouter(container: Container): Router {
     container.get('IAuditService')
   );
 
+  const sessionEnrichmentService = new SessionEnrichmentService(
+    container.get('PrismaClient')
+  );
+
   const exchangeCodeUseCase = new ExchangeCodeUseCase(
     container.get('IAuthCodeRepository'),
     container.get('ISessionRepository'),
@@ -65,7 +70,8 @@ export function createRouter(container: Container): Router {
     container.get('IAuditService'),
     container.get('IEventBus'),
     container.get('IHashService'),
-    container.get('PrismaClient')
+    container.get('PrismaClient'),
+    sessionEnrichmentService
   );
 
   const authorizeUseCase = new AuthorizeUseCase(
