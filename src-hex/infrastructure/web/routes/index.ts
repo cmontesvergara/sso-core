@@ -57,10 +57,6 @@ export function createRouter(container: Container): Router {
     container.get('IAuditService')
   );
 
-  const sessionEnrichmentService = new SessionEnrichmentService(
-    container.get('PrismaClient')
-  );
-
   const exchangeCodeUseCase = new ExchangeCodeUseCase(
     container.get('IAuthCodeRepository'),
     container.get('ISessionRepository'),
@@ -71,7 +67,7 @@ export function createRouter(container: Container): Router {
     container.get('IEventBus'),
     container.get('IHashService'),
     container.get('PrismaClient'),
-    sessionEnrichmentService
+    container.get<SessionEnrichmentService>('SessionEnrichmentService')
   );
 
   const authorizeUseCase = new AuthorizeUseCase(
@@ -93,7 +89,8 @@ export function createRouter(container: Container): Router {
   const getSessionContextUseCase = new GetSessionContextUseCase(
     container.get('ISessionRepository'),
     container.get('PrismaClient'),
-    container.get('ITokenService')
+    container.get('ITokenService'),
+    container.get<SessionEnrichmentService>('SessionEnrichmentService')
   );
 
   const changePasswordUseCase = new ChangePasswordUseCase(

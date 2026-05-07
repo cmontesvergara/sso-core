@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { AppSession } from '../../domain/entities/Session';
+import { AppSession, Session, SSOSession } from '../../domain/entities/Session';
 
 /**
  * SessionEnrichmentService
@@ -7,15 +7,22 @@ import { AppSession } from '../../domain/entities/Session';
  * Enriches AppSession entities with data from the Application table.
  * This centralizes the logic for adding audience, url, and backendUrl
  * to sessions that may have been loaded from the database without these fields.
+ * For SSOSession, returns the session unchanged.
  */
 export class SessionEnrichmentService {
   constructor(private prisma: PrismaClient) {}
 
   /**
-   * Enrich an AppSession with Application data (audience, url, backendUrl)
-   * Only performs a database lookup if the session doesn't already have audience data
+   * Enrich a Session (AppSession or SSOSession) with Application data
+   * Only enriches AppSession; SSOSession is returned unchanged
+   * Only performs a database lookup if the AppSession doesn't already have audience data
    */
-  async enrich(session: AppSession): Promise<AppSession> {
+  async enrich(session: Session): Promise<Session> {
+    // Only enrich AppSession instances
+    if (!(session instanceof AppSession)) {
+      return session;
+    }
+
     // Only enrich if the session doesn't already have audience data
     // This avoids unnecessary database lookups
     if (session.audience) {

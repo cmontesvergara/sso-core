@@ -44,6 +44,9 @@ import { InMemoryEventBus } from '../external-services/events/InMemoryEventBus';
 import { PrismaAuditService } from '../external-services/audit/PrismaAuditService';
 import { ResendEmailService } from '../external-services/email/ResendEmailService';
 
+// Application — services
+import { SessionEnrichmentService } from '../../application/services/SessionEnrichmentService';
+
 // Application — use cases (auth)
 import { LoginUseCase } from '../../application/use-cases/auth/LoginUseCase';
 import { LogoutUseCase } from '../../application/use-cases/auth/LogoutUseCase';
@@ -170,6 +173,9 @@ export class Container {
       anyCache(), strCache(), keyFactory
     );
 
+    // ── Application services ─────────────────────────────────────────────────
+    const sessionEnrichmentService = new SessionEnrichmentService(this.prisma);
+
     // ── Use cases ────────────────────────────────────────────────────────────
     const loginUseCase = new LoginUseCase(
       userRepository,
@@ -245,6 +251,8 @@ export class Container {
     this.instances.set('IRoleRepository', roleRepository);
     this.instances.set('IEmailVerificationRepository', emailVerificationRepository);
     this.instances.set('IOtpRepository', otpRepository);
+
+    this.instances.set('SessionEnrichmentService', sessionEnrichmentService);
 
     this.instances.set('LoginUseCase', loginUseCase);
     this.instances.set('LogoutUseCase', logoutUseCase);

@@ -2,7 +2,7 @@ import { ISessionRepository } from '../../../domain/repositories/ISessionReposit
 import { ITokenService } from '../../ports/output/ITokenService';
 import { PrismaClient } from '@prisma/client';
 import { SessionId } from '../../../domain/value-objects/SessionId';
-import { AppSession } from '../../../domain/entities/Session';
+import { SessionEnrichmentService } from '../../services/SessionEnrichmentService';
 
 export interface GetSessionContextInput {
   sessionId: string;
@@ -25,7 +25,8 @@ export class GetSessionContextUseCase {
   constructor(
     private sessionRepository: ISessionRepository,
     private prisma: PrismaClient,
-    private tokenService: ITokenService
+    private tokenService: ITokenService,
+    private sessionEnrichmentService: SessionEnrichmentService
   ) {}
 
   async execute(input: GetSessionContextInput): Promise<any> {
@@ -46,7 +47,10 @@ export class GetSessionContextUseCase {
     // NOTE: We re-issue an access token from the stored session so the client always
     // has a valid Bearer token after calling /session.  The refresh token is NOT
     // rotated here — rotation only happens through the explicit /refresh endpoint.
-    const tokens = await this.tokenService.generateTokens(session);
+    //
+    // Enrich the session with audience data from Application table if not present
+    const enrichedSession = await this.sessionEnrichmentService.enrich(session);
+    const tokens = await this.tokenService.generateTokens(enrichedSession);
 
     // ── 3. Load user from Prisma (already injected, no src/ needed) ──────────────
     const user = await this.prisma.user.findUnique({
