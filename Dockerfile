@@ -23,8 +23,9 @@ COPY prisma ./prisma
 # Generate Prisma client
 RUN npx prisma generate
 
-# Copy source code
-COPY src ./src
+# Copy source code (src/ removed — fully migrated to src-hex/)
+COPY src-hex ./src-hex
+COPY index.ts ./
 
 # Build TypeScript
 RUN npm run build
@@ -66,4 +67,5 @@ USER nodejs
 ENTRYPOINT ["dumb-init", "--"]
 
 # Start the application
-CMD ["node", "dist/src/index.js"]
+ENV SSO_MODE=hexagonal
+CMD ["node", "dist/index.js"]

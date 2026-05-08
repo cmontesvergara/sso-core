@@ -83,8 +83,8 @@ jwt:
     _mandatory: true
     _default: sso-key-2026
 
-  private_key_path: null
-  public_key_path: null
+  private_key_path: /app/dist/keys/private.pem
+  public_key_path: /app/dist/keys/public.pem
 
 # ============================================================
 # Token Validity (in seconds)
@@ -165,7 +165,7 @@ logging:
     _default: json
 
 # ============================================================
-# API Rate Limiting
+# Rate Limiting
 # ============================================================
 
 rateLimit:
@@ -179,7 +179,7 @@ rateLimit:
     windowMs:
       _default: 900000 # 15 minutes
     max:
-      _default: 10
+      _default: 4
 
   refresh:
     windowMs:
@@ -192,6 +192,50 @@ rateLimit:
       _default: 60000 # 1 minute
     max:
       _default: 60
+
+  session:
+    windowMs:
+      _default: 60000 # 1 minute
+    max:
+      _default: 30
+
+# ============================================================
+# Redis Configuration (for SSO v2 sessions)
+# ============================================================
+
+redis:
+  host:
+    _default: localhost
+
+  port:
+    _default: 6379
+
+  password: null
+
+# ============================================================
+# SSO v2 Configuration
+# ============================================================
+
+v2:
+  access_token_expiry:
+    _default: 900
+
+  refresh_token_expiry:
+    _default: 604800
+
+# ============================================================
+# Default App ID (used for SSO v2 if not provided in .env or request)
+# ============================================================
+
+default_app_id:
+    _mandatory: true
+
+# ============================================================
+# Default Tenant ID (used for SSO v2 if not provided in .env or request)
+# ============================================================
+
+default_tenant_id:
+    _mandatory: true
 
 # ============================================================
 # Features
