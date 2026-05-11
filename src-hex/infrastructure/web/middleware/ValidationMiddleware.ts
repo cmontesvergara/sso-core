@@ -63,13 +63,16 @@ export const validateLogin = validate(
 
 /**
  * POST /api/v3/auth/refresh
- * Requires: refreshToken + tenantId + appId
+ * Requires: refreshToken. tenantId and appId are optional — the UseCase
+ * has fallbacks for both when they are absent or empty.
+ * (The auth-sdk middleware may send tenantId as empty string when
+ *  the x-tenant-id header is not present on the incoming request.)
  */
 export const validateRefresh = validate(
   Joi.object({
     refreshToken: Joi.string().required(),
-    tenantId:     Joi.string().trim().required(),
-    appId:        Joi.string().trim().required(),
+    tenantId:     Joi.string().trim().allow('').optional(),
+    appId:        Joi.string().trim().allow('').optional(),
   })
 );
 

@@ -40,11 +40,17 @@ export class RefreshTokenUseCase {
   ) { }
 
   async execute(input: RefreshTokenInput): Promise<LoginResult> {
-    // 1. Validate JWT signature / expiry
+    // 1. Validate JWT signature / expiry — also extracts tenantId/appId from token claims
     const claims = await this.tokenService.validateRefreshToken(input.refreshToken);
     if (!claims) {
       throw new InvalidCredentialsError('Invalid refresh token');
     }
+
+    // Resolve tenantId — trust the JWT claims only, not client input
+    // DB lookup as fallback for legacy tokens that don't have tenantId embedded
+    const resolvedTenantId = claims.tenantId || null;
+    const resolvedAppId    = claims.appId    || null;
+    const resolvedInput    = { ...input, tenantId: resolvedTenantId ?? undefined, appId: resolvedAppId ?? undefined };
 
     // 2. Look up hex refresh token record
     const tokenHash = this.hashToken(input.refreshToken);
@@ -52,7 +58,7 @@ export class RefreshTokenUseCase {
 
     if (!refreshToken) {
       // ── V2 fallback — JWT is valid but not in the hex table ──────────────────
-      return this.handleV2Refresh(input, claims);
+      return this.handleV2Refresh(resolvedInput, claims);
     }
 
     // ── Hex path ──────────────────────────────────────────────────────────────
@@ -75,16 +81,33 @@ export class RefreshTokenUseCase {
     const sessionToken = `app_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const now = new Date();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    const tenantId = input.tenantId
-      ? TenantId.create(input.tenantId)
-      : TenantId.create(refreshToken.userId.value); // safe fallback
+
+    // tenantId chain: input → JWT claims → DB lookup → userId last-resort
+    let effectiveTenantId: string | undefined = resolvedInput.tenantId || claims.tenantId;
+    if (!effectiveTenantId && user) {
+      const firstMembership = await this.prisma.tenantMember.findFirst({
+        where: {
+          userId: user.id,
+          tenant: resolvedInput.appId
+            ? { tenantApps: { some: { application: { appId: resolvedInput.appId }, isEnabled: true } } }
+            : undefined,
+        },
+        select: { tenantId: true },
+      });
+      effectiveTenantId = firstMembership?.tenantId ?? undefined;
+    }
+    console.log('[RefreshTokenUseCase] tenantId:', effectiveTenantId, '(input:', input.tenantId, ', claims:', claims.tenantId, ')');
+
+    const tenantId = effectiveTenantId
+      ? TenantId.create(effectiveTenantId)
+      : TenantId.create(refreshToken.userId.value); // last-resort
 
     const session = new AppSession(
       SessionId.create(sessionToken),
       sessionToken,
       refreshToken.userId,
       tenantId,
-      input.appId || 'default',
+      resolvedInput.appId || 'default',
       user?.systemRole || 'user',
       null,
       null,
@@ -118,7 +141,7 @@ export class RefreshTokenUseCase {
     });
 
     // 9. Enrich response
-    return this.buildResponse(tokens, user, session, input);
+    return this.buildResponse(tokens, user, session, resolvedInput);
   }
 
   // ── V2 path ───────────────────────────────────────────────────────────────────
@@ -133,16 +156,32 @@ export class RefreshTokenUseCase {
     const sessionToken = `app_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const now = new Date();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    const tenantId = input.tenantId
-      ? TenantId.create(input.tenantId)
-      : TenantId.create(userId); // no tenant context for manager app
+
+    // tenantId chain: JWT claims only → DB lookup → userId last-resort
+    let effectiveTenantId: string | undefined = claims.tenantId;
+    if (!effectiveTenantId) {
+      const firstMembership = await this.prisma.tenantMember.findFirst({
+        where: {
+          userId: user.id,
+          tenant: claims.appId
+            ? { tenantApps: { some: { application: { appId: claims.appId }, isEnabled: true } } }
+            : undefined,
+        },
+        select: { tenantId: true },
+      });
+      effectiveTenantId = firstMembership?.tenantId ?? undefined;
+    }
+
+    const tenantId = effectiveTenantId
+      ? TenantId.create(effectiveTenantId)
+      : TenantId.create(userId); // last-resort
 
     const session = new AppSession(
       SessionId.create(sessionToken),
       sessionToken,
       UserId.create(userId),
       tenantId,
-      input.appId || 'default',
+      claims.appId || 'default',
       user.systemRole || 'user',
       null,
       null,
@@ -218,12 +257,12 @@ export class RefreshTokenUseCase {
       systemRole: user.systemRole,
     } : null;
 
-    // Find the active tenant — fallback to first available if no match to avoid undefined spread
+    // Safe tenant lookup — fallback to first available to avoid undefined spread
     const activeTenantId = input.tenantId || session.tenantId.value;
     const matchedTenant = tenants.find((t: any) => t.id === activeTenantId) ?? tenants[0] ?? null;
 
     if (!matchedTenant) {
-      console.warn('[RefreshTokenUseCase] No matching tenant found for tenantId:', activeTenantId, '— user tenants:', tenants.map(t => t.id));
+      console.warn('[RefreshTokenUseCase] No matching tenant for id:', activeTenantId, '| available:', tenants.map(t => t.id));
     }
 
     return {

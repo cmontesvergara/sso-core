@@ -56,7 +56,7 @@ export class JwtTokenService implements ITokenService {
       accessTokenPayload['https://bigso.co/role'] = (session as any)._role;
     }
 
-    const refreshTokenPayload = {
+    const refreshTokenPayload: Record<string, any> = {
       sub: session.userId.value,
       jti: `rt_${session.sessionToken}`,
       type: 'refresh',
@@ -64,6 +64,12 @@ export class JwtTokenService implements ITokenService {
       exp: now + 7 * 24 * 60 * 60, // 7 days
       iss: this.issuer,
     };
+
+    // Embed tenant/app context so future refreshes don't need x-tenant-id header
+    if (session instanceof AppSession) {
+      refreshTokenPayload['https://bigso.co/tenant_id'] = session.tenantId.value;
+      refreshTokenPayload['https://bigso.co/app_id']    = session.appId;
+    }
 
     const accessToken = jwt.sign(accessTokenPayload, this.privateKey, {
       algorithm: 'RS256',
@@ -123,6 +129,9 @@ export class JwtTokenService implements ITokenService {
       iat: decoded.iat,
       exp: decoded.exp,
       systemRole: decoded.systemRole,
+      // Extract tenant/app context embedded in refresh token claims
+      tenantId: decoded['https://bigso.co/tenant_id'] || decoded.tenantId,
+      appId:    decoded['https://bigso.co/app_id']    || decoded.appId,
     };
   }
 

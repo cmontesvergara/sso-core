@@ -31,7 +31,8 @@ export class GetSessionContextUseCase {
 
   async execute(input: GetSessionContextInput): Promise<any> {
     if (!input.sessionId) {
-      throw new Error('SessionId cannot be empty');
+      // Return structured response instead of throwing — the caller turns exceptions into 500s
+      return { success: false, valid: false, message: 'Session ID is required' };
     }
 
     // ── 1. Look up the session (hex repo covers both v3 UUID and v2 app_* tokens) ──
