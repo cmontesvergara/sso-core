@@ -66,11 +66,16 @@ export class LoginUseCase {
         this.authService.ensureTenantAccess(user, tenantId);
       }
     } catch (error: any) {
-      await this.auditService.logAuthFailure(
-        input.email || input.nuid || 'unknown',
-        input.deviceFingerprint?.ip || 'unknown',
-        error.message || 'Invalid credentials or access denied'
-      );
+      await this.auditService.log({
+        type: 'AUTH_FAILURE',
+        userId: user.id.value,
+        tenantId: input.tenantId || undefined,
+        ip: input.deviceFingerprint?.ip || 'unknown',
+        metadata: {
+          email: input.email || input.nuid || 'unknown',
+          reason: error.message || 'Invalid credentials or access denied'
+        }
+      });
       throw error;
     }
 
@@ -106,11 +111,13 @@ export class LoginUseCase {
     );
 
     // 7. Log audit
-    await this.auditService.logAuthSuccess(
-      user.id.value,
-      input.deviceFingerprint?.ip || 'unknown',
-      input.deviceFingerprint?.userAgent || 'unknown'
-    );
+    await this.auditService.log({
+      type: 'AUTH_SUCCESS',
+      userId: user.id.value,
+      tenantId: input.tenantId || undefined,
+      ip: input.deviceFingerprint?.ip || 'unknown',
+      userAgent: input.deviceFingerprint?.userAgent || 'unknown'
+    });
 
     return {
       success: true,

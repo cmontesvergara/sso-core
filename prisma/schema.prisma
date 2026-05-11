@@ -124,6 +124,7 @@ model Tenant {
   appSessions   AppSession[]
   tenantApps    TenantApp[]
   userAppAccess UserAppAccess[]
+  AuditLog      AuditLog[]
 
   @@map("tenants")
 }
@@ -223,22 +224,22 @@ model SSOSession {
 }
 
 model AuthCode {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code        String   @unique @db.VarChar(255)
-  userId      String   @map("user_id") @db.Uuid
-  tenantId    String   @map("tenant_id") @db.Uuid
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code         String   @unique @db.VarChar(255)
+  userId       String   @map("user_id") @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
   appId        String   @map("app_id") @db.VarChar(100)
   redirectUri  String   @map("redirect_uri")
   ssoSessionId String?  @map("sso_session_id") @db.Uuid
   used         Boolean  @default(false)
-  expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt    DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   // PKCE / v2.3 fields (optional for backward compat)
-  codeChallenge       String?  @map("code_challenge") @db.VarChar(128)
-  codeChallengeMethod String?  @map("code_challenge_method") @db.VarChar(10)
-  state               String?  @db.VarChar(255)
-  nonce               String?  @db.VarChar(255)
+  codeChallenge       String? @map("code_challenge") @db.VarChar(128)
+  codeChallengeMethod String? @map("code_challenge_method") @db.VarChar(10)
+  state               String? @db.VarChar(255)
+  nonce               String? @db.VarChar(255)
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -284,9 +285,9 @@ model Application {
   logoUrl     String?  @map("logo_url")
   backendUrl  String?  @map("backend_url")
   isActive    Boolean  @default(true) @map("is_active")
-   audience    String?  @db.VarChar(255)
-   scope       String[] @default([])
-   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  audience    String?  @db.VarChar(255)
+  scope       String[] @default([])
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   tenantApps    TenantApp[]
@@ -356,18 +357,21 @@ model UserAppAccess {
 }
 
 model AuditLog {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  action     String   @db.VarChar(100)
-  userId     String?  @map("user_id") @db.Uuid
-  jti        String?  @db.VarChar(255)
-  ipAddress  String?  @map("ip_address") @db.Inet
-  userAgent  String?  @map("user_agent")
-  metadata   Json?
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  action    String   @db.VarChar(100)
+  userId    String?  @map("user_id") @db.Uuid
+  tenantId  String?  @map("tenant_id") @db.Uuid
+  jti       String?  @db.VarChar(255)
+  ipAddress String?  @map("ip_address") @db.Inet
+  userAgent String?  @map("user_agent")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([tenantId])
   @@index([action])
   @@index([createdAt])
   @@index([action, createdAt])

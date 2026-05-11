@@ -15,6 +15,7 @@ export class PrismaAuditService implements IAuditService {
         data: {
           action: event.type,
           userId: event.userId ?? null,
+          tenantId: event.tenantId ?? null,
           ipAddress: event.ip ?? null,
           userAgent: event.userAgent ?? null,
           metadata: event.metadata ?? undefined,

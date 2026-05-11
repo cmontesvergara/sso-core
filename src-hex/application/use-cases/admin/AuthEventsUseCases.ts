@@ -54,6 +54,16 @@ export class AuthEventsUseCases {
     };
     if (input.userId) {
       auditWhere.userId = input.userId;
+    } else if (input.tenantId) {
+      const usersInTenant = await this.prisma.tenantMember.findMany({
+        where: { tenantId: input.tenantId },
+        select: { userId: true }
+      });
+      const userIds = usersInTenant.map((u: any) => u.userId);
+      auditWhere.OR = [
+        { tenantId: input.tenantId },
+        ...(userIds.length > 0 ? [{ userId: { in: userIds } }] : [])
+      ];
     }
 
     // ── Totals by event type ───────────────────────────────────────────────────
@@ -65,9 +75,21 @@ export class AuthEventsUseCases {
     });
 
     // ── Timeline: count per day per action (last N days) ─────────────────────
-    const userFilter = input.userId
-      ? Prisma.sql`AND user_id = ${input.userId}::uuid`
-      : Prisma.empty;
+    let userFilter = Prisma.empty;
+    if (input.userId) {
+      userFilter = Prisma.sql`AND user_id = ${input.userId}::uuid`;
+    } else if (input.tenantId) {
+      const usersInTenant = await this.prisma.tenantMember.findMany({
+        where: { tenantId: input.tenantId },
+        select: { userId: true }
+      });
+      const userIds = usersInTenant.map((u: any) => u.userId);
+      if (userIds.length > 0) {
+        userFilter = Prisma.sql`AND (tenant_id = ${input.tenantId}::uuid OR user_id::text IN (${Prisma.join(userIds)}))`;
+      } else {
+        userFilter = Prisma.sql`AND tenant_id = ${input.tenantId}::uuid`;
+      }
+    }
 
     const timeline: Array<{ date: string; action: string; count: number }> =
       await this.prisma.$queryRaw`
@@ -132,6 +154,34 @@ export class AuthEventsUseCases {
       });
     }
 
+    // ── Recent raw events ────────────────────────────────────────────────────
+    const recentLogs = await this.prisma.auditLog.findMany({
+      where: auditWhere,
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    const logUserIds = [...new Set(recentLogs.map((l: any) => l.userId).filter(Boolean))] as string[];
+    const logUsers = logUserIds.length > 0 
+      ? await this.prisma.user.findMany({
+          where: { id: { in: logUserIds } },
+          select: { id: true, email: true }
+        })
+      : [];
+
+    const recentEvents = recentLogs.map((log: any) => {
+      const u = logUsers.find((u: any) => u.id === log.userId);
+      return {
+        id: log.id,
+        action: log.action,
+        userId: log.userId,
+        email: u?.email || null,
+        ipAddress: log.ipAddress,
+        createdAt: log.createdAt,
+        metadata: log.metadata,
+      };
+    });
+
     // ── Format response ──────────────────────────────────────────────────────
     return {
       meta: { days, since: since.toISOString(), tenantId: input.tenantId, userId: input.userId },
@@ -144,6 +194,7 @@ export class AuthEventsUseCases {
       topUsers,
       tenants,
       tenantUsers,
+      recentEvents,
       actionLabels: ACTION_LABELS,
     };
   }
