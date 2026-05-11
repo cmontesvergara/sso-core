@@ -61,6 +61,7 @@ import { AdminTenantUseCases } from '../../application/use-cases/admin/AdminTena
 import { AdminApplicationUseCases } from '../../application/use-cases/admin/AdminApplicationUseCases';
 import { AdminRoleUseCases } from '../../application/use-cases/admin/AdminRoleUseCases';
 import { AdminStatsUseCases } from '../../application/use-cases/admin/AdminStatsUseCases';
+import { AuthEventsUseCases } from '../../application/use-cases/admin/AuthEventsUseCases';
 import { AdminAppResourceUseCases } from '../../application/use-cases/admin/AdminAppResourceUseCases';
 
 // Infrastructure — controllers (admin)
@@ -267,6 +268,7 @@ export class Container {
     const adminApplications = new AdminApplicationUseCases(this.prisma);
     const adminRoles        = new AdminRoleUseCases(this.prisma);
     const adminStats        = new AdminStatsUseCases(this.prisma);
+    const authEvents        = new AuthEventsUseCases(this.prisma);
     const adminAppResources = new AdminAppResourceUseCases(this.prisma);
 
     this.instances.set('AdminUserUseCases',        adminUsers);
@@ -274,6 +276,7 @@ export class Container {
     this.instances.set('AdminApplicationUseCases', adminApplications);
     this.instances.set('AdminRoleUseCases',        adminRoles);
     this.instances.set('AdminStatsUseCases',       adminStats);
+    this.instances.set('AuthEventsUseCases',        authEvents);
     this.instances.set('AdminAppResourceUseCases', adminAppResources);
 
     // ── Admin controllers ─────────────────────────────────────────────────────
@@ -282,7 +285,7 @@ export class Container {
     this.instances.set('RoleController',              new RoleController(adminRoles));
     this.instances.set('ApplicationsController',      new ApplicationsController(adminApplications));
     this.instances.set('ApplicationSyncController',   new ApplicationSyncController(this.prisma, adminAppResources));
-    this.instances.set('StatsController',             new StatsController(adminStats));
+    this.instances.set('StatsController',             new StatsController(adminStats, authEvents));
     this.instances.set('AppResourceController',       new AppResourceController(adminAppResources));
     this.instances.set('UtilController',              new UtilController());
     this.instances.set('MetadataController',          new MetadataController());

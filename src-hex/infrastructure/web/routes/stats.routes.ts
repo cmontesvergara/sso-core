@@ -5,5 +5,6 @@ import { RequestHandler } from 'express';
 export function createStatsRouter(controller: StatsController, requireAuth: RequestHandler): Router {
   const router = Router();
   router.get('/', requireAuth, controller.getRoute1);
+  router.get('/auth-events', requireAuth, controller.getAuthEvents);
   return router;
 }
