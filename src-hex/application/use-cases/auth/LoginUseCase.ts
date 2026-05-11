@@ -57,12 +57,21 @@ export class LoginUseCase {
     }
 
     // 2. Verify credentials
-    await this.authService.verifyCredentials(user, input.password);
+    try {
+      await this.authService.verifyCredentials(user, input.password);
 
-    // 3. Check tenant access (if tenant specified)
-    if (input.tenantId) {
-      const tenantId = TenantId.create(input.tenantId);
-      this.authService.ensureTenantAccess(user, tenantId);
+      // 3. Check tenant access (if tenant specified)
+      if (input.tenantId) {
+        const tenantId = TenantId.create(input.tenantId);
+        this.authService.ensureTenantAccess(user, tenantId);
+      }
+    } catch (error: any) {
+      await this.auditService.logAuthFailure(
+        input.email || input.nuid || 'unknown',
+        input.deviceFingerprint?.ip || 'unknown',
+        error.message || 'Invalid credentials or access denied'
+      );
+      throw error;
     }
 
     // 4. Create SSO session
