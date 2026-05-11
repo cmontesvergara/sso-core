@@ -14,18 +14,24 @@ const AUTH_ACTIONS = [
   'SESSION_CONTEXT',
   'LOGOUT',
   'AUTH_FAILURE',
-  'TOKEN_REUSE_DETECTED',
+  'REFRESH_FAILURE',
+  'SESSION_CONTEXT_FAILURE',
+  'SESSION_EXPIRED',
+  'SECURITY_TOKEN_REUSE_DETECTED',
 ] as const;
 
 const ACTION_LABELS: Record<string, string> = {
-  LOGIN:                 'Inicio de sesión',
-  AUTH_SUCCESS:          'Autenticación exitosa',
-  TOKEN_REFRESH:         'Refresh de token',
-  TOKEN_REFRESH_V2:      'Refresh (legacy)',
-  SESSION_CONTEXT:       'Consulta de sesión',
-  LOGOUT:                'Cierre de sesión',
-  AUTH_FAILURE:          'Fallo de autenticación',
-  TOKEN_REUSE_DETECTED:  'Reutilización de token',
+  LOGIN:                         'Inicio de sesión',
+  AUTH_SUCCESS:                  'Autenticación exitosa',
+  TOKEN_REFRESH:                 'Refresh de token',
+  TOKEN_REFRESH_V2:              'Refresh (legacy)',
+  SESSION_CONTEXT:               'Consulta de sesión',
+  LOGOUT:                        'Cierre de sesión',
+  AUTH_FAILURE:                  'Fallo de autenticación',
+  REFRESH_FAILURE:               'Fallo de refresh',
+  SESSION_CONTEXT_FAILURE:       'Fallo de consulta de sesión',
+  SESSION_EXPIRED:               'Sesión expirada',
+  SECURITY_TOKEN_REUSE_DETECTED: 'Reutilización de token',
 };
 
 /**

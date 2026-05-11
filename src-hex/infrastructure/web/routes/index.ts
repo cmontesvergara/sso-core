@@ -90,7 +90,8 @@ export function createRouter(container: Container): Router {
     container.get('ISessionRepository'),
     container.get('PrismaClient'),
     container.get('ITokenService'),
-    container.get<SessionEnrichmentService>('SessionEnrichmentService')
+    container.get<SessionEnrichmentService>('SessionEnrichmentService'),
+    container.get('IAuditService')
   );
 
   const changePasswordUseCase = new ChangePasswordUseCase(

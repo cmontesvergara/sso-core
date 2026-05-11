@@ -3,6 +3,7 @@ import { ITokenService } from '../../ports/output/ITokenService';
 import { PrismaClient } from '@prisma/client';
 import { SessionId } from '../../../domain/value-objects/SessionId';
 import { SessionEnrichmentService } from '../../services/SessionEnrichmentService';
+import { IAuditService } from '../../ports/output/IAuditService';
 
 export interface GetSessionContextInput {
   sessionId: string;
@@ -26,7 +27,8 @@ export class GetSessionContextUseCase {
     private sessionRepository: ISessionRepository,
     private prisma: PrismaClient,
     private tokenService: ITokenService,
-    private sessionEnrichmentService: SessionEnrichmentService
+    private sessionEnrichmentService: SessionEnrichmentService,
+    private auditService: IAuditService
   ) {}
 
   async execute(input: GetSessionContextInput): Promise<any> {
@@ -41,8 +43,19 @@ export class GetSessionContextUseCase {
 
     if (!session) {
       // Session truly not found (expired or never existed)
+      await this.auditService.log({
+        type: 'SESSION_CONTEXT_FAILURE',
+        sessionId: input.sessionId,
+        metadata: { reason: 'Session not found or expired' },
+      });
       return { success: false, valid: false, message: 'Session not found or expired' };
     }
+
+    await this.auditService.log({
+      type: 'SESSION_CONTEXT',
+      userId: session.userId.value,
+      sessionId: session.id.value,
+    });
 
     // ── 2. Generate a fresh access token ─────────────────────────────────────────
     // NOTE: We re-issue an access token from the stored session so the client always

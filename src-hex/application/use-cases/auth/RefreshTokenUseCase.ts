@@ -43,6 +43,10 @@ export class RefreshTokenUseCase {
     // 1. Validate JWT signature / expiry — also extracts tenantId/appId from token claims
     const claims = await this.tokenService.validateRefreshToken(input.refreshToken);
     if (!claims) {
+      await this.auditService.log({
+        type: 'REFRESH_FAILURE',
+        metadata: { reason: 'Invalid refresh token signature or expiry' },
+      });
       throw new InvalidCredentialsError('Invalid refresh token');
     }
 
@@ -69,6 +73,11 @@ export class RefreshTokenUseCase {
         await this.handleTokenReuse(refreshToken);
         throw new InvalidCredentialsError('Token reuse detected');
       }
+      await this.auditService.log({
+        type: 'REFRESH_FAILURE',
+        userId: refreshToken.userId.value,
+        metadata: { reason: 'Token has been revoked' },
+      });
       throw new InvalidCredentialsError('Token has been revoked');
     }
 
@@ -150,7 +159,14 @@ export class RefreshTokenUseCase {
     const userId = claims.sub as string;
 
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new InvalidCredentialsError('User not found');
+    if (!user) {
+      await this.auditService.log({
+        type: 'REFRESH_FAILURE',
+        userId,
+        metadata: { reason: 'User not found in V2 refresh path' },
+      });
+      throw new InvalidCredentialsError('User not found');
+    }
 
     // Create a new AppSession for the v2 user
     const sessionToken = `app_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
