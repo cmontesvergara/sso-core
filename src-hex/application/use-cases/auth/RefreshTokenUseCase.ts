@@ -218,6 +218,14 @@ export class RefreshTokenUseCase {
       systemRole: user.systemRole,
     } : null;
 
+    // Find the active tenant — fallback to first available if no match to avoid undefined spread
+    const activeTenantId = input.tenantId || session.tenantId.value;
+    const matchedTenant = tenants.find((t: any) => t.id === activeTenantId) ?? tenants[0] ?? null;
+
+    if (!matchedTenant) {
+      console.warn('[RefreshTokenUseCase] No matching tenant found for tenantId:', activeTenantId, '— user tenants:', tenants.map(t => t.id));
+    }
+
     return {
       success: true,
       tokens: {
@@ -228,7 +236,7 @@ export class RefreshTokenUseCase {
       },
       user: userInformation,
       currentTenant: {
-        ...tenants.find((t: any) => t.id === (input.tenantId || session.tenantId.value)),
+        ...(matchedTenant ?? {}),
         permissions,
       },
       relatedTenants: tenants,
