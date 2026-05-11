@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 export interface AuthEventSummaryInput {
   tenantId?: string;
@@ -59,7 +59,10 @@ export class AuthEventsUseCases {
     });
 
     // ── Timeline: count per day per action (last N days) ─────────────────────
-    // Prisma doesn't support DATE_TRUNC natively, use raw
+    const userFilter = input.userId
+      ? Prisma.sql`AND user_id = ${input.userId}::uuid`
+      : Prisma.empty;
+
     const timeline: Array<{ date: string; action: string; count: number }> =
       await this.prisma.$queryRaw`
         SELECT
@@ -68,8 +71,8 @@ export class AuthEventsUseCases {
           COUNT(*)::int AS count
         FROM audit_logs
         WHERE created_at >= ${since}
-          AND action = ANY(${AUTH_ACTIONS as unknown as string[]})
-          ${input.userId   ? this.prisma.$queryRaw`AND user_id = ${input.userId}::uuid`   : this.prisma.$queryRaw``}
+          AND action IN (${Prisma.join([...AUTH_ACTIONS])})
+          ${userFilter}
         GROUP BY 1, 2
         ORDER BY 1 ASC, 2 ASC
       `;

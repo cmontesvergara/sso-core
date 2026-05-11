@@ -6,7 +6,7 @@ export class StatsController {
   constructor(
     private readonly stats: AdminStatsUseCases,
     private readonly authEvents: AuthEventsUseCases,
-  ) {}
+  ) { }
 
   getRoute1 = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -25,8 +25,8 @@ export class StatsController {
   getAuthEvents = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const tenantId = req.query['tenantId'] as string | undefined;
-      const userId   = req.query['userId']   as string | undefined;
-      const days     = parseInt(req.query['days'] as string ?? '30', 10);
+      const userId = req.query['userId'] as string | undefined;
+      const days = parseInt(req.query['days'] as string ?? '30', 10);
 
       const data = await this.authEvents.getAuthEventSummary({ tenantId, userId, days });
       res.json({ success: true, ...data });
