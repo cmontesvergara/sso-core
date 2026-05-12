@@ -19,6 +19,7 @@ const AUTH_ACTIONS = [
   'SESSION_CONTEXT_FAILURE',
   'SESSION_EXPIRED',
   'SECURITY_TOKEN_REUSE_DETECTED',
+  'RATE_LIMIT_BLOCKED',
 ] as const;
 
 const ACTION_LABELS: Record<string, string> = {
@@ -33,6 +34,7 @@ const ACTION_LABELS: Record<string, string> = {
   SESSION_CONTEXT_FAILURE:       'Fallo de consulta de sesión',
   SESSION_EXPIRED:               'Sesión expirada',
   SECURITY_TOKEN_REUSE_DETECTED: 'Reutilización de token',
+  RATE_LIMIT_BLOCKED:            'Bloqueado por Rate Limit',
 };
 
 /**

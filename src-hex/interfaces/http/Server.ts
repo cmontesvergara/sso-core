@@ -51,13 +51,39 @@ export async function createHexServer(container: Container): Promise<Express> {
   app.use(cookieParser());
 
   // Rate limiting
+  // handler: persists RATE_LIMIT_BLOCKED events into the audit log
+  // so they show up in sso-manager's activity dashboard.
+  const prismaForRateLimit = container.get<any>('PrismaClient');
   app.use(
     rateLimit({
       windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS ?? '60000', 10),
-      max: parseInt(process.env.RATE_LIMIT_MAX ?? '100', 10),
+      max: parseInt(process.env.RATE_LIMIT_MAX ?? '2000', 10),
       standardHeaders: true,
       legacyHeaders: false,
-skip: (req) => process.env.RATE_LIMIT_DISABLED === 'true' || req.ip === '127.0.0.1' || req.ip === '::1',
+      skip: (req) => process.env.RATE_LIMIT_DISABLED === 'true' || req.ip === '127.0.0.1' || req.ip === '::1',
+      handler: async (req: Request, res: Response) => {
+        // Log the blocked request asynchronously — do not await so response is immediate
+        prismaForRateLimit.auditLog.create({
+          data: {
+            action: 'RATE_LIMIT_BLOCKED',
+            userId: null,
+            tenantId: null,
+            ipAddress: req.ip ?? null,
+            userAgent: req.headers['user-agent'] ?? null,
+            metadata: {
+              method: req.method,
+              path: req.path,
+              origin: req.headers['origin'] ?? null,
+            },
+            createdAt: new Date(),
+          },
+        }).catch((err: any) => console.warn('[RateLimit] Failed to persist audit log:', err));
+
+        res.status(429).json({
+          error: 'Too many requests, please try again later.',
+          retryAfter: Math.ceil(parseInt(process.env.RATE_LIMIT_WINDOW_MS ?? '60000', 10) / 1000),
+        });
+      },
     })
   );
 
