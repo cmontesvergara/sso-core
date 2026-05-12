@@ -48,11 +48,16 @@ export class LoginUseCase {
     // 1. Find user
     const user = await this.findUser(input.email, input.nuid);
     if (!user) {
-      await this.auditService.logAuthFailure(
-        input.email || input.nuid || 'unknown',
-        input.deviceFingerprint?.ip || 'unknown',
-        'User not found'
-      );
+      await this.auditService.log({
+        type: 'AUTH_FAILURE',
+        tenantId: input.tenantId || undefined,
+        ip: input.deviceFingerprint?.ip || 'unknown',
+        userAgent: input.deviceFingerprint?.userAgent || 'unknown',
+        metadata: {
+          email: input.email || input.nuid || 'unknown',
+          reason: 'User not found'
+        }
+      });
       throw new UserNotFoundError(input.email || input.nuid || 'unknown');
     }
 
