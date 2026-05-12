@@ -8,6 +8,8 @@ import { IAuditService } from '../../ports/output/IAuditService';
 export interface GetSessionContextInput {
   sessionId: string;
   appId?: string;
+  ip?: string;
+  userAgent?: string;
 }
 
 /**
@@ -46,6 +48,8 @@ export class GetSessionContextUseCase {
       await this.auditService.log({
         type: 'SESSION_CONTEXT_FAILURE',
         sessionId: input.sessionId,
+        ip: input.ip,
+        userAgent: input.userAgent,
         metadata: { reason: 'Session not found or expired' },
       });
       return { success: false, valid: false, message: 'Session not found or expired' };
@@ -54,7 +58,10 @@ export class GetSessionContextUseCase {
     await this.auditService.log({
       type: 'SESSION_CONTEXT',
       userId: session.userId.value,
+      tenantId: (session as any).tenantId?.value,
       sessionId: session.id.value,
+      ip: input.ip,
+      userAgent: input.userAgent,
     });
 
     // ── 2. Generate a fresh access token ─────────────────────────────────────────

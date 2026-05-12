@@ -175,6 +175,7 @@ export class AuthEventsUseCases {
         id: log.id,
         action: log.action,
         userId: log.userId,
+        tenantId: log.tenantId,
         email: u?.email || null,
         ipAddress: log.ipAddress,
         createdAt: log.createdAt,

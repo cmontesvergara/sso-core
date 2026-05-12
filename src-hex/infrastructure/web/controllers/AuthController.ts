@@ -72,6 +72,8 @@ export class AuthController {
         refreshToken: req.body.refreshToken,
         tenantId: req.body.tenantId,
         appId: req.body.appId,
+        ip: req.ip ?? req.socket.remoteAddress,
+        userAgent: req.headers['user-agent'] as string,
       });
       res.status(200).json(result);
     } catch (err) {
@@ -130,6 +132,8 @@ export class AuthController {
       const result = await this.getSessionContextUseCase.execute({
         sessionId: req.body.sessionId,
         appId: req.body.appId,
+        ip: req.ip ?? req.socket.remoteAddress,
+        userAgent: req.headers['user-agent'] as string,
       });
       res.status(200).json(result);
     } catch (err) {

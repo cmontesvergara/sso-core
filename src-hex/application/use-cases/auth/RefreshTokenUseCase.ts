@@ -45,6 +45,8 @@ export class RefreshTokenUseCase {
     if (!claims) {
       await this.auditService.log({
         type: 'REFRESH_FAILURE',
+        ip: input.ip,
+        userAgent: input.userAgent,
         metadata: { reason: 'Invalid refresh token signature or expiry' },
       });
       throw new InvalidCredentialsError('Invalid refresh token');
@@ -76,6 +78,8 @@ export class RefreshTokenUseCase {
       await this.auditService.log({
         type: 'REFRESH_FAILURE',
         userId: refreshToken.userId.value,
+        ip: input.ip,
+        userAgent: input.userAgent,
         metadata: { reason: 'Token has been revoked' },
       });
       throw new InvalidCredentialsError('Token has been revoked');
@@ -146,7 +150,10 @@ export class RefreshTokenUseCase {
     await this.auditService.log({
       type: 'TOKEN_REFRESH',
       userId: refreshToken.userId.value,
+      tenantId: resolvedTenantId || undefined,
       sessionId: session.id.value,
+      ip: input.ip,
+      userAgent: input.userAgent,
     });
 
     // 9. Enrich response
@@ -163,7 +170,9 @@ export class RefreshTokenUseCase {
       await this.auditService.log({
         type: 'REFRESH_FAILURE',
         userId,
-        metadata: { reason: 'User not found in V2 refresh path' },
+        ip: input.ip,
+        userAgent: input.userAgent,
+        metadata: { reason: 'V2 fallback: User not found for subject' },
       });
       throw new InvalidCredentialsError('User not found');
     }
@@ -212,7 +221,10 @@ export class RefreshTokenUseCase {
     await this.auditService.log({
       type: 'TOKEN_REFRESH_V2',
       userId,
-      sessionId: session.id.value,
+      tenantId: claims.tenantId || undefined,
+      ip: input.ip,
+      userAgent: input.userAgent,
+      metadata: { reason: 'V2 token migrated on the fly' }
     });
 
     return this.buildResponse(tokens, user, session, input);
