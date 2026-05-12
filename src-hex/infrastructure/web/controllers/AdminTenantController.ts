@@ -32,8 +32,7 @@ export class AdminTenantController {
   /** GET /api/v1/tenant */
   getRoute3 = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userId = (req as any).userId;
-      const tenants = await this.tenants.getUserTenants(userId);
+      const tenants = await this.tenants.listAllTenants();
       res.json({ success: true, tenants, count: tenants.length });
     } catch (error) { next(error); }
   };
