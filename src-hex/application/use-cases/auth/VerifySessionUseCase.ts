@@ -8,6 +8,8 @@ import { TokenClaims } from '../../ports/output/ITokenService';
 
 export interface VerifySessionInput {
   accessToken: string;
+  ip?: string;
+  userAgent?: string;
 }
 
 export interface VerifySessionResult {
@@ -46,6 +48,9 @@ export class VerifySessionUseCase {
         type: 'SESSION_EXPIRED',
         userId: claims.sub,
         sessionId: claims.jti,
+        tenantId: claims.tenantId || (session as any).tenantId?.value || undefined,
+        ip: input.ip,
+        userAgent: input.userAgent,
       });
       throw new SessionExpiredError(claims.jti);
     }

@@ -18,7 +18,11 @@ export function createAuthMiddleware(verifySessionUseCase: VerifySessionUseCase)
 
     const token = authHeader.slice(7);
     try {
-      const result = await verifySessionUseCase.execute({ accessToken: token });
+      const result = await verifySessionUseCase.execute({
+        accessToken: token,
+        ip: req.ip ?? req.socket.remoteAddress,
+        userAgent: req.headers['user-agent'] as string,
+      });
       (req as any).userId = result.userId;
       (req as any).sessionId = result.sessionId;
       (req as any).tokenClaims = result.claims;
