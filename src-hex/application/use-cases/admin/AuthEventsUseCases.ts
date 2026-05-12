@@ -55,15 +55,7 @@ export class AuthEventsUseCases {
     if (input.userId) {
       auditWhere.userId = input.userId;
     } else if (input.tenantId) {
-      const usersInTenant = await this.prisma.tenantMember.findMany({
-        where: { tenantId: input.tenantId },
-        select: { userId: true }
-      });
-      const userIds = usersInTenant.map((u: any) => u.userId);
-      auditWhere.OR = [
-        { tenantId: input.tenantId },
-        ...(userIds.length > 0 ? [{ userId: { in: userIds } }] : [])
-      ];
+      auditWhere.tenantId = input.tenantId;
     }
 
     // ── Totals by event type ───────────────────────────────────────────────────
@@ -79,16 +71,7 @@ export class AuthEventsUseCases {
     if (input.userId) {
       userFilter = Prisma.sql`AND user_id = ${input.userId}::uuid`;
     } else if (input.tenantId) {
-      const usersInTenant = await this.prisma.tenantMember.findMany({
-        where: { tenantId: input.tenantId },
-        select: { userId: true }
-      });
-      const userIds = usersInTenant.map((u: any) => u.userId);
-      if (userIds.length > 0) {
-        userFilter = Prisma.sql`AND (tenant_id = ${input.tenantId}::uuid OR user_id::text IN (${Prisma.join(userIds)}))`;
-      } else {
-        userFilter = Prisma.sql`AND tenant_id = ${input.tenantId}::uuid`;
-      }
+      userFilter = Prisma.sql`AND tenant_id = ${input.tenantId}::uuid`;
     }
 
     const timeline: Array<{ date: string; action: string; count: number }> =
