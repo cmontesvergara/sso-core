@@ -20,6 +20,7 @@ import { createAppResourceRouter } from '../../infrastructure/web/routes/appReso
 import { createRouter } from '../../infrastructure/web/routes/index';
 import { createRoleRouter } from '../../infrastructure/web/routes/role.routes';
 import { createStatsRouter } from '../../infrastructure/web/routes/stats.routes';
+import { AuditLogCleanupJob } from '../../infrastructure/jobs/AuditLogCleanupJob';
 
 /**
  * createHexServer
@@ -106,6 +107,10 @@ export async function createHexServer(container: Container): Promise<Express> {
 
   // ── Global error handler (must be last) ──────────────────────────────────
   app.use(errorHandlerMiddleware);
+
+  // ── Audit log cleanup cron job ───────────────────────────────────────────
+  const prisma = container.get<any>('PrismaClient');
+  new AuditLogCleanupJob(prisma).start();
 
   return app;
 }
