@@ -27,8 +27,9 @@ export class StatsController {
       const tenantId = req.query['tenantId'] as string | undefined;
       const userId = req.query['userId'] as string | undefined;
       const days = parseInt(req.query['days'] as string ?? '30', 10);
+      const action = req.query['action'] as string | undefined;
 
-      const data = await this.authEvents.getAuthEventSummary({ tenantId, userId, days });
+      const data = await this.authEvents.getAuthEventSummary({ tenantId, userId, days, action });
       res.json({ success: true, ...data });
     } catch (error) { next(error); }
   };

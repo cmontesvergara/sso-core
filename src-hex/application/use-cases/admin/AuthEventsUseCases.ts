@@ -4,6 +4,7 @@ export interface AuthEventSummaryInput {
   tenantId?: string;
   userId?: string;
   days?: number;
+  action?: string;
 }
 
 const AUTH_ACTIONS = [
@@ -138,8 +139,13 @@ export class AuthEventsUseCases {
     }
 
     // ── Recent raw events ────────────────────────────────────────────────────
+    const recentWhere = { ...auditWhere };
+    if (input.action) {
+      recentWhere.action = input.action;
+    }
+
     const recentLogs = await this.prisma.auditLog.findMany({
-      where: auditWhere,
+      where: recentWhere,
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
