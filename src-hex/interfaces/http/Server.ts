@@ -57,6 +57,7 @@ export async function createHexServer(container: Container): Promise<Express> {
       max: parseInt(process.env.RATE_LIMIT_MAX ?? '100', 10),
       standardHeaders: true,
       legacyHeaders: false,
+skip: (req) => process.env.RATE_LIMIT_DISABLED === 'true' || req.ip === '127.0.0.1' || req.ip === '::1',
     })
   );
 
