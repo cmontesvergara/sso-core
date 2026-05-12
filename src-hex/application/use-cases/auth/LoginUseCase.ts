@@ -43,7 +43,7 @@ export class LoginUseCase {
   ) {
     this.authService = new AuthenticationService(passwordHasher);
   }
-
+  //
   async execute(input: LoginInput): Promise<LoginResult> {
     // 1. Find user
     const user = await this.findUser(input.email, input.nuid);
@@ -89,7 +89,7 @@ export class LoginUseCase {
 
     // 5. Generate and save tokens
     const tokens = await this.tokenService.generateTokens(session);
-    
+
     const tokenHash = this.hashService.hash(tokens.refreshToken);
     const refreshTokenEntity = new RefreshToken(
       RefreshTokenId.create(crypto.randomUUID()),
