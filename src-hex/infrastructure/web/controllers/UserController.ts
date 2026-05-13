@@ -29,7 +29,12 @@ export class UserController {
         firstName: req.body.firstName,
         lastName: req.body.lastName,
         tenantName: req.body.tenantName,
+        nuid: req.body.nuid,
       });
+      
+      // Auto-send verification email with OTP code after registration
+      await this.verifyEmailUseCase.sendVerification({ userId: result.id });
+      
       res.status(201).json(result);
     } catch (err) {
       next(err);
@@ -73,7 +78,7 @@ export class UserController {
    */
   verifyEmail = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await this.verifyEmailUseCase.verifyToken({ token: req.query.token as string });
+      await this.verifyEmailUseCase.verifyToken({ token: req.body.token });
       res.status(200).json({ success: true, message: 'Email verificado correctamente' });
     } catch (err) {
       next(err);
@@ -85,7 +90,12 @@ export class UserController {
    */
   sendVerification = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await this.verifyEmailUseCase.sendVerification({ userId: (req as any).userId });
+      const { userId } = req.body;
+      if (!userId) {
+        res.status(400).json({ success: false, message: 'userId es requerido' });
+        return;
+      }
+      await this.verifyEmailUseCase.sendVerification({ userId });
       res.status(204).send();
     } catch (err) {
       next(err);

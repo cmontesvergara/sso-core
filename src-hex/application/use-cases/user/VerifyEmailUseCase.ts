@@ -34,7 +34,7 @@ export class VerifyEmailUseCase {
     const user = await this.userRepository.findById(UserId.create(input.userId));
     if (!user) throw new UserNotFoundError(input.userId);
 
-    const token = uuidv4();
+    const token = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digits
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 h
 
@@ -61,9 +61,9 @@ export class VerifyEmailUseCase {
     const verified = verification.markAsVerified();
     await this.emailVerificationRepository.update(verified);
 
-    // Activate user if still pending
+    // Activate user if still disabled (pending verification)
     const user = await this.userRepository.findById(verification.userId);
-    if (user && user.userStatus === 'pending') {
+    if (user && user.userStatus === 'disabled') {
       const activated = user.withStatus('active');
       await this.userRepository.update(activated);
     }

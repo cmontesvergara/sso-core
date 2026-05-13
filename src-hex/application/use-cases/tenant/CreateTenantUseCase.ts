@@ -1,5 +1,6 @@
 import { ITenantRepository } from '../../../domain/repositories/ITenantRepository';
 import { IUserRepository } from '../../../domain/repositories/IUserRepository';
+import crypto from 'crypto';
 import { IAuditService } from '../../ports/output/IAuditService';
 import { IEventBus } from '../../ports/output/IEventBus';
 import { CreateTenantInput } from '../../dto/input/CreateTenantInput';
@@ -68,7 +69,7 @@ export class CreateTenantUseCase {
   }
 
   private generateId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    return crypto.randomUUID();
   }
 
   private generateSlug(name: string): string {

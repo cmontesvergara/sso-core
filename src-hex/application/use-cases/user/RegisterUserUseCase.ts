@@ -1,5 +1,6 @@
 import { IUserRepository } from '../../../domain/repositories/IUserRepository';
 import { ITenantRepository } from '../../../domain/repositories/ITenantRepository';
+import crypto from 'crypto';
 import { IEmailService } from '../../ports/output/IEmailService';
 import { IAuditService } from '../../ports/output/IAuditService';
 import { IEventBus } from '../../ports/output/IEventBus';
@@ -14,6 +15,7 @@ import { Email } from '../../../domain/value-objects/Email';
 // import { PasswordHash } from '../../../domain/value-objects/PasswordHash';
 import { NUID } from '../../../domain/value-objects/NUID';
 import { UserAlreadyExistsError } from '../../../domain/errors/UserAlreadyExistsError';
+import { DocumentAlreadyExistsError } from '../../../domain/errors/DocumentAlreadyExistsError';
 import { WeakPasswordError } from '../../../domain/errors/WeakPasswordError';
 import {
   AuthenticationService,
@@ -53,6 +55,15 @@ export class RegisterUserUseCase {
       throw new UserAlreadyExistsError(input.email);
     }
 
+    // 2b. Check if NUID already exists (if provided)
+    if (input.nuid) {
+      const nuidResult = NUID.create(input.nuid);
+      const existingDocument = await this.userRepository.findByNUID(nuidResult);
+      if (existingDocument) {
+        throw new DocumentAlreadyExistsError(input.nuid);
+      }
+    }
+
     // 3. Validate password complexity
     const passwordValidation = this.authService.validatePasswordComplexity(input.password);
     if (!passwordValidation.isValid) {
@@ -67,11 +78,11 @@ export class RegisterUserUseCase {
     const user = new User(
       UserId.create(this.generateId()),
       email,
-      NUID.create(this.generateNUID()), // Generate NUID
+      NUID.create(input.nuid || this.generateNUID()), // Use input NUID or generate
       input.firstName,
       input.lastName,
       passwordHash,
-      'pending', // Requires email verification
+      'disabled', // Requires email verification (DB constraint: disabled, active, blocked)
       'user',    // systemRole — matches Prisma SystemRole enum default
       '', // phone - required but empty for now
       null, // secondName
@@ -130,7 +141,7 @@ export class RegisterUserUseCase {
   }
 
   private generateId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    return crypto.randomUUID();
   }
 
   private generateNUID(): string {

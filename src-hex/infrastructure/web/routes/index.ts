@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { Container } from '../../config/Container';
 import { AuthController } from '../controllers/AuthController';
 import { UserController } from '../controllers/UserController';
@@ -181,6 +182,15 @@ export function createRouter(container: Container): Router {
   // ── Auth middleware ───────────────────────────────────────────────────────
   const requireAuth = createAuthMiddleware(verifySessionUseCase);
 
+  // ── Rate limiters ─────────────────────────────────────────────────────────
+  const sendVerificationLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 3, // Limit each IP to 3 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: 'Has excedido el límite de reenvíos. Intenta de nuevo más tarde.' },
+  });
+
   // ── Public routes (no auth required) ─────────────────────────────────────────
   router.post('/auth/login',           validateLogin,    authController.login);
   router.post('/auth/refresh',          validateRefresh,  authController.refresh);
@@ -189,7 +199,8 @@ export function createRouter(container: Container): Router {
   router.post('/auth/forgot-password',  passwordController.forgotPassword);
   router.post('/auth/reset-password',   passwordController.resetPassword);
   router.post('/users/register',        validateRegister, userController.register);
-  router.get('/users/verify-email',     userController.verifyEmail);
+  router.post('/users/verify-email',    userController.verifyEmail);
+  router.post('/users/send-verification', sendVerificationLimiter, userController.sendVerification);
 
   // ── Protected routes ──────────────────────────────────────────────────────
   router.post('/auth/logout',           requireAuth, authController.logout);
@@ -197,7 +208,6 @@ export function createRouter(container: Container): Router {
 
   router.patch('/users/profile',        requireAuth, userController.updateProfile);
   router.post('/users/change-password', requireAuth, userController.changePassword);
-  router.post('/users/send-verification', requireAuth, userController.sendVerification);
 
   router.post('/tenants',               requireAuth, tenantController.createTenant);
   router.post('/tenants/:tenantId/members',                requireAuth, tenantController.addMember);

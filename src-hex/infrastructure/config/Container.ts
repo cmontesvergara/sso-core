@@ -115,7 +115,7 @@ export class Container {
     const auditService = new PrismaAuditService(this.prisma);
     const emailService = new ResendEmailService(
       process.env.RESEND_API_KEY ?? '',
-      process.env.EMAIL_FROM ?? 'noreply@bigso.co'
+      process.env.EMAIL_FROM ?? 'no-reply@bigso.co'
     );
     const cacheService = new RedisCacheService(this.redis);
 
@@ -130,11 +130,11 @@ export class Container {
     const jwksProvider = new JwksProvider(loadKey('JWT_PRIVATE_KEY'));
 
     // ── Shared infrastructure for repositories ──────────────────────────
-    const keyFactory     = new RedisKeyFactory();
+    const keyFactory = new RedisKeyFactory();
     const tenantVersions = new TenantVersionService(this.redis); // O(1) group invalidation
-    const anyCache       = () => new RedisCacheService<any>(this.redis);
-    const strCache       = () => new RedisCacheService<string>(this.redis);
-    const strArrCache    = () => new RedisCacheService<string[]>(this.redis);
+    const anyCache = () => new RedisCacheService<any>(this.redis);
+    const strCache = () => new RedisCacheService<string>(this.redis);
+    const strArrCache = () => new RedisCacheService<string[]>(this.redis);
 
     const userRepository = new UserCachedRepository(
       new PrismaUserRepository(this.prisma),
@@ -263,32 +263,32 @@ export class Container {
     this.instances.set('CreateTenantUseCase', createTenantUseCase);
 
     // ── Admin use cases (all use injected PrismaClient, zero src/ imports) ───
-    const adminUsers        = new AdminUserUseCases(this.prisma);
-    const adminTenants      = new AdminTenantUseCases(this.prisma);
+    const adminUsers = new AdminUserUseCases(this.prisma);
+    const adminTenants = new AdminTenantUseCases(this.prisma);
     const adminApplications = new AdminApplicationUseCases(this.prisma);
-    const adminRoles        = new AdminRoleUseCases(this.prisma);
-    const adminStats        = new AdminStatsUseCases(this.prisma);
-    const authEvents        = new AuthEventsUseCases(this.prisma);
+    const adminRoles = new AdminRoleUseCases(this.prisma);
+    const adminStats = new AdminStatsUseCases(this.prisma);
+    const authEvents = new AuthEventsUseCases(this.prisma);
     const adminAppResources = new AdminAppResourceUseCases(this.prisma);
 
-    this.instances.set('AdminUserUseCases',        adminUsers);
-    this.instances.set('AdminTenantUseCases',      adminTenants);
+    this.instances.set('AdminUserUseCases', adminUsers);
+    this.instances.set('AdminTenantUseCases', adminTenants);
     this.instances.set('AdminApplicationUseCases', adminApplications);
-    this.instances.set('AdminRoleUseCases',        adminRoles);
-    this.instances.set('AdminStatsUseCases',       adminStats);
-    this.instances.set('AuthEventsUseCases',        authEvents);
+    this.instances.set('AdminRoleUseCases', adminRoles);
+    this.instances.set('AdminStatsUseCases', adminStats);
+    this.instances.set('AuthEventsUseCases', authEvents);
     this.instances.set('AdminAppResourceUseCases', adminAppResources);
 
     // ── Admin controllers ─────────────────────────────────────────────────────
-    this.instances.set('AdminUserController',        new AdminUserController(adminUsers));
-    this.instances.set('TenantController',      new AdminTenantController(adminTenants));
-    this.instances.set('RoleController',              new RoleController(adminRoles));
-    this.instances.set('ApplicationsController',      new ApplicationsController(adminApplications));
-    this.instances.set('ApplicationSyncController',   new ApplicationSyncController(this.prisma, adminAppResources));
-    this.instances.set('StatsController',             new StatsController(adminStats, authEvents));
-    this.instances.set('AppResourceController',       new AppResourceController(adminAppResources));
-    this.instances.set('UtilController',              new UtilController());
-    this.instances.set('MetadataController',          new MetadataController());
+    this.instances.set('AdminUserController', new AdminUserController(adminUsers));
+    this.instances.set('TenantController', new AdminTenantController(adminTenants));
+    this.instances.set('RoleController', new RoleController(adminRoles));
+    this.instances.set('ApplicationsController', new ApplicationsController(adminApplications));
+    this.instances.set('ApplicationSyncController', new ApplicationSyncController(this.prisma, adminAppResources));
+    this.instances.set('StatsController', new StatsController(adminStats, authEvents));
+    this.instances.set('AppResourceController', new AppResourceController(adminAppResources));
+    this.instances.set('UtilController', new UtilController());
+    this.instances.set('MetadataController', new MetadataController());
 
     // ── Auth middleware factory ───────────────────────────────────────────────
     const verifySessionUseCase = new VerifySessionUseCase(

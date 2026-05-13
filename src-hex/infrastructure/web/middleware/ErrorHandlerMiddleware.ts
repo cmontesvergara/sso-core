@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { InvalidCredentialsError } from '../../../domain/errors/InvalidCredentialsError';
 import { UserNotFoundError } from '../../../domain/errors/UserNotFoundError';
 import { UserAlreadyExistsError } from '../../../domain/errors/UserAlreadyExistsError';
+import { DocumentAlreadyExistsError } from '../../../domain/errors/DocumentAlreadyExistsError';
 import { SessionExpiredError } from '../../../domain/errors/SessionExpiredError';
 import { SessionNotFoundError } from '../../../domain/errors/SessionNotFoundError';
 import { TenantAccessDeniedError } from '../../../domain/errors/TenantAccessDeniedError';
@@ -20,6 +21,7 @@ const ERROR_STATUS_MAP = new Map<Function, number>([
   [UserNotFoundError, 404],
   [SessionNotFoundError, 404],
   [UserAlreadyExistsError, 409],
+  [DocumentAlreadyExistsError, 409],
   [WeakPasswordError, 422],
   [InvalidAuthCodeError, 422],
   [TenantAccessDeniedError, 403],

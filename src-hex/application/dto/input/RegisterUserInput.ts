@@ -8,4 +8,5 @@ export interface RegisterUserInput {
   firstName: string;
   lastName: string;
   tenantName?: string;
+  nuid?: string;
 }
