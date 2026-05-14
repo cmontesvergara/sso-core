@@ -14,6 +14,7 @@ import { UpdateUserProfileUseCase, ChangePasswordUseCase } from '../../../applic
 import { VerifyEmailUseCase } from '../../../application/use-cases/user/VerifyEmailUseCase';
 import { ForgotPasswordUseCase, ResetPasswordUseCase } from '../../../application/use-cases/user/PasswordResetUseCase';
 import { AddUserToTenantUseCase, ChangeUserRoleUseCase } from '../../../application/use-cases/tenant/TenantMemberUseCase';
+import { GetTenantPublicInfoUseCase } from '../../../application/use-cases/tenant/GetTenantPublicInfoUseCase';
 
 import { RoleController } from '../controllers/RoleController';
 import { ApplicationsController } from '../controllers/ApplicationsController';
@@ -158,10 +159,13 @@ export function createRouter(container: Container): Router {
     verifyEmailUseCase
   );
 
+  const getTenantPublicInfoUseCase = new GetTenantPublicInfoUseCase(container.get('ITenantRepository'));
+
   const tenantController = new TenantController(
     container.get('CreateTenantUseCase'),
     addUserToTenantUseCase,
-    changeUserRoleUseCase
+    changeUserRoleUseCase,
+    getTenantPublicInfoUseCase
   );
 
   const passwordController = new PasswordController(
@@ -191,6 +195,14 @@ export function createRouter(container: Container): Router {
     message: { success: false, message: 'Has excedido el límite de reenvíos. Intenta de nuevo más tarde.' },
   });
 
+  const tenantInfoLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    max: 60, // Limit each IP to 60 requests per window
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: 'Too many requests for tenant info. Please try again later.' },
+  });
+
   // ── Public routes (no auth required) ─────────────────────────────────────────
   router.post('/auth/login',           validateLogin,    authController.login);
   router.post('/auth/refresh',          validateRefresh,  authController.refresh);
@@ -201,6 +213,7 @@ export function createRouter(container: Container): Router {
   router.post('/users/register',        validateRegister, userController.register);
   router.post('/users/verify-email',    userController.verifyEmail);
   router.post('/users/send-verification', sendVerificationLimiter, userController.sendVerification);
+  router.get('/tenants/:tenantId/info', tenantInfoLimiter, tenantController.getPublicInfo);
 
   // ── Protected routes ──────────────────────────────────────────────────────
   router.post('/auth/logout',           requireAuth, authController.logout);
