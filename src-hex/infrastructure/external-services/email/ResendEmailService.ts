@@ -149,7 +149,7 @@ export class ResendEmailService implements IEmailService {
   }
 
   async sendPasswordResetEmail(to: Email, token: string): Promise<void> {
-    const resetUrl = `${process.env.APP_URL ?? 'https://sso.bigso.co'}/reset-password?token=${token}`;
+    const resetUrl = `${process.env.APP_URL ?? 'https://auth.bigso.org'}/auth/reset-password?token=${token}`;
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 0.5px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
         <div style="background: #5B50D6; padding: 24px 36px;">
