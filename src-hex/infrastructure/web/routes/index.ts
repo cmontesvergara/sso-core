@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
-import { SessionEnrichmentService } from '../../../application/services/SessionEnrichmentService';
 import { AuthorizeUseCase } from '../../../application/use-cases/auth/AuthorizeUseCase';
 import { ExchangeCodeUseCase } from '../../../application/use-cases/auth/ExchangeCodeUseCase';
 import { GetSessionContextUseCase } from '../../../application/use-cases/auth/GetSessionContextUseCase';
@@ -91,7 +90,6 @@ export function createRouter(container: Container): Router {
     container.get('ISessionRepository'),
     container.get('IQueryRepository'),
     container.get('ITokenService'),
-    container.get<SessionEnrichmentService>('SessionEnrichmentService'),
     container.get('IAuditService')
   );
 

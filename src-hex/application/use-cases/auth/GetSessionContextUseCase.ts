@@ -1,9 +1,9 @@
+import { AppSession, Session } from '../../../domain/entities/Session';
 import { ISessionRepository } from '../../../domain/repositories/ISessionRepository';
 import { SessionId } from '../../../domain/value-objects/SessionId';
 import { IAuditService } from '../../ports/output/IAuditService';
 import { IQueryRepository } from '../../ports/output/IQueryRepository';
 import { ITokenService } from '../../ports/output/ITokenService';
-import { SessionEnrichmentService } from '../../services/SessionEnrichmentService';
 
 export interface GetSessionContextInput {
   sessionId: string;
@@ -29,7 +29,6 @@ export class GetSessionContextUseCase {
     private sessionRepository: ISessionRepository,
     private queryRepository: IQueryRepository,
     private tokenService: ITokenService,
-    private sessionEnrichmentService: SessionEnrichmentService,
     private auditService: IAuditService
   ) { }
 
@@ -64,13 +63,34 @@ export class GetSessionContextUseCase {
       userAgent: input.userAgent,
     });
 
-    // ── 2. Generate a fresh access token ─────────────────────────────────────────
+    // ── 2. Enrich AppSession with Application metadata if not present ───────────
     // NOTE: We re-issue an access token from the stored session so the client always
     // has a valid Bearer token after calling /session.  The refresh token is NOT
     // rotated here — rotation only happens through the explicit /refresh endpoint.
-    //
-    // Enrich the session with audience data from Application table if not present
-    const enrichedSession = await this.sessionEnrichmentService.enrich(session);
+    let enrichedSession: Session = session;
+    if (enrichedSession instanceof AppSession && !enrichedSession.audience) {
+      const appRecord = await this.queryRepository.findApplicationByAppId(enrichedSession.appId);
+      if (appRecord) {
+        enrichedSession = new AppSession(
+          enrichedSession.id,
+          enrichedSession.sessionToken,
+          enrichedSession.userId,
+          enrichedSession.tenantId,
+          enrichedSession.appId,
+          enrichedSession.role,
+          enrichedSession.ip,
+          enrichedSession.userAgent,
+          enrichedSession.expiresAt,
+          enrichedSession.createdAt,
+          enrichedSession.lastActivityAt,
+          enrichedSession.ssoSessionId,
+          appRecord.audience ?? undefined,
+          appRecord.url ?? undefined,
+          appRecord.backendUrl ?? undefined
+        );
+      }
+    }
+
     const tokens = await this.tokenService.generateTokens(enrichedSession);
 
     // ── 3. Load user via query repository ────────────────────────────────────────
