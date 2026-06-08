@@ -1,32 +1,27 @@
-import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
+import * as crypto from 'crypto';
+import { RefreshToken } from '../../../domain/entities/RefreshToken';
+import { AppSession } from '../../../domain/entities/Session';
+import { InvalidCredentialsError } from '../../../domain/errors/InvalidCredentialsError';
+import { TokenRefreshedEvent } from '../../../domain/events/AuthEvents';
 import { IRefreshTokenRepository } from '../../../domain/repositories/IRefreshTokenRepository';
 import { ISessionRepository } from '../../../domain/repositories/ISessionRepository';
-import { ITokenService } from '../../ports/output/ITokenService';
+import { RefreshTokenId } from '../../../domain/value-objects/Ids';
+import { SessionId } from '../../../domain/value-objects/SessionId';
+import { TenantId } from '../../../domain/value-objects/TenantId';
+import { RefreshTokenInput } from '../../dto/input/RefreshTokenInput';
+import { LoginResult } from '../../dto/output/LoginResult';
 import { IAuditService } from '../../ports/output/IAuditService';
 import { IEventBus } from '../../ports/output/IEventBus';
 import { IHashService } from '../../ports/output/IHashService';
-import { RefreshTokenInput } from '../../dto/input/RefreshTokenInput';
-import { LoginResult } from '../../dto/output/LoginResult';
-import { TokenRefreshedEvent } from '../../../domain/events/AuthEvents';
-import { RefreshToken } from '../../../domain/entities/RefreshToken';
-import { AppSession } from '../../../domain/entities/Session';
-import { SessionId } from '../../../domain/value-objects/SessionId';
-import { TenantId } from '../../../domain/value-objects/TenantId';
-import { UserId } from '../../../domain/value-objects/UserId';
-import { InvalidCredentialsError } from '../../../domain/errors/InvalidCredentialsError';
-import { RefreshTokenId } from '../../../domain/value-objects/Ids';
+import { ITokenService } from '../../ports/output/ITokenService';
 
 /**
  * RefreshTokenUseCase
  * Orchestrates token refresh with rotation.
  *
- * Two paths:
- * 1. Hex path  — token was created by hex ExchangeCodeUseCase and is stored in the
- *                hex RefreshToken table (findByHash). Full rotation.
- * 2. V2 path   — token is a raw JWT created by the legacy v2 exchange.  It was never
- *                stored in the hex table. We validate it via ITokenService, generate
- *                new tokens, and save a fresh AppSession — no rotation record needed.
+ * All refresh tokens must exist in the hexagonal RefreshToken table.
+ * Tokens not found are rejected with InvalidCredentialsError.
  */
 export class RefreshTokenUseCase {
   constructor(
@@ -40,7 +35,7 @@ export class RefreshTokenUseCase {
   ) { }
 
   async execute(input: RefreshTokenInput): Promise<LoginResult> {
-    // 1. Validate JWT signature / expiry — also extracts tenantId/appId from token claims
+    // 1. Validate JWT signature / expiry
     const claims = await this.tokenService.validateRefreshToken(input.refreshToken);
     if (!claims) {
       await this.auditService.log({
@@ -52,22 +47,24 @@ export class RefreshTokenUseCase {
       throw new InvalidCredentialsError('Invalid refresh token');
     }
 
-    // Resolve tenantId — trust the JWT claims only, not client input
-    // DB lookup as fallback for legacy tokens that don't have tenantId embedded
     const resolvedTenantId = claims.tenantId || null;
-    const resolvedAppId    = claims.appId    || null;
-    const resolvedInput    = { ...input, tenantId: resolvedTenantId ?? undefined, appId: resolvedAppId ?? undefined };
+    const resolvedAppId = claims.appId || null;
+    const resolvedInput = { ...input, tenantId: resolvedTenantId ?? undefined, appId: resolvedAppId ?? undefined };
 
-    // 2. Look up hex refresh token record
-    const tokenHash = this.hashToken(input.refreshToken);
+    // 2. Look up refresh token record
+    const tokenHash = this.hashService.hash(input.refreshToken);
     const refreshToken = await this.refreshTokenRepository.findByHash(tokenHash);
 
     if (!refreshToken) {
-      // ── V2 fallback — JWT is valid but not in the hex table ──────────────────
-      return this.handleV2Refresh(resolvedInput, claims);
+      // Token not found - reject (legacy V2 tokens no longer supported)
+      await this.auditService.log({
+        type: 'REFRESH_FAILURE',
+        ip: input.ip,
+        userAgent: input.userAgent,
+        metadata: { reason: 'Token not found in refresh token table', userId: claims.sub },
+      });
+      throw new InvalidCredentialsError('Token not recognized. Please login again.');
     }
-
-    // ── Hex path ──────────────────────────────────────────────────────────────
 
     // 3. Check token status
     if (!refreshToken.isActive()) {
@@ -95,7 +92,7 @@ export class RefreshTokenUseCase {
     const now = new Date();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-    // tenantId chain: input → JWT claims → DB lookup → userId last-resort
+    // tenantId chain: input -> JWT claims -> DB lookup -> userId last-resort
     let effectiveTenantId: string | undefined = resolvedInput.tenantId || claims.tenantId;
     if (!effectiveTenantId && user) {
       const firstMembership = await this.prisma.tenantMember.findFirst({
@@ -109,11 +106,10 @@ export class RefreshTokenUseCase {
       });
       effectiveTenantId = firstMembership?.tenantId ?? undefined;
     }
-    console.log('[RefreshTokenUseCase] tenantId:', effectiveTenantId, '(input:', input.tenantId, ', claims:', claims.tenantId, ')');
 
     const tenantId = effectiveTenantId
       ? TenantId.create(effectiveTenantId)
-      : TenantId.create(refreshToken.userId.value); // last-resort
+      : TenantId.create(refreshToken.userId.value);
 
     const session = new AppSession(
       SessionId.create(sessionToken),
@@ -130,107 +126,38 @@ export class RefreshTokenUseCase {
     );
     await this.sessionRepository.save(session);
 
-    // 6. Generate tokens
-    const tokens = await this.tokenService.generateTokens(session);
-
-    // 7. Rotate refresh token
-    const newTokenHash = this.hashToken(tokens.refreshToken);
+    // 6. Rotate refresh token
     const newRefreshToken = refreshToken.createRotation(
       RefreshTokenId.create(crypto.randomUUID()),
-      newTokenHash,
+      this.hashService.hash(sessionToken),
       new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     );
-    await this.refreshTokenRepository.update(refreshToken.revoke());
     await this.refreshTokenRepository.save(newRefreshToken);
+    await this.refreshTokenRepository.update(refreshToken.revoke());
 
-    // 8. Events & audit
+    // 7. Generate tokens
+    const tokens = await this.tokenService.generateTokens(session);
+
+    // 8. Publish event - TokenRefreshedEvent takes (userId, sessionId, tokenFamily)
     await this.eventBus.publish(
-      new TokenRefreshedEvent(refreshToken.userId, session.id, newTokenHash.substring(0, 16))
+      new TokenRefreshedEvent(
+        refreshToken.userId,
+        session.id,
+        newRefreshToken.id.value
+      )
     );
+
+    // 9. Log audit
     await this.auditService.log({
       type: 'TOKEN_REFRESH',
       userId: refreshToken.userId.value,
-      tenantId: resolvedTenantId || undefined,
-      sessionId: session.id.value,
+      tenantId: effectiveTenantId || undefined,
       ip: input.ip,
       userAgent: input.userAgent,
-    });
-
-    // 9. Enrich response
-    return this.buildResponse(tokens, user, session, resolvedInput);
-  }
-
-  // ── V2 path ───────────────────────────────────────────────────────────────────
-
-  private async handleV2Refresh(input: RefreshTokenInput, claims: any): Promise<LoginResult> {
-    const userId = claims.sub as string;
-
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      await this.auditService.log({
-        type: 'REFRESH_FAILURE',
-        userId,
-        ip: input.ip,
-        userAgent: input.userAgent,
-        metadata: { reason: 'V2 fallback: User not found for subject' },
-      });
-      throw new InvalidCredentialsError('User not found');
-    }
-
-    // Create a new AppSession for the v2 user
-    const sessionToken = `app_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    const now = new Date();
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-
-    // tenantId chain: JWT claims only → DB lookup → userId last-resort
-    let effectiveTenantId: string | undefined = claims.tenantId;
-    if (!effectiveTenantId) {
-      const firstMembership = await this.prisma.tenantMember.findFirst({
-        where: {
-          userId: user.id,
-          tenant: claims.appId
-            ? { tenantApps: { some: { application: { appId: claims.appId }, isEnabled: true } } }
-            : undefined,
-        },
-        select: { tenantId: true },
-      });
-      effectiveTenantId = firstMembership?.tenantId ?? undefined;
-    }
-
-    const tenantId = effectiveTenantId
-      ? TenantId.create(effectiveTenantId)
-      : TenantId.create(userId); // last-resort
-
-    const session = new AppSession(
-      SessionId.create(sessionToken),
-      sessionToken,
-      UserId.create(userId),
-      tenantId,
-      claims.appId || 'default',
-      user.systemRole || 'user',
-      null,
-      null,
-      expiresAt,
-      now,
-      now
-    );
-    await this.sessionRepository.save(session);
-
-    const tokens = await this.tokenService.generateTokens(session);
-
-    await this.auditService.log({
-      type: 'TOKEN_REFRESH_V2',
-      userId,
-      tenantId: claims.tenantId || undefined,
-      ip: input.ip,
-      userAgent: input.userAgent,
-      metadata: { reason: 'V2 token migrated on the fly' }
     });
 
     return this.buildResponse(tokens, user, session, input);
   }
-
-  // ── Shared helpers ────────────────────────────────────────────────────────────
 
   private async buildResponse(tokens: any, user: any, session: AppSession, input: RefreshTokenInput): Promise<LoginResult> {
     let tenants: any[] = [];
@@ -285,7 +212,6 @@ export class RefreshTokenUseCase {
       systemRole: user.systemRole,
     } : null;
 
-    // Safe tenant lookup — fallback to first available to avoid undefined spread
     const activeTenantId = input.tenantId || session.tenantId.value;
     const matchedTenant = tenants.find((t: any) => t.id === activeTenantId) ?? tenants[0] ?? null;
 
@@ -311,10 +237,6 @@ export class RefreshTokenUseCase {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
     };
-  }
-
-  private hashToken(token: string): string {
-    return this.hashService.hash(token);
   }
 
   private async handleTokenReuse(token: RefreshToken): Promise<void> {

@@ -152,7 +152,13 @@ describe('LoginUseCase', () => {
 
     it('should log an audit entry on success', async () => {
       await loginUseCase.execute(baseInput);
-      expect(auditService.logAuthSuccess).toHaveBeenCalled();
+      // The LoginUseCase calls auditService.log() with type: 'AUTH_SUCCESS'
+      expect(auditService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'AUTH_SUCCESS',
+          userId: 'user-123',
+        })
+      );
     });
   });
 

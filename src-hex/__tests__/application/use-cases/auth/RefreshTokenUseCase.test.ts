@@ -1,19 +1,5 @@
 import { RefreshTokenUseCase } from '@hex/application/use-cases/auth/RefreshTokenUseCase';
-
-jest.mock('../../../../../src/services/prisma', () => ({
-  getPrismaClient: () => ({
-    user: {
-      findUnique: jest.fn().mockResolvedValue({
-        id: 'user-123',
-        firstName: 'Test',
-        lastName: 'User',
-      }),
-    },
-    tenantMember: {
-      findMany: jest.fn().mockResolvedValue([]),
-    },
-  }),
-}));
+import { InvalidCredentialsError } from '@hex/domain/errors/InvalidCredentialsError';
 
 const mockRefreshToken = {
   id: { value: 'rt-001' },
@@ -22,6 +8,7 @@ const mockRefreshToken = {
   revoked: false,
   expiresAt: new Date(Date.now() + 7 * 24 * 3600_000),
   isActive: () => true,
+  hasBeenRotated: () => false,
   revoke: jest.fn().mockReturnThis(),
   createRotation: jest.fn().mockReturnValue({
     id: { value: 'rt-002' },
@@ -42,6 +29,7 @@ const refreshTokenRepository = {
   findByHash: jest.fn().mockResolvedValue(mockRefreshToken),
   save: jest.fn().mockResolvedValue(undefined),
   update: jest.fn().mockResolvedValue(undefined),
+  findByUser: jest.fn().mockResolvedValue([]),
 };
 
 const sessionRepository = {
@@ -61,6 +49,8 @@ const tokenService = {
     sub: 'user-123',
     sessionId: 'session-abc',
     type: 'refresh',
+    tenantId: 'tenant-456',
+    appId: 'crm',
   }),
 };
 
@@ -77,6 +67,30 @@ const eventBus = {
   subscribe: jest.fn(),
 };
 
+const mockPrisma = {
+  user: {
+    findUnique: jest.fn().mockResolvedValue({
+      id: 'user-123',
+      firstName: 'Test',
+      lastName: 'User',
+      systemRole: 'user',
+    }),
+  },
+  tenantMember: {
+    findMany: jest.fn().mockResolvedValue([]),
+    findFirst: jest.fn().mockResolvedValue({
+      tenantId: 'tenant-456',
+      role: 'admin',
+    }),
+  },
+  role: {
+    findFirst: jest.fn().mockResolvedValue(null),
+  },
+  application: {
+    findUnique: jest.fn().mockResolvedValue(null),
+  },
+};
+
 describe('RefreshTokenUseCase', () => {
   let refreshTokenUseCase: RefreshTokenUseCase;
 
@@ -88,7 +102,8 @@ describe('RefreshTokenUseCase', () => {
       tokenService as any,
       auditService as any,
       eventBus as any,
-      { hash: (v: string) => v, verify: (v: string, h: string) => v === h } // test stub
+      { hash: (v: string) => v, verify: (v: string, h: string) => v === h },
+      mockPrisma as any
     );
   });
 
@@ -103,11 +118,25 @@ describe('RefreshTokenUseCase', () => {
     expect(result.accessToken).toBe('new.access.token');
   });
 
-  it('should throw when refresh token is not found', async () => {
+  it('should reject token not found in refresh token table', async () => {
     refreshTokenRepository.findByHash.mockResolvedValueOnce(null);
+    
     await expect(
-      refreshTokenUseCase.execute({ refreshToken: 'invalid', tenantId: 't', appId: 'a' })
-    ).rejects.toThrow();
+      refreshTokenUseCase.execute({ 
+        refreshToken: 'unknown-token', 
+        tenantId: 't', 
+        appId: 'a' 
+      })
+    ).rejects.toThrow(InvalidCredentialsError);
+    
+    expect(auditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'REFRESH_FAILURE',
+        metadata: expect.objectContaining({
+          reason: 'Token not found in refresh token table'
+        })
+      })
+    );
   });
 
   it('should throw when refresh token is revoked', async () => {
@@ -115,18 +144,57 @@ describe('RefreshTokenUseCase', () => {
       ...mockRefreshToken,
       revoked: true,
       isActive: () => false,
+      hasBeenRotated: () => false,
     });
+    
     await expect(
       refreshTokenUseCase.execute({ refreshToken: 'hashed-token-abc', tenantId: 't', appId: 'a' })
-    ).rejects.toThrow();
+    ).rejects.toThrow('Token has been revoked');
   });
 
-  it('should publish TokenRefreshedEvent', async () => {
+  it('should detect token reuse and revoke all user tokens', async () => {
+    const rotatedToken = {
+      ...mockRefreshToken,
+      isActive: () => false,
+      hasBeenRotated: () => true,
+    };
+    refreshTokenRepository.findByHash.mockResolvedValueOnce(rotatedToken);
+    refreshTokenRepository.findByUser.mockResolvedValueOnce([
+      { ...mockRefreshToken, isActive: () => true, revoke: () => mockRefreshToken },
+    ]);
+
+    await expect(
+      refreshTokenUseCase.execute({ refreshToken: 'reused-token', tenantId: 't', appId: 'a' })
+    ).rejects.toThrow('Token reuse detected');
+
+    expect(auditService.logSecurity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'TOKEN_REUSE_DETECTED'
+      })
+    );
+  });
+
+  it('should publish TokenRefreshedEvent on successful refresh', async () => {
     await refreshTokenUseCase.execute({
       refreshToken: 'hashed-token-abc',
       tenantId: 'tenant-456',
       appId: 'crm',
     });
     expect(eventBus.publish).toHaveBeenCalled();
+  });
+
+  it('should log audit on successful refresh', async () => {
+    await refreshTokenUseCase.execute({
+      refreshToken: 'hashed-token-abc',
+      tenantId: 'tenant-456',
+      appId: 'crm',
+    });
+    
+    expect(auditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'TOKEN_REFRESH',
+        userId: 'user-123'
+      })
+    );
   });
 });

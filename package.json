@@ -1,13 +1,16 @@
 {
-  "name": "bigso-sso-core",
+  "name": "bigso-idp-core",
   "version": "1.0.0",
   "description": "Open-source authentication provider - Node.js with Express implementation",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "author": "Big Labs SAS",
+  "license": "MIT",
   "scripts": {
     "build": "tsc",
     "start": "SSO_MODE=legacy node dist/index.js",
     "start:legacy": "SSO_MODE=legacy node dist/index.js",
+    "start:local": "NODE_EXTRA_CA_CERTS=\"$(mkcert -CAROOT)/rootCA.pem\" node dist/index.js",
     "start:hex": "SSO_MODE=hexagonal node dist/index.js",
     "dev": "SSO_MODE=legacy ts-node index.ts",
     "dev:legacy": "SSO_MODE=legacy ts-node index.ts",
@@ -37,8 +40,6 @@
     "bigso-sso",
     "express"
   ],
-  "author": "BigSo",
-  "license": "MIT",
   "dependencies": {
     "@prisma/client": "^5.7.0",
     "@types/node-cron": "^3.0.11",

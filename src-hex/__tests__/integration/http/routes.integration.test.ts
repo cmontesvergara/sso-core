@@ -40,10 +40,9 @@ const mockLoginUseCase       = { execute: jest.fn().mockResolvedValue(loginResul
 const mockLogoutUseCase      = { execute: jest.fn().mockResolvedValue(undefined) };
 const mockRefreshUseCase     = { execute: jest.fn().mockResolvedValue(loginResult) };
 const mockExchangeUseCase    = { execute: jest.fn().mockResolvedValue(loginResult) };
-const mockRegisterUseCase    = { execute: jest.fn().mockResolvedValue({ id: 'user-1', email: 'new@bigso.co', userStatus: 'pending', firstName: 'Ana', lastName: 'García', fullName: 'Ana García', tenantMemberships: [], createdAt: new Date(), lastLoginAt: null }) };
+const mockRegisterUseCase    = { execute: jest.fn().mockResolvedValue({ id: 'user-1', email: 'new@bigso.co', userStatus: 'disabled', firstName: 'Ana', lastName: 'García', fullName: 'Ana García', tenantMemberships: [], createdAt: new Date(), lastLoginAt: null }) };
 const mockUpdateProfileUC    = { execute: jest.fn().mockResolvedValue({ success: true, userId: 'user-1' }) };
 const mockChangePasswordUC   = { execute: jest.fn().mockResolvedValue(undefined) };
-const mockVerifyEmailUC      = { execute: jest.fn().mockResolvedValue({ success: true }) };
 const mockForgotPasswordUC   = { execute: jest.fn().mockResolvedValue(undefined) };
 const mockResetPasswordUC    = { execute: jest.fn().mockResolvedValue(undefined) };
 const mockVerifySessionUC    = {
@@ -53,6 +52,17 @@ const mockVerifySessionUC    = {
     sessionId: 'session-1',
     role: 'user',
   }),
+};
+const mockGetSessionContextUC = {
+  execute: jest.fn().mockResolvedValue({
+    userId: 'user-1',
+    tenantId: 'tenant-1',
+    sessionId: 'session-1',
+  }),
+};
+const mockVerifyEmailUC = {
+  sendVerification: jest.fn().mockResolvedValue(undefined),
+  verifyToken: jest.fn().mockResolvedValue(undefined),
 };
 
 // ── Build minimal Express app ─────────────────────────────────────────────────
@@ -68,7 +78,8 @@ function buildApp() {
     mockLogoutUseCase as any,
     mockRefreshUseCase as any,
     mockExchangeUseCase as any,
-    { execute: jest.fn() } as any  // mockAuthorizeUseCase stub
+    { execute: jest.fn() } as any,  // mockAuthorizeUseCase stub
+    mockGetSessionContextUC as any   // mockGetSessionContextUseCase
   );
 
   const userController = new UserController(
@@ -106,17 +117,17 @@ function buildApp() {
 
 const app = buildApp();
 
-// ── Test suites ───────────────────────────────────────────────────────────────
+// ── Test suites ─────────────────────────────────────────────────────────────────
 
 describe('POST /api/v3/auth/login', () => {
   beforeEach(() => jest.resetAllMocks());
 
-  it('200 — returns tokens on valid email + password', async () => {
+  it('200 — returns tokens on valid credentials', async () => {
     mockLoginUseCase.execute.mockResolvedValue(loginResult);
 
     const res = await request(app)
       .post('/api/v3/auth/login')
-      .send({ email: 'user@bigso.co', password: 'StrongPass123!' });
+      .send({ email: 'test@bigso.co', password: 'StrongPass123!' });
 
     expect(res.status).toBe(200);
     expect(res.body.accessToken).toBe(MOCK_ACCESS_TOKEN);
@@ -178,7 +189,7 @@ describe('POST /api/v3/users/register', () => {
   const registerResult = {
     id: 'user-1',
     email: 'new@bigso.co',
-    userStatus: 'pending',
+    userStatus: 'disabled',
     firstName: 'Ana',
     lastName: 'García',
     fullName: 'Ana García',
@@ -199,7 +210,7 @@ describe('POST /api/v3/users/register', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.email).toBe('new@bigso.co');
-    expect(res.body.userStatus).toBe('pending');
+    expect(res.body.userStatus).toBe('disabled');
   });
 
   it('409 — returns conflict when use case throws UserAlreadyExistsError', async () => {

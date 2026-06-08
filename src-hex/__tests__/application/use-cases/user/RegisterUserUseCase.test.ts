@@ -67,7 +67,8 @@ describe('RegisterUserUseCase', () => {
 
     expect(result.email).toBe('newuser@bigso.co');
     expect(result.firstName).toBe('Maria');
-    expect(result.userStatus).toBe('pending');
+    // The RegisterUserUseCase creates users with 'disabled' status (requires email verification)
+    expect(result.userStatus).toBe('disabled');
   });
 
   it('should save the user to the repository', async () => {

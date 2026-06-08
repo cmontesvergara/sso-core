@@ -1,8 +1,11 @@
-# 🔐 SSO Backend - Sistema de Autenticación Multi-Tenant
+# 🔐 BIGSO IdP Core
 
-**Versión:** 2.5.0  
-**Estado:** ✅ Producción-Ready (Core + App Management + System Roles)  
-**Stack:** TypeScript + Express + Prisma + PostgreSQL
+Identity Provider (IdP) empresarial open-source con arquitectura hexagonal, multi-tenancy completo y flujo Authorization Code Flow con cookies HttpOnly.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3%2B-blue.svg)](https://www.typescriptlang.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-blue.svg)](https://www.postgresql.org/)
 
 ---
 
@@ -10,75 +13,119 @@
 
 - [Descripción](#-descripción)
 - [Características](#-características)
-- [Inicio Rápido](#-inicio-rápido)
 - [Arquitectura](#-arquitectura)
-- [API Endpoints](#-api-endpoints)
-- [Multi-Tenancy](#-multi-tenancy)
-- [Seguridad](#-seguridad)
+- [Inicio Rápido](#-inicio-rápido)
 - [Desarrollo](#-desarrollo)
-- [Producción](#-producción)
+- [API Reference](#-api-reference)
+- [Documentación](#-documentación)
 - [Roadmap](#-roadmap)
 
 ---
 
 ## 🎯 Descripción
 
-Sistema de **Single Sign-On (SSO)** empresarial con soporte multi-tenant completo. Diseñado para permitir que múltiples aplicaciones compartan autenticación centralizada con aislamiento total entre tenants.
+BIGSO IdP Core es un **Identity Provider** centralizado que proporciona:
 
-**Casos de Uso:**
+- **Autenticación unificada** para múltiples aplicaciones (SSO)
+- **Multi-tenancy** con aislamiento total de datos (RLS)
+- **RBAC granular** con roles y permisos
+- **Authorization Code Flow** seguro con PKCE
+- **Arquitectura Hexagonal** limpia y mantenible
 
-- SaaS con múltiples organizaciones
-- Plataformas empresariales con equipos
-- Microservicios que necesitan autenticación centralizada
-- Sistemas con RBAC (Role-Based Access Control)
+**Casos de uso ideal para:**
+- SaaS B2B con múltiples organizaciones
+- Plataformas empresariales con equipos aislados
+- Ecosistemas de microservicios con autenticación centralizada
+- Sistemas que requieren compliance y seguridad enterprise
 
 ---
 
 ## ✨ Características
 
-### ✅ Autenticación Core
+### 🔐 Autenticación Segura
 
-- **JWT con RS256** (firma asimétrica con claves públicas/privadas)
-- **Passwords seguros** con Argon2
-- **Refresh tokens** con rotación automática
-- **Email verification** (3 proveedores: Resend, SMTP, Ethereal)
-- **2FA/TOTP** con QR codes (Google Authenticator, Authy)
-- **Session management** con invalidación automática
+| Feature | Implementación |
+|---------|---------------|
+| JWT Signing | RS256 (asimétrico) con rotación de claves |
+| Password Hashing | Argon2id (resistente a GPUs) |
+| Session Management | Cookies HttpOnly + Redis |
+| 2FA/TOTP | Google Authenticator, Authy compatible |
+| Email Verification | Resend, SMTP, Ethereal adapters |
+| Refresh Tokens | Rotación automática con blacklist |
 
-### ✅ Multi-Tenancy
+### 🏢 Multi-Tenancy Enterprise
 
-- **Tenant CRUD** completo
-- **RBAC** con 3 roles predefinidos (admin, member, viewer)
-- **Permissions** granulares (resource:action)
-- **Row-Level Security (RLS)** en PostgreSQL (11 políticas)
-- **Tenant isolation** garantizado a nivel de BD
+- **Aislamiento físico** mediante Row-Level Security (RLS) en PostgreSQL
+- **Roles por tenant:** admin, member, viewer (personalizables)
+- **Permisos granulares:** resource:action pattern
 - **Member invitations** con gestión de roles
+- **App-Tenant association:** control de apps habilitadas por organización
 
-### ✅ Application Management (NEW v2.4.0)
+### 🚀 Developer Experience
 
-- **Application Registry** - Registro centralizado de apps
-- **Tenant-App Association** - Control de apps habilitadas por tenant
-- **User Access Control** - Acceso granular por usuario a apps
-- **Authorization Flow** - Validación completa de acceso
-- **Bulk Operations** - Asignación masiva de acceso
-- **Audit Trail** - Registro de quién otorgó acceso y cuándo
+- **Arquitectura Hexagonal:** separación clara de responsabilidades
+- **TypeScript strict:** tipado completo en toda la base de código
+- **Prisma ORM:** migrations automáticas y type-safe queries
+- **Test suite:** Jest con unit, integration y e2e tests
+- **Configuración centralizada:** `config.yaml` + variables de entorno
 
-### ✅ Seguridad
+---
 
-- **SQL Injection** protegido (Prisma parameterizado)
-- **XSS** sanitizado (validación Joi)
-- **CORS** configurable
-- **Rate limiting** básico
-- **HTTPS-ready**
-- **JWT verification** estricta
-- **4 capas de validación** por request
+## 🏗️ Arquitectura
 
-### ✅ Email Adapters
+### Clean Architecture / Ports & Adapters
 
-- **Resend** (producción, API moderna)
-- **Nodemailer SMTP** (self-hosted, staging)
-- **Ethereal** (desarrollo, email testing)
-- Auto-detección según `EMAIL_PROVIDER` en `.env`
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        INTERFACES                               │
+│     (Adaptadores que conectan el mundo exterior)               │
+├─────────────────────────────────────────────────────────────────┤
+│  HTTP (Express)  │  CLI  │  Events  │  Queue Workers             │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────────┐
+│                     INFRASTRUCTURE                              │
+│       (Implementaciones concretas, frameworks)                │
+├─────────────────────────────────────────────────────────────────┤
+│  Persistence (Prisma/Redis) │ Web (Controllers) │ Security    │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────────┐
+│                     APPLICATION                                 │
+│              (Casos de uso, orquestación)                     │
+├─────────────────────────────────────────────────────────────────┤
+│  Use Cases  │  DTOs  │  Mappers  │  Application Services       │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────────┐
+│                        DOMAIN                                   │
+│         (Entidades, reglas de negocio puras)                  │
+├─────────────────────────────────────────────────────────────────┤
+│  Entities  │  Value Objects  │  Repository Interfaces  │ Events │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Flujo de Dependencias
+
+```
+Interfaces ──▶ Infrastructure ──▶ Application ──▶ Domain
+     │                │                │            │
+     └────────────────┴────────────────┴────────────┘
+                    (Domain no depende de nadie)
+```
+
+### Stack Tecnológico
+
+| Capa | Tecnología | Versión |
+|------|-----------|---------|
+| Runtime | Node.js | >= 18 |
+| Framework | Express | 4.18+ |
+| ORM | Prisma | 5.7+ |
+| Database | PostgreSQL | >= 14 |
+| Cache | Redis | 6+ |
+| Auth | jsonwebtoken | RS256 |
+| Passwords | argon2 | latest |
+| Testing | Jest | 29+ |
 
 ---
 
@@ -87,628 +134,269 @@ Sistema de **Single Sign-On (SSO)** empresarial con soporte multi-tenant complet
 ### Prerrequisitos
 
 ```bash
-Node.js >= 18.0.0
-PostgreSQL >= 14
-npm o yarn
+# Node.js >= 18
+node --version  # v18.0.0+
+
+# PostgreSQL >= 14
+psql --version  # 14.0+
+
+# Redis (opcional, para cache/sesiones)
+redis-server --version  # 6.0+
 ```
 
-### 1. Clonar e Instalar
+### 1. Instalación
 
 ```bash
 git clone <repo-url>
-cd new_sso_backend
+cd idp-core
 npm install
 ```
 
-### 2. Configurar Variables de Entorno
+### 2. Configuración de Variables de Entorno
 
 ```bash
 cp .env.example .env
 ```
 
-**Edita `.env`:**
+Edita `.env` con tus valores:
 
 ```bash
-# Base de datos
-DATABASE_URL="postgresql://user:password@localhost:5432/sso_db"
+# Base de datos (obligatorio)
+DB_TYPE=postgresql
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=idp_core
+DB_USER=postgres
+DB_PASSWORD=your_password
 
-# JWT (genera claves con scripts)
-JWT_PRIVATE_KEY_PATH="./keys/private.pem"
-JWT_PUBLIC_KEY_PATH="./keys/public.pem"
-JWT_ACCESS_EXPIRY="15m"
-JWT_REFRESH_EXPIRY="7d"
+# JWT (obligatorio)
+JWT_SECRET=your-super-secret-jwt-key-min-32-chars
+JWT_ISSUER=bigso.co
+JWT_KID=idp-key-2026
 
-# Email (elige un proveedor)
-EMAIL_PROVIDER="resend"  # o "smtp" o "ethereal"
+# Email (elige proveedor)
+EMAIL_PROVIDER=resend  # smtp | ethereal
+RESEND_API_KEY=re_xxxx
+RESEND_FROM_EMAIL=noreply@bigso.co
 
-# Resend (si usas Resend)
-RESEND_API_KEY="re_xxxxx"
-RESEND_FROM_EMAIL="noreply@tudominio.com"
+# App defaults
+DEFAULT_APP_ID=app-default
+DEFAULT_TENANT_ID=tenant-default
 
-# O SMTP (si usas Nodemailer)
-SMTP_HOST="smtp.gmail.com"
-SMTP_PORT="587"
-SMTP_USER="tu@email.com"
-SMTP_PASS="tu-password"
-SMTP_FROM="noreply@tudominio.com"
-
-# App
-PORT="3000"
-NODE_ENV="development"
+# Redis (opcional pero recomendado)
+REDIS_HOST=localhost
+REDIS_PORT=6379
 ```
 
-### 3. Generar Claves JWT
+### 3. Generar Claves JWT (RS256)
 
 ```bash
-# Crea directorio keys si no existe
 mkdir -p keys
-
-# Genera clave privada
 openssl genpkey -algorithm RSA -out keys/private.pem -pkeyopt rsa_keygen_bits:2048
-
-# Genera clave pública
 openssl rsa -pubout -in keys/private.pem -out keys/public.pem
 ```
 
-### 4. Crear Base de Datos
+### 4. Setup de Base de Datos
 
 ```bash
-# Opción A: Crear BD manualmente
-createdb -U postgres sso_db
+# Crear base de datos
+createdb -U postgres idp_core
 
-# Opción B: Usar Docker
-docker-compose up -d postgres
-```
-
-### 5. Ejecutar Migraciones
-
-```bash
-# Genera el cliente Prisma
+# Generar cliente Prisma
 npm run prisma:generate
 
-# Aplica todas las migraciones
+# Ejecutar migraciones
 npm run migrate:up
 
-# Verifica en la BD
-psql -U postgres -d sso_db -c "\dt"
+# Seed datos iniciales (opcional)
+npm run seed:complete
 ```
 
-### 6. Iniciar Servidor
+### 5. Iniciar Servidor
 
 ```bash
-# Desarrollo (con auto-reload)
-npm run dev:watch
+# Desarrollo con hot-reload
+npm run dev:watch:hex
 
 # Producción
 npm run build
 npm start
 ```
 
-**Servidor corriendo en:** `http://localhost:3000`
+El servidor estará disponible en `http://localhost:3567` (o el puerto configurado en `config.yaml`).
 
-### 7. Probar API
+### 6. Verificar Instalación
 
 ```bash
 # Health check
-curl http://localhost:3000/health
+curl http://localhost:3567/health
 
-# JWKS (claves públicas)
-curl http://localhost:3000/.well-known/jwks.json
-
-# Registro de usuario
-curl -X POST http://localhost:3000/api/v1/auth/signup \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@ejemplo.com",
-    "password": "Test1234!",
-    "firstName": "Test",
-    "lastName": "User"
-  }'
+# JWKS endpoint
+curl http://localhost:3567/.well-known/jwks.json
 ```
 
 ---
 
-## 🏗️ Arquitectura
+## 🧪 Desarrollo
 
-### Stack Tecnológico
-
-```
-┌─────────────────────────────────────────────────┐
-│  Frontend (Vue/React) + App Backends            │
-└──────────────────┬──────────────────────────────┘
-                   │ HTTP + JWT
-┌──────────────────▼──────────────────────────────┐
-│  Express Server (TypeScript)                    │
-│  ├─ Routes (auth, tenant, user, otp, session)   │
-│  ├─ Middleware (auth, logging, errorHandler)    │
-│  └─ Services (auth, email, tenant, jwt)         │
-└──────────────────┬──────────────────────────────┘
-                   │ Prisma ORM
-┌──────────────────▼──────────────────────────────┐
-│  PostgreSQL 14+ (with RLS)                      │
-│  ├─ users, tenants, tenant_members              │
-│  ├─ roles, permissions                          │
-│  ├─ refresh_tokens, otp_secrets                 │
-│  ├─ addresses, other_information (NEW)          │
-│  └─ RLS Policies (8 políticas activas)          │
-└─────────────────────────────────────────────────┘
-```
-
-### Flujo de Autenticación
-
-```
-1. Usuario → POST /api/v1/auth/signup
-   ├─ Valida input (Joi)
-   ├─ Hashea password (Argon2)
-   ├─ Guarda en BD (Prisma)
-   └─ Envía email verificación (Resend/SMTP)
-
-2. Usuario → POST /api/v1/auth/signin
-   ├─ Valida credenciales
-   ├─ Verifica 2FA (si está habilitado)
-   ├─ Genera access token (15min)
-   ├─ Genera refresh token (7 días)
-   └─ Retorna tokens
-
-3. App Backend → Valida JWT
-   ├─ Verifica firma con clave pública
-   ├─ Valida expiración
-   ├─ Extrae userId + tenantId
-   └─ Autoriza request
-```
-
-### Capas de Seguridad
-
-```
-Request → [1. CORS] → [2. Rate Limit] → [3. JWT Verify]
-       → [4. Tenant Check] → [5. RLS Policy] → [6. Permission Check]
-       → Handler → Response
-```
-
----
-
-## 📡 API Endpoints
-
-**Base URL:** `http://localhost:3000/api/v1`
-
-### Auth Endpoints
-
-| Método | Ruta            | Descripción       | Auth               |
-| ------ | --------------- | ----------------- | ------------------ |
-| POST   | `/auth/signup`  | Registrar usuario | ❌                 |
-| POST   | `/auth/signin`  | Login             | ❌                 |
-| POST   | `/auth/refresh` | Renovar token     | ❌ (refresh token) |
-| POST   | `/auth/signout` | Logout            | ✅                 |
-
-### OTP/2FA Endpoints
-
-| Método | Ruta                  | Descripción           | Auth |
-| ------ | --------------------- | --------------------- | ---- |
-| POST   | `/otp/generate`       | Genera QR para 2FA    | ✅   |
-| POST   | `/otp/verify`         | Verifica y activa 2FA | ✅   |
-| POST   | `/otp/validate`       | Valida código 2FA     | ✅   |
-| POST   | `/otp/disable`        | Desactiva 2FA         | ✅   |
-| GET    | `/otp/status/:userId` | Estado 2FA de usuario | ✅   |
-
-### Email Verification
-
-| Método | Ruta                         | Descripción      | Auth |
-| ------ | ---------------------------- | ---------------- | ---- |
-| POST   | `/email-verification/send`   | Enviar código    | ❌   |
-| POST   | `/email-verification/verify` | Verificar código | ❌   |
-| POST   | `/email-verification/resend` | Reenviar código  | ❌   |
-
-### Tenant Endpoints
-
-| Método | Ruta                           | Descripción        | Auth       |
-| ------ | ------------------------------ | ------------------ | ---------- |
-| POST   | `/tenants`                     | Crear tenant       | ✅         |
-| GET    | `/tenants`                     | Listar mis tenants | ✅         |
-| GET    | `/tenants/:id`                 | Detalle de tenant  | ✅         |
-| PATCH  | `/tenants/:id`                 | Actualizar tenant  | ✅ (admin) |
-| DELETE | `/tenants/:id`                 | Eliminar tenant    | ✅ (admin) |
-| POST   | `/tenants/:id/members`         | Invitar miembro    | ✅ (admin) |
-| PATCH  | `/tenants/:id/members/:userId` | Cambiar rol        | ✅ (admin) |
-| DELETE | `/tenants/:id/members/:userId` | Remover miembro    | ✅ (admin) |
-
-### User Endpoints
-
-| Método | Ruta         | Descripción       | Auth |
-| ------ | ------------ | ----------------- | ---- |
-| GET    | `/users/me`  | Mi perfil         | ✅   |
-| PATCH  | `/users/me`  | Actualizar perfil | ✅   |
-| GET    | `/users/:id` | Perfil de usuario | ✅   |
-
-### System Endpoints
-
-| Método | Ruta                     | Descripción         | Auth |
-| ------ | ------------------------ | ------------------- | ---- |
-| GET    | `/health`                | Health check        | ❌   |
-| GET    | `/ready`                 | Readiness probe     | ❌   |
-| GET    | `/.well-known/jwks.json` | Claves públicas JWT | ❌   |
-
-**Ver documentación completa:** `DEVELOPER_GUIDE.md`
-
----
-
-## 🏢 Multi-Tenancy
-
-### Concepto
-
-Cada **tenant** representa una organización/equipo con:
-
-- Usuarios propios
-- Roles y permisos independientes
-- Datos aislados (RLS en PostgreSQL)
-
-Un usuario puede pertenecer a **múltiples tenants** con roles diferentes.
-
-### Ejemplo Práctico
-
-**1. Carlos crea su empresa (Acme Corp)**
-
-```bash
-POST /api/v1/tenants
-Authorization: Bearer <token>
-{
-  "name": "Acme Corp",
-  "slug": "acme-corp"
-}
-
-# Response: Carlos es ADMIN automáticamente
-{
-  "id": "tenant-123",
-  "name": "Acme Corp",
-  "members": [
-    { "userId": "carlos-id", "role": "admin" }
-  ]
-}
-```
-
-**2. Carlos invita a Alice como MEMBER**
-
-```bash
-POST /api/v1/tenants/tenant-123/members
-Authorization: Bearer <token>
-X-Tenant-ID: tenant-123
-{
-  "userId": "alice-id",
-  "role": "member"
-}
-```
-
-**3. Alice hace requests usando su tenant**
-
-```bash
-GET /api/v1/users
-Authorization: Bearer <alice-token>
-X-Tenant-ID: tenant-123
-
-# Solo ve usuarios de tenant-123 (RLS activo)
-```
-
-### Roles Predefinidos
-
-| Rol        | Permisos               | Uso Típico      |
-| ---------- | ---------------------- | --------------- |
-| **admin**  | Todos (CRUD completo)  | Dueño, CTO      |
-| **member** | Read/Write (no delete) | Desarrolladores |
-| **viewer** | Solo lectura           | Auditores, QA   |
-
-### Row-Level Security (RLS)
-
-PostgreSQL filtra **automáticamente** por `tenant_id`:
-
-```sql
--- Política activa en tabla users
-CREATE POLICY tenant_isolation ON users
-  USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
-```
-
-Cuando haces `X-Tenant-ID: tenant-123`, el middleware establece:
-
-```typescript
-await prisma.$executeRaw`SET app.current_tenant_id = ${tenantId}`;
-// Todas las queries subsecuentes están filtradas por tenant
-```
-
----
-
-## 🔒 Seguridad
-
-### JWT con RS256
-
-- **Clave privada:** Firma tokens (solo backend)
-- **Clave pública:** Verifica tokens (backend + apps)
-- **Beneficio:** Apps pueden verificar tokens sin conocer la clave privada
-
-### Password Hashing
-
-```typescript
-import argon2 from 'argon2';
-
-// Hash al registrar
-const hash = await argon2.hash(password);
-
-// Verificar al login
-const valid = await argon2.verify(hash, password);
-```
-
-### 2FA/TOTP
-
-```typescript
-// 1. Usuario solicita habilitar 2FA
-POST /api/v1/otp/generate
-→ Genera secret + QR code
-
-// 2. Usuario escanea QR con Google Authenticator
-
-// 3. Usuario verifica código inicial
-POST /api/v1/otp/verify { token: "123456" }
-→ Activa 2FA
-
-// 4. En futuros logins:
-POST /api/v1/auth/signin { email, password }
-→ Response: { requiresOtp: true }
-
-POST /api/v1/otp/validate { token: "654321" }
-→ Response: { accessToken, refreshToken }
-```
-
-### Email Verification
-
-```typescript
-// 1. Al registrarse, se envía código de 6 dígitos
-POST /api/v1/auth/signup
-→ Email: "Tu código es: 847392"
-
-// 2. Usuario verifica
-POST /api/v1/email-verification/verify
-{ email: "user@test.com", token: "847392" }
-
-// 3. EmailVerification.verified = true
-```
-
----
-
-## 💻 Desarrollo
-
-### Estructura del Proyecto
-
-```
-new_sso_backend/
-├── src/
-│   ├── index.ts              # Entry point
-│   ├── server.ts             # Express app setup
-│   ├── config/               # Configuración (DB, JWT, Email)
-│   ├── routes/               # Endpoints (9 archivos)
-│   ├── services/             # Lógica de negocio (9 archivos)
-│   ├── repositories/         # Acceso a datos (4 repos)
-│   ├── middleware/           # Auth, logging, errors
-│   ├── types/                # TypeScript interfaces
-│   └── utils/                # Helpers
-├── prisma/
-│   └── schema.prisma         # Modelos de BD
-├── migrations/               # Migraciones SQL
-├── keys/                     # Claves JWT (gitignored)
-├── .env                      # Variables de entorno
-├── docker-compose.yml        # PostgreSQL local
-├── Dockerfile                # Build de producción
-└── tsconfig.json             # Config TypeScript
-```
-
-### Comandos Útiles
+### Scripts Disponibles
 
 ```bash
 # Desarrollo
-npm run dev              # Ejecutar sin reload
-npm run dev:watch        # Ejecutar con auto-reload
+npm run dev:watch:hex      # Modo hexagonal con hot-reload
+npm run dev:hex           # Modo hexagonal sin watch
 
-# Build
-npm run build            # Compilar TypeScript
-npm run clean            # Limpiar dist/
+# Build y start
+npm run build             # Compilar TypeScript
+npm start                 # Iniciar en producción
 
 # Testing
-npm test                 # Ejecutar tests (Jest)
-npm run test:watch       # Tests en watch mode
+npm test                  # Ejecutar tests
+npm run test:watch        # Tests en modo watch
 
-# Migraciones
-npm run migrate:create add_campo   # Crear migración
-npm run migrate:up                 # Aplicar migraciones
-npm run migrate:down               # Rollback
+# Database
+npm run migrate:create    # Crear nueva migración
+npm run migrate:up        # Aplicar migraciones
+npm run migrate:down      # Revertir última migración
+npm run prisma:generate   # Regenerar cliente Prisma
 
-# Prisma
-npm run prisma:generate   # Regenerar cliente
-npm run prisma:format     # Formatear schema
-npx prisma studio         # UI para ver BD
-
-# Linting
-npm run lint              # Revisar errores
-npm run lint:fix          # Auto-fix
-npm run format            # Prettier
+# Linting y formatting
+npm run lint            # Verificar código
+npm run lint:fix        # Corregir automáticamente
+npm run format          # Formatear con Prettier
 ```
 
-### Variables de Entorno
+### Ejecutar Tests
 
-| Variable               | Descripción              | Ejemplo                                     |
-| ---------------------- | ------------------------ | ------------------------------------------- |
-| `DATABASE_URL`         | Conexión PostgreSQL      | `postgresql://user:pass@localhost:5432/sso` |
-| `JWT_PRIVATE_KEY_PATH` | Ruta clave privada       | `./keys/private.pem`                        |
-| `JWT_PUBLIC_KEY_PATH`  | Ruta clave pública       | `./keys/public.pem`                         |
-| `JWT_ACCESS_EXPIRY`    | Expiración access token  | `15m`                                       |
-| `JWT_REFRESH_EXPIRY`   | Expiración refresh token | `7d`                                        |
-| `EMAIL_PROVIDER`       | Proveedor email          | `resend`, `smtp`, `ethereal`                |
-| `RESEND_API_KEY`       | API key Resend           | `re_xxxxx`                                  |
-| `SMTP_HOST`            | Servidor SMTP            | `smtp.gmail.com`                            |
-| `PORT`                 | Puerto servidor          | `3000`                                      |
-| `NODE_ENV`             | Entorno                  | `development`, `production`                 |
+```bash
+# Unit tests
+npm test -- --testPathPattern="domain"
 
-### Agregar un Endpoint Nuevo
+# Integration tests
+npm test -- --testPathPattern="integration"
 
-**Ejemplo:** Endpoint para cambiar password
-
-**1. Crear servicio** (`src/services/auth.ts`)
-
-```typescript
-async changePassword(userId: string, oldPassword: string, newPassword: string) {
-  const user = await userRepo.findById(userId);
-  const valid = await argon2.verify(user.passwordHash, oldPassword);
-  if (!valid) throw new UnauthorizedError('Contraseña incorrecta');
-
-  const newHash = await argon2.hash(newPassword);
-  await userRepo.update(userId, { passwordHash: newHash });
-}
-```
-
-**2. Crear ruta** (`src/routes/auth.ts`)
-
-```typescript
-router.post('/change-password', authMiddleware, async (req, res) => {
-  const { oldPassword, newPassword } = req.body;
-  await authService.changePassword(req.userId, oldPassword, newPassword);
-  res.json({ message: 'Contraseña actualizada' });
-});
-```
-
-**3. Agregar validación** (Joi schema en route)
-
-```typescript
-const schema = Joi.object({
-  oldPassword: Joi.string().required(),
-  newPassword: Joi.string().min(8).required(),
-});
+# Tests específicos
+npm test -- LoginUseCase.test.ts
 ```
 
 ---
 
-## 🚀 Producción
+## 📡 API Reference
 
-### Deploy con Docker
+### Endpoints Principales
 
-**1. Build de imagen**
+| Endpoint | Método | Descripción | Auth |
+|----------|--------|-------------|------|
+| `/health` | GET | Health check | No |
+| `/.well-known/jwks.json` | GET | Claves públicas JWT | No |
+| `/api/v1/auth/signup` | POST | Registro de usuario | No |
+| `/api/v1/auth/signin` | POST | Inicio de sesión | No |
+| `/api/v1/auth/logout` | POST | Cierre de sesión | Cookie |
+| `/api/v1/auth/refresh` | POST | Refrescar tokens | Cookie |
+| `/api/v1/auth/authorize` | POST | Generar auth code | Cookie |
+| `/api/v1/auth/token` | POST | Intercambiar code por tokens | No |
+| `/api/v1/user/me` | GET | Perfil del usuario | Bearer |
+| `/api/v1/tenants` | GET | Listar mis tenants | Bearer |
+| `/api/v1/tenants` | POST | Crear tenant | Bearer |
+| `/api/v1/tenants/:id/members` | GET | Miembros del tenant | Bearer |
+| `/api/v1/tenants/:id/apps` | GET | Apps del tenant | Bearer |
+| `/api/v1/applications` | GET | Listar aplicaciones | Bearer |
+| `/api/v1/applications/:id` | GET | Detalle de app | Bearer |
+| `/api/v1/admin/stats` | GET | Estadísticas sistema | SystemAdmin |
 
-```bash
-docker build -t sso-backend:latest .
+### Flujo de Autenticación
+
+```mermaid
+sequenceDiagram
+    participant U as Usuario
+    participant AF as App Frontend
+    participant AB as App Backend
+    participant IdP as IdP Core
+    participant DB as PostgreSQL
+
+    U->>AF: Accede a la app
+    AF->>AB: Verificar sesión
+    AB-->>AF: 401 No autenticado
+    AF->>IdP: Redirect /auth/authorize
+    
+    U->>IdP: Login (email/password)
+    IdP->>DB: Verificar credenciales
+    IdP-->>U: Set cookie sso_session
+    
+    U->>IdP: Seleccionar tenant
+    IdP->>DB: Generar auth code
+    IdP-->>AF: Redirect con code
+    
+    AF->>AB: POST /auth/exchange
+    AB->>IdP: POST /auth/token
+    IdP->>DB: Validar code
+    IdP-->>AB: sessionToken + user + tenant
+    AB-->>AF: Set cookie app_session
+    
+    U->>AF: Accede con sesión activa
 ```
 
-**2. Ejecutar con Docker Compose**
+Ver [docs/shared/api-reference.md](docs/shared/api-reference.md) para documentación completa de la API.
 
-```bash
-docker-compose up -d
-```
+---
 
-**3. Verificar salud**
+## 📚 Documentación
 
-```bash
-curl http://localhost:3000/health
-```
+La documentación completa está en [`docs/shared/`](docs/shared/):
 
-### Variables de Entorno Producción
+| Documento | Descripción |
+|-----------|-------------|
+| [getting-started.md](docs/shared/getting-started.md) | Guía de instalación detallada |
+| [architecture.md](docs/shared/architecture.md) | Decisiones de arquitectura y diagramas |
+| [api-reference.md](docs/shared/api-reference.md) | Referencia completa de endpoints |
+| [database-schema.md](docs/shared/database-schema.md) | Esquema de base de datos |
+| [multi-tenancy.md](docs/shared/multi-tenancy.md) | Guía de multi-tenancy |
+| [application-integration.md](docs/shared/application-integration.md) | Integrar apps externas |
+| [configuration.md](docs/shared/configuration.md) | Variables de entorno y config.yaml |
+| [security.md](docs/shared/security.md) | Cookies, rate limiting, 2FA, RLS |
+| [deployment.md](docs/shared/deployment.md) | Docker, Nginx, producción |
 
-```bash
-NODE_ENV=production
-DATABASE_URL=postgresql://prod_user:pass@db.prod.com:5432/sso
-JWT_PRIVATE_KEY_PATH=/run/secrets/jwt_private
-JWT_PUBLIC_KEY_PATH=/run/secrets/jwt_public
-EMAIL_PROVIDER=resend
-RESEND_API_KEY=<secret>
-PORT=3000
-```
+### Documentación Técnica Interna
 
-### Checklist Pre-Deploy
-
-- [ ] Generar claves JWT nuevas (no reusar de dev)
-- [ ] Configurar `DATABASE_URL` de producción
-- [ ] Establecer `NODE_ENV=production`
-- [ ] Configurar email provider (Resend recomendado)
-- [ ] Ejecutar migraciones: `npm run migrate:up`
-- [ ] Probar health checks: `/health`, `/ready`
-- [ ] Configurar HTTPS (reverse proxy: Nginx, Caddy)
-- [ ] Habilitar logging externo (CloudWatch, Datadog)
-- [ ] Configurar monitoreo (Prometheus, Grafana)
-- [ ] Revisar límites de rate limiting
-
-### Monitoreo
-
-```bash
-# Logs
-docker logs -f sso-backend
-
-# Métricas (futuro: Prometheus)
-GET /metrics
-
-# Health checks
-GET /health      # 200 si funciona
-GET /ready       # 200 si BD conectada
-```
+| Archivo | Descripción |
+|---------|-------------|
+| [src-hex/README.md](src-hex/README.md) | Guía de arquitectura hexagonal |
+| [src-hex/domain/README.md](src-hex/domain/README.md) | Domain layer: entidades y reglas |
+| [src-hex/application/README.md](src-hex/application/README.md) | Application layer: casos de uso |
+| [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) | Migración de legacy a hexagonal |
+| [CLAUDE.md](CLAUDE.md) | Contexto para agentes de IA |
 
 ---
 
 ## 🗺️ Roadmap
 
-### ✅ Fase 1: Core (COMPLETADO - 8 semanas)
+### ✅ Completado
 
-- [x] JWT Authentication (RS256)
-- [x] Password management (Argon2)
-- [x] 2FA/TOTP
+- [x] Arquitectura Hexagonal (Clean Architecture)
+- [x] JWT RS256 con rotación de claves
+- [x] Password hashing con Argon2
+- [x] Sessions con Redis
+- [x] Multi-tenancy con RLS
+- [x] RBAC con roles y permisos
+- [x] 2FA/TOTP con QR codes
 - [x] Email verification (3 adapters)
-- [x] Multi-tenancy (RBAC + RLS)
-- [x] 19 API endpoints
-- [x] User schema extendido (27 campos)
+- [x] Application management
+- [x] Authorization Code Flow
 
-### 🟡 Fase 2: Testing (Pendiente - 3 semanas)
+### 🚧 En Progreso
 
-- [ ] Unit tests (Jest)
-- [ ] Integration tests
-- [ ] E2E tests
-- [ ] Security tests
-- [ ] 80%+ coverage
+- [ ] Password reset flow
+- [ ] Magic link authentication
+- [ ] Audit logging completo
 
-### 🟡 Fase 3: Password Reset (Pendiente - 1 semana)
+### 📋 Pendiente
 
-- [ ] Forgot password flow
-- [ ] Reset token generation
-- [ ] Email templates
-- [ ] Reset endpoint
-
-### 🟡 Fase 4: OAuth/Social Login (Pendiente - 4 semanas)
-
-- [ ] Google OAuth
-- [ ] GitHub OAuth
-- [ ] Microsoft OAuth
-- [ ] Apple Sign In
-
-### 🟡 Fase 5: SAML 2.0 (Pendiente - 3 semanas)
-
-- [ ] SAML metadata endpoint
-- [ ] Assertion Consumer Service
-- [ ] IdP integration
-
-### 🟡 Fase 6: DevOps (Pendiente - 2 semanas)
-
-- [ ] CI/CD (GitHub Actions)
-- [ ] Kubernetes manifests
-- [ ] Automated testing
-- [ ] Staging + Production deploys
-
-### 🟡 Fase 7: Performance (Pendiente - 3 semanas)
-
-- [ ] Redis caching
-- [ ] Query optimization
-- [ ] Load testing
-- [ ] Database replicas
-
-**Tiempo total estimado:** ~24 semanas (480 horas)  
-**Progreso actual:** ~72% completado
-
----
-
-## 📚 Documentación Adicional
-
-- **[DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md)** - Referencia técnica completa
-- **[prisma/schema.prisma](./prisma/schema.prisma)** - Esquema de base de datos
-- **[docker-compose.yml](./docker-compose.yml)** - Setup local con Docker
-- **[.env.example](./.env.example)** - Variables de entorno template
+- [ ] OAuth 2.0 / OpenID Connect
+- [ ] SAML 2.0 support
+- [ ] Social login (Google, GitHub, Microsoft)
+- [ ] SCIM provisioning
+- [ ] Webhook events
+- [ ] Admin dashboard
 
 ---
 
@@ -716,16 +404,16 @@ GET /ready       # 200 si BD conectada
 
 1. Fork el repositorio
 2. Crea una rama: `git checkout -b feature/nueva-feature`
-3. Commit: `git commit -m 'Agrega nueva feature'`
-4. Hazpush: `git push origin feature/nueva-feature`
+3. Commit: `git commit -m 'feat: agrega nueva feature'`
+4. Push: `git push origin feature/nueva-feature`
 5. Abre un Pull Request
 
-**Estándares de código:**
+**Estándares:**
 
-- TypeScript strict mode
-- ESLint + Prettier
-- Tests obligatorios para nuevas features
-- Documentación actualizada
+- Commits siguen [Conventional Commits](https://www.conventionalcommits.org/)
+- TypeScript strict mode obligatorio
+- Tests para nuevas features
+- Lint y format antes de push
 
 ---
 
@@ -737,17 +425,8 @@ MIT License - Ver [LICENSE](./LICENSE)
 
 ## 👤 Autor
 
-**EmpireSoft**  
-Contacto: cmontes@empiresoft.com
+**Big Labs SAS** - Contacto: cmontes@biglabs.com
 
 ---
 
-## 🙏 Agradecimientos
-
-- **SuperTokens** - Inspiración arquitectura
-- **Prisma** - ORM excepcional
-- **Resend** - Email API moderna
-
----
-
-**¿Preguntas?** Abre un issue o consulta `DEVELOPER_GUIDE.md` para detalles técnicos.
+**¿Preguntas?** Abre un issue o revisa la documentación en `docs/shared/`.
