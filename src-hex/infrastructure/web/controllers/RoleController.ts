@@ -4,7 +4,7 @@ import { AdminRoleUseCases } from '../../../application/use-cases/admin/AdminRol
 export class RoleController {
   constructor(private readonly roles: AdminRoleUseCases) {}
 
-  /** POST /api/v1/role */
+  /** POST /api/v2/role */
   postRoute1 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const role = await this.roles.createRole(req.body, (req as any).userId);
@@ -12,7 +12,7 @@ export class RoleController {
     } catch (error) { next(error); }
   };
 
-  /** GET /api/v1/role/:tenantId */
+  /** GET /api/v2/role/:tenantId */
   getRoute2 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const roles = await this.roles.getTenantRoles(req.params.tenantId);
@@ -20,7 +20,7 @@ export class RoleController {
     } catch (error) { next(error); }
   };
 
-  /** GET /api/v1/role?tenantId=... */
+  /** GET /api/v2/role?tenantId=... */
   getRouteAllRoles = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const tenantId = req.query.tenantId as string | undefined;
@@ -29,7 +29,7 @@ export class RoleController {
     } catch (error) { next(error); }
   };
 
-  /** GET /api/v1/role/:roleId */
+  /** GET /api/v2/role/:roleId */
   getRoute3 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const role = await this.roles.getRoleById(req.params.roleId);
@@ -37,7 +37,7 @@ export class RoleController {
     } catch (error) { next(error); }
   };
 
-  /** PUT /api/v1/role/:roleId */
+  /** PUT /api/v2/role/:roleId */
   putRoute4 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const role = await this.roles.updateRole(req.params.roleId, req.body);
@@ -45,7 +45,7 @@ export class RoleController {
     } catch (error) { next(error); }
   };
 
-  /** DELETE /api/v1/role/:roleId */
+  /** DELETE /api/v2/role/:roleId */
   deleteRoute5 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       await this.roles.deleteRole(req.params.roleId);
@@ -53,7 +53,7 @@ export class RoleController {
     } catch (error) { next(error); }
   };
 
-  /** POST /api/v1/role/:roleId/permissions */
+  /** POST /api/v2/role/:roleId/permissions */
   postRoute6 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const permission = await this.roles.addPermission(req.params.roleId, req.body);
@@ -61,7 +61,7 @@ export class RoleController {
     } catch (error) { next(error); }
   };
 
-  /** GET /api/v1/role/:roleId/permissions */
+  /** GET /api/v2/role/:roleId/permissions */
   getRoute7 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const permissions = await this.roles.getRolePermissions(req.params.roleId);
@@ -69,7 +69,7 @@ export class RoleController {
     } catch (error) { next(error); }
   };
 
-  /** DELETE /api/v1/role/:roleId/permissions/:permissionId */
+  /** DELETE /api/v2/role/:roleId/permissions/:permissionId */
   deleteRoute8 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       await this.roles.removePermission(req.params.permissionId);
@@ -77,7 +77,7 @@ export class RoleController {
     } catch (error) { next(error); }
   };
 
-  /** DELETE /api/v1/role/:roleId/permissions — by resource/action */
+  /** DELETE /api/v2/role/:roleId/permissions — by resource/action */
   deleteRoute9 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { applicationId, resource, action } = req.body;

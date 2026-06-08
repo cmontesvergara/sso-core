@@ -16,7 +16,7 @@ export class ApplicationSyncController {
     private readonly appResources: AdminAppResourceUseCases,
   ) { }
 
-  /** POST /api/v1/applications/sync/:appId */
+  /** POST /api/v2/applications/sync/:appId */
   postRoute1 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { appId } = req.params;

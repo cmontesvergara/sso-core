@@ -4,7 +4,7 @@ import { AdminTenantUseCases } from '../../../application/use-cases/admin/AdminT
 export class AdminTenantController {
   constructor(private readonly tenants: AdminTenantUseCases) {}
 
-  /** POST /api/v1/tenant */
+  /** POST /api/v2/tenant */
   postRoute1 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = (req as any).userId;
@@ -13,7 +13,7 @@ export class AdminTenantController {
     } catch (error) { next(error); }
   };
 
-  /** GET /api/v1/tenant/:tenantId */
+  /** GET /api/v2/tenant/:tenantId */
   getRoute2 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const tenant = await this.tenants.getTenantById(req.params.tenantId);
@@ -29,7 +29,7 @@ export class AdminTenantController {
     } catch (error) { next(error); }
   };
 
-  /** GET /api/v1/tenant */
+  /** GET /api/v2/tenant */
   getRoute3 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const tenants = await this.tenants.listAllTenants();
@@ -38,7 +38,7 @@ export class AdminTenantController {
   };
 
   /**
-   * POST /api/v1/tenant/:tenantId/members
+   * POST /api/v2/tenant/:tenantId/members
    * Frontend can send { email, role } or { userId, role }.
    * resolveUserId looks up the user by email when userId is absent.
    */
@@ -52,7 +52,7 @@ export class AdminTenantController {
     } catch (error) { next(error); }
   };
 
-  /** GET /api/v1/tenant/:tenantId/members */
+  /** GET /api/v2/tenant/:tenantId/members */
   getRoute5 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const members = await this.tenants.getTenantMembers(req.params.tenantId);
@@ -60,7 +60,7 @@ export class AdminTenantController {
     } catch (error) { next(error); }
   };
 
-  /** PUT /api/v1/tenant/:tenantId/members/:memberId */
+  /** PUT /api/v2/tenant/:tenantId/members/:memberId */
   putRoute6 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { tenantId, memberId } = req.params;
@@ -69,7 +69,7 @@ export class AdminTenantController {
     } catch (error) { next(error); }
   };
 
-  /** DELETE /api/v1/tenant/:tenantId/members/:memberId */
+  /** DELETE /api/v2/tenant/:tenantId/members/:memberId */
   deleteRoute7 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { tenantId, memberId } = req.params;
@@ -78,7 +78,7 @@ export class AdminTenantController {
     } catch (error) { next(error); }
   };
 
-  /** PUT /api/v1/tenant/:tenantId */
+  /** PUT /api/v2/tenant/:tenantId */
   putRoute8 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const tenant = await this.tenants.updateTenant(req.params.tenantId, req.body);
@@ -86,7 +86,7 @@ export class AdminTenantController {
     } catch (error) { next(error); }
   };
 
-  /** DELETE /api/v1/tenant/:tenantId */
+  /** DELETE /api/v2/tenant/:tenantId */
   deleteRoute8b = async (req: Request, res: Response, next: NextFunction) => {
     try {
       await this.tenants.deleteTenant(req.params.tenantId);
@@ -94,7 +94,7 @@ export class AdminTenantController {
     } catch (error) { next(error); }
   };
 
-  /** GET /api/v1/tenant/:tenantId/apps */
+  /** GET /api/v2/tenant/:tenantId/apps */
   getRoute9 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const apps = await this.tenants.getTenantApps(req.params.tenantId);
@@ -102,7 +102,7 @@ export class AdminTenantController {
     } catch (error) { next(error); }
   };
 
-  /** POST /api/v1/tenant/:tenantId/apps */
+  /** POST /api/v2/tenant/:tenantId/apps */
   postRoute10 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       await this.tenants.addAppToTenant(req.params.tenantId, req.body.applicationId);
@@ -110,7 +110,7 @@ export class AdminTenantController {
     } catch (error) { next(error); }
   };
 
-  /** DELETE /api/v1/tenant/:tenantId/apps/:applicationId */
+  /** DELETE /api/v2/tenant/:tenantId/apps/:applicationId */
   deleteRoute11 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       await this.tenants.removeAppFromTenant(req.params.tenantId, req.params.applicationId);

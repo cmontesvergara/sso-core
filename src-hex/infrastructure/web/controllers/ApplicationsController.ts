@@ -4,7 +4,7 @@ import { AdminApplicationUseCases } from '../../../application/use-cases/admin/A
 export class ApplicationsController {
   constructor(private readonly apps: AdminApplicationUseCases) {}
 
-  /** GET /api/v1/applications */
+  /** GET /api/v2/applications */
   getRoute1 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const applications = await this.apps.listApplications(req.query);
@@ -12,7 +12,7 @@ export class ApplicationsController {
     } catch (error) { next(error); }
   };
 
-  /** GET /api/v1/applications/:applicationId */
+  /** GET /api/v2/applications/:applicationId */
   getRoute2 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const app = await this.apps.getApplicationById(req.params.applicationId);
@@ -21,7 +21,7 @@ export class ApplicationsController {
     } catch (error) { next(error); }
   };
 
-  /** POST /api/v1/applications — create a new global application */
+  /** POST /api/v2/applications — create a new global application */
   postRoute1 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const application = await this.apps.createApplication(req.body);
@@ -29,7 +29,7 @@ export class ApplicationsController {
     } catch (error) { next(error); }
   };
 
-  /** PUT /api/v1/applications/:applicationId — update global app */
+  /** PUT /api/v2/applications/:applicationId — update global app */
   putRoute1 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const application = await this.apps.updateApplication(req.params.applicationId, req.body);
@@ -37,7 +37,7 @@ export class ApplicationsController {
     } catch (error) { next(error); }
   };
 
-  /** DELETE /api/v1/applications/:applicationId — delete global app */
+  /** DELETE /api/v2/applications/:applicationId — delete global app */
   deleteRoute1 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       await this.apps.deleteApplication(req.params.applicationId);
@@ -45,7 +45,7 @@ export class ApplicationsController {
     } catch (error) { next(error); }
   };
 
-  /** GET /api/v1/applications/tenant/:tenantId */
+  /** GET /api/v2/applications/tenant/:tenantId */
   getRoute3 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const tenantApps = await this.apps.listTenantApps(req.params.tenantId);
@@ -53,7 +53,7 @@ export class ApplicationsController {
     } catch (error) { next(error); }
   };
 
-  /** POST /api/v1/applications/tenant/:tenantId */
+  /** POST /api/v2/applications/tenant/:tenantId */
   postRoute4 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       await this.apps.addAppToTenant(req.params.tenantId, req.body.applicationId);
@@ -61,7 +61,7 @@ export class ApplicationsController {
     } catch (error) { next(error); }
   };
 
-  /** DELETE /api/v1/applications/tenant/:tenantId/:applicationId */
+  /** DELETE /api/v2/applications/tenant/:tenantId/:applicationId */
   deleteRoute5 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       await this.apps.removeAppFromTenant(req.params.tenantId, req.params.applicationId);
@@ -69,7 +69,7 @@ export class ApplicationsController {
     } catch (error) { next(error); }
   };
 
-  /** GET /api/v1/applications/tenant/:tenantId/:applicationId/users */
+  /** GET /api/v2/applications/tenant/:tenantId/:applicationId/users */
   getRoute6 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const users = await this.apps.listUsersWithAppAccess(req.params.tenantId, req.params.applicationId);
@@ -77,7 +77,7 @@ export class ApplicationsController {
     } catch (error) { next(error); }
   };
 
-  /** GET /api/v1/applications/user/:tenantId/my-apps */
+  /** GET /api/v2/applications/user/:tenantId/my-apps */
   getRoute7 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = (req as any).userId;
@@ -87,8 +87,8 @@ export class ApplicationsController {
   };
 
   /**
-   * POST /api/v1/applications/tenant/:tenantId/:applicationId/users  (new hex URL)
-   * POST /api/v1/applications/tenant/:tenantId/:applicationId/grant   (alias — legacy frontend)
+   * POST /api/v2/applications/tenant/:tenantId/:applicationId/users  (new hex URL)
+   * POST /api/v2/applications/tenant/:tenantId/:applicationId/grant   (alias — legacy frontend)
    */
   postRoute8 = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -101,7 +101,7 @@ export class ApplicationsController {
     } catch (error) { next(error); }
   };
 
-  /** POST /api/v1/applications/tenant/:tenantId/:applicationId/users/bulk */
+  /** POST /api/v2/applications/tenant/:tenantId/:applicationId/users/bulk */
   postRoute9 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { tenantId, applicationId } = req.params;
@@ -113,8 +113,8 @@ export class ApplicationsController {
   };
 
   /**
-   * DELETE /api/v1/applications/tenant/:tenantId/:applicationId/users/:userId  (hex URL)
-   * DELETE /api/v1/applications/tenant/:tenantId/:applicationId/revoke/:userId  (alias — legacy frontend)
+   * DELETE /api/v2/applications/tenant/:tenantId/:applicationId/users/:userId  (hex URL)
+   * DELETE /api/v2/applications/tenant/:tenantId/:applicationId/revoke/:userId  (alias — legacy frontend)
    */
   deleteRoute10 = async (req: Request, res: Response, next: NextFunction) => {
     try {

@@ -45,8 +45,8 @@ import { createUtilRouter } from './util.routes';
 
 /**
  * createRouter
- * Wires all /api/v3 routes from the Container.
- * The resulting Router is mounted on /api/v3 in Server.ts.
+ * Wires all /api/v2 routes from the Container.
+ * The resulting Router is mounted on /api/v2 in Server.ts.
  */
 export function createRouter(container: Container): Router {
   const router = Router();
@@ -223,7 +223,7 @@ export function createRouter(container: Container): Router {
   router.post('/tenants/:tenantId/members', requireAuth, tenantController.addMember);
   router.patch('/tenants/:tenantId/members/:userId/role', requireAuth, tenantController.changeRole);
 
-  // ── Migrated v1 routes (Legacy integrations) ───────────────────────────────
+  // ── Admin / management routes ─────────────────────────────────────────────
   router.use('/role', createRoleRouter(roleController, requireAuth));
   router.use('/applications', createApplicationsRouter(applicationsController, requireAuth));
   router.use('/app-resources', createAppResourceRouter(appResourceController, requireAuth));

@@ -4,7 +4,7 @@ import { AdminUserUseCases } from '../../../application/use-cases/admin/AdminUse
 export class AdminUserController {
   constructor(private readonly users: AdminUserUseCases) {}
 
-  /** GET /api/v1/user/list */
+  /** GET /api/v2/user/list */
   getRoute1 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const result = await this.users.listUsers(req.query);
@@ -12,7 +12,7 @@ export class AdminUserController {
     } catch (error) { next(error); }
   };
 
-  /** GET /api/v1/user/profile */
+  /** GET /api/v2/user/profile */
   getRoute2 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = (req as any).userId;
@@ -22,7 +22,7 @@ export class AdminUserController {
     } catch (error) { next(error); }
   };
 
-  /** GET /api/v1/user/tenants */
+  /** GET /api/v2/user/tenants */
   getRoute3 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = (req as any).userId;
@@ -31,7 +31,7 @@ export class AdminUserController {
     } catch (error) { next(error); }
   };
 
-  /** PUT /api/v1/user/profile */
+  /** PUT /api/v2/user/profile */
   putRoute4 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = (req as any).userId;
@@ -51,7 +51,7 @@ export class AdminUserController {
     } catch (error) { next(error); }
   };
 
-  /** GET /api/v1/user/:userId */
+  /** GET /api/v2/user/:userId */
   getRoute5 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = await this.users.getUserById(req.params.userId);
@@ -60,7 +60,7 @@ export class AdminUserController {
     } catch (error) { next(error); }
   };
 
-  /** PUT /api/v1/user/:userId/status */
+  /** PUT /api/v2/user/:userId/status */
   putStatusRoute = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { status } = req.body;
@@ -70,7 +70,7 @@ export class AdminUserController {
     } catch (error) { next(error); }
   };
 
-  /** GET /api/v1/user/:userId/tenants */
+  /** GET /api/v2/user/:userId/tenants */
   getTenantsByUserRoute = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const tenants = await this.users.getUserTenantsWithApps(req.params.userId);
@@ -78,7 +78,7 @@ export class AdminUserController {
     } catch (error) { next(error); }
   };
 
-  /** PUT /api/v1/user/:userId */
+  /** PUT /api/v2/user/:userId */
   putRoute6 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { firstName, lastName, email } = req.body;
@@ -87,7 +87,7 @@ export class AdminUserController {
     } catch (error) { next(error); }
   };
 
-  /** DELETE /api/v1/user/:userId */
+  /** DELETE /api/v2/user/:userId */
   deleteRoute7 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       // TODO: implement soft-delete or anonymization
