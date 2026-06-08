@@ -1,14 +1,5 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
-import { AuthorizeUseCase } from '../../../application/use-cases/auth/AuthorizeUseCase';
-import { ExchangeCodeUseCase } from '../../../application/use-cases/auth/ExchangeCodeUseCase';
-import { GetSessionContextUseCase } from '../../../application/use-cases/auth/GetSessionContextUseCase';
-import { VerifySessionUseCase } from '../../../application/use-cases/auth/VerifySessionUseCase';
-import { GetTenantPublicInfoUseCase } from '../../../application/use-cases/tenant/GetTenantPublicInfoUseCase';
-import { AddUserToTenantUseCase, ChangeUserRoleUseCase } from '../../../application/use-cases/tenant/TenantMemberUseCase';
-import { ForgotPasswordUseCase, ResetPasswordUseCase } from '../../../application/use-cases/user/PasswordResetUseCase';
-import { ChangePasswordUseCase, UpdateUserProfileUseCase } from '../../../application/use-cases/user/UpdateUserUseCase';
-import { VerifyEmailUseCase } from '../../../application/use-cases/user/VerifyEmailUseCase';
 import { Container } from '../../config/Container';
 import { AuthController } from '../controllers/AuthController';
 import { PasswordController } from '../controllers/PasswordController';
@@ -51,124 +42,11 @@ import { createUtilRouter } from './util.routes';
 export function createRouter(container: Container): Router {
   const router = Router();
 
-  // ── Resolve use cases not yet in Container ───────────────────────────────
-  const verifySessionUseCase = new VerifySessionUseCase(
-    container.get('ISessionRepository'),
-    container.get('ITokenService'),
-    container.get('IAuditService')
-  );
-
-  const exchangeCodeUseCase = new ExchangeCodeUseCase(
-    container.get('IAuthCodeRepository'),
-    container.get('ISessionRepository'),
-    container.get('IUserRepository'),
-    container.get('IRefreshTokenRepository'),
-    container.get('ITokenService'),
-    container.get('IAuditService'),
-    container.get('IEventBus'),
-    container.get('IHashService'),
-    container.get('IQueryRepository')
-  );
-
-  const authorizeUseCase = new AuthorizeUseCase(
-    container.get('IAuthCodeRepository'),
-    container.get('IApplicationRepository'),
-    container.get('ITenantRepository'),
-    container.get('IUserRepository'),
-    container.get('ISessionRepository'),
-    container.get('ITokenService'),
-    container.get('IAuditService')
-  );
-
-  const updateProfileUseCase = new UpdateUserProfileUseCase(
-    container.get('IUserRepository'),
-    container.get('IAuditService'),
-    container.get('IEventBus')
-  );
-
-  const getSessionContextUseCase = new GetSessionContextUseCase(
-    container.get('ISessionRepository'),
-    container.get('IQueryRepository'),
-    container.get('ITokenService'),
-    container.get('IAuditService')
-  );
-
-  const changePasswordUseCase = new ChangePasswordUseCase(
-    container.get('IUserRepository'),
-    container.get('IAuditService'),
-    container.get('IEventBus'),
-    container.get('IPasswordHasher')
-  );
-
-  const verifyEmailUseCase = new VerifyEmailUseCase(
-    container.get('IEmailVerificationRepository'),
-    container.get('IUserRepository'),
-    container.get('IEmailService'),
-    container.get('IAuditService'),
-    container.get('IEventBus')
-  );
-
-  const addUserToTenantUseCase = new AddUserToTenantUseCase(
-    container.get('ITenantRepository'),
-    container.get('IUserRepository'),
-    container.get('IQueryRepository'),
-    container.get('IAuditService'),
-    container.get('IEventBus')
-  );
-
-  const changeUserRoleUseCase = new ChangeUserRoleUseCase(
-    container.get('ITenantRepository'),
-    container.get('IUserRepository'),
-    container.get('IQueryRepository'),
-    container.get('IAuditService'),
-    container.get('IEventBus')
-  );
-
-  const forgotPasswordUseCase = new ForgotPasswordUseCase(
-    container.get('IUserRepository'),
-    container.get('IEmailVerificationRepository'),
-    container.get('IEmailService'),
-    container.get('IAuditService')
-  );
-
-  const resetPasswordUseCase = new ResetPasswordUseCase(
-    container.get('IUserRepository'),
-    container.get('IEmailVerificationRepository'),
-    container.get('IAuditService'),
-    container.get('IEventBus'),
-    container.get('IPasswordHasher')
-  );
-
-  // ── Controllers ──────────────────────────────────────────────────────────
-  const authController = new AuthController(
-    container.get('LoginUseCase'),
-    container.get('LogoutUseCase'),
-    container.get('RefreshTokenUseCase'),
-    exchangeCodeUseCase,
-    authorizeUseCase,
-    getSessionContextUseCase
-  );
-
-  const userController = new UserController(
-    container.get('RegisterUserUseCase'),
-    updateProfileUseCase,
-    changePasswordUseCase,
-    verifyEmailUseCase
-  );
-
-  const getTenantPublicInfoUseCase = new GetTenantPublicInfoUseCase(container.get('ITenantRepository'));
-
-  const tenantController = new TenantController(
-    container.get('CreateTenantUseCase'),
-    addUserToTenantUseCase,
-    changeUserRoleUseCase,
-    getTenantPublicInfoUseCase
-  );
-
-  const passwordController = new PasswordController(
-    forgotPasswordUseCase,
-    resetPasswordUseCase
-  );
+  // ── Resolve all controllers from Container ───────────────────────────────
+  const authController = container.get<AuthController>('AuthController');
+  const userController = container.get<UserController>('UserController');
+  const tenantController = container.get<TenantController>('TenantController');
+  const passwordController = container.get<PasswordController>('PasswordController');
 
   const roleController = container.get<RoleController>('RoleController');
   const applicationsController = container.get<ApplicationsController>('ApplicationsController');
@@ -178,10 +56,10 @@ export function createRouter(container: Container): Router {
   const statsController = container.get<StatsController>('StatsController');
   const utilController = container.get<UtilController>('UtilController');
   const userLegacyController = container.get<AdminUserController>('AdminUserController');
-  const tenantLegacyController = container.get<AdminTenantController>('TenantController');
+  const tenantLegacyController = container.get<AdminTenantController>('AdminTenantController');
 
   // ── Auth middleware ───────────────────────────────────────────────────────
-  const requireAuth = createAuthMiddleware(verifySessionUseCase);
+  const requireAuth = createAuthMiddleware(container.get('VerifySessionUseCase'));
 
   // ── Rate limiters ─────────────────────────────────────────────────────────
   const sendVerificationLimiter = rateLimit({

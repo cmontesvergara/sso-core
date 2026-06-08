@@ -53,12 +53,21 @@ import { ResendEmailService } from '../external-services/email/ResendEmailServic
 import { InMemoryEventBus } from '../external-services/events/InMemoryEventBus';
 
 // Application — use cases (auth)
+import { AuthorizeUseCase } from '../../application/use-cases/auth/AuthorizeUseCase';
+import { ExchangeCodeUseCase } from '../../application/use-cases/auth/ExchangeCodeUseCase';
+import { GetSessionContextUseCase } from '../../application/use-cases/auth/GetSessionContextUseCase';
 import { LoginUseCase } from '../../application/use-cases/auth/LoginUseCase';
 import { LogoutUseCase } from '../../application/use-cases/auth/LogoutUseCase';
 import { RefreshTokenUseCase } from '../../application/use-cases/auth/RefreshTokenUseCase';
+import { VerifySessionUseCase } from '../../application/use-cases/auth/VerifySessionUseCase';
 import { CreateAppSessionUseCase } from '../../application/use-cases/session/CreateAppSessionUseCase';
 import { CreateTenantUseCase } from '../../application/use-cases/tenant/CreateTenantUseCase';
+import { GetTenantPublicInfoUseCase } from '../../application/use-cases/tenant/GetTenantPublicInfoUseCase';
+import { AddUserToTenantUseCase, ChangeUserRoleUseCase } from '../../application/use-cases/tenant/TenantMemberUseCase';
+import { ForgotPasswordUseCase, ResetPasswordUseCase } from '../../application/use-cases/user/PasswordResetUseCase';
 import { RegisterUserUseCase } from '../../application/use-cases/user/RegisterUserUseCase';
+import { ChangePasswordUseCase, UpdateUserProfileUseCase } from '../../application/use-cases/user/UpdateUserUseCase';
+import { VerifyEmailUseCase } from '../../application/use-cases/user/VerifyEmailUseCase';
 
 // Application — admin use cases
 import { AdminApplicationUseCases } from '../../application/use-cases/admin/AdminApplicationUseCases';
@@ -69,19 +78,22 @@ import { AdminTenantUseCases } from '../../application/use-cases/admin/AdminTena
 import { AdminUserUseCases } from '../../application/use-cases/admin/AdminUserUseCases';
 import { AuthEventsUseCases } from '../../application/use-cases/admin/AuthEventsUseCases';
 
-// Infrastructure — controllers (admin)
+// Infrastructure — controllers
 import { AdminTenantController } from '../web/controllers/AdminTenantController';
 import { AdminUserController } from '../web/controllers/AdminUserController';
 import { ApplicationsController } from '../web/controllers/ApplicationsController';
 import { ApplicationSyncController } from '../web/controllers/ApplicationSyncController';
 import { AppResourceController } from '../web/controllers/AppResourceController';
+import { AuthController } from '../web/controllers/AuthController';
 import { MetadataController } from '../web/controllers/MetadataController';
+import { PasswordController } from '../web/controllers/PasswordController';
 import { RoleController } from '../web/controllers/RoleController';
 import { StatsController } from '../web/controllers/StatsController';
+import { TenantController } from '../web/controllers/TenantController';
+import { UserController } from '../web/controllers/UserController';
 import { UtilController } from '../web/controllers/UtilController';
 
 // Infrastructure — auth middleware
-import { VerifySessionUseCase } from '../../application/use-cases/auth/VerifySessionUseCase';
 import { createAuthMiddleware } from '../web/middleware/AuthMiddleware';
 
 /**
@@ -244,6 +256,95 @@ export class Container {
       eventBus
     );
 
+    const verifySessionUseCase = new VerifySessionUseCase(
+      sessionRepository,
+      tokenService,
+      auditService
+    );
+
+    const exchangeCodeUseCase = new ExchangeCodeUseCase(
+      authCodeRepository,
+      sessionRepository,
+      userRepository,
+      refreshTokenRepository,
+      tokenService,
+      auditService,
+      eventBus,
+      hashService,
+      queryRepository
+    );
+
+    const authorizeUseCase = new AuthorizeUseCase(
+      authCodeRepository,
+      applicationRepository,
+      tenantRepository,
+      userRepository,
+      sessionRepository,
+      tokenService,
+      auditService
+    );
+
+    const updateProfileUseCase = new UpdateUserProfileUseCase(
+      userRepository,
+      auditService,
+      eventBus
+    );
+
+    const getSessionContextUseCase = new GetSessionContextUseCase(
+      sessionRepository,
+      queryRepository,
+      tokenService,
+      auditService
+    );
+
+    const changePasswordUseCase = new ChangePasswordUseCase(
+      userRepository,
+      auditService,
+      eventBus,
+      passwordHasher
+    );
+
+    const verifyEmailUseCase = new VerifyEmailUseCase(
+      emailVerificationRepository,
+      userRepository,
+      emailService,
+      auditService,
+      eventBus
+    );
+
+    const addUserToTenantUseCase = new AddUserToTenantUseCase(
+      tenantRepository,
+      userRepository,
+      queryRepository,
+      auditService,
+      eventBus
+    );
+
+    const changeUserRoleUseCase = new ChangeUserRoleUseCase(
+      tenantRepository,
+      userRepository,
+      queryRepository,
+      auditService,
+      eventBus
+    );
+
+    const forgotPasswordUseCase = new ForgotPasswordUseCase(
+      userRepository,
+      emailVerificationRepository,
+      emailService,
+      auditService
+    );
+
+    const resetPasswordUseCase = new ResetPasswordUseCase(
+      userRepository,
+      emailVerificationRepository,
+      auditService,
+      eventBus,
+      passwordHasher
+    );
+
+    const getTenantPublicInfoUseCase = new GetTenantPublicInfoUseCase(tenantRepository);
+
     // ── Register in map ──────────────────────────────────────────────────────
     this.instances.set('PrismaClient', this.prisma);
     this.instances.set('RedisClient', this.redis);
@@ -275,6 +376,19 @@ export class Container {
     this.instances.set('CreateAppSessionUseCase', createAppSessionUseCase);
     this.instances.set('CreateTenantUseCase', createTenantUseCase);
 
+    this.instances.set('VerifySessionUseCase', verifySessionUseCase);
+    this.instances.set('ExchangeCodeUseCase', exchangeCodeUseCase);
+    this.instances.set('AuthorizeUseCase', authorizeUseCase);
+    this.instances.set('UpdateUserProfileUseCase', updateProfileUseCase);
+    this.instances.set('GetSessionContextUseCase', getSessionContextUseCase);
+    this.instances.set('ChangePasswordUseCase', changePasswordUseCase);
+    this.instances.set('VerifyEmailUseCase', verifyEmailUseCase);
+    this.instances.set('AddUserToTenantUseCase', addUserToTenantUseCase);
+    this.instances.set('ChangeUserRoleUseCase', changeUserRoleUseCase);
+    this.instances.set('ForgotPasswordUseCase', forgotPasswordUseCase);
+    this.instances.set('ResetPasswordUseCase', resetPasswordUseCase);
+    this.instances.set('GetTenantPublicInfoUseCase', getTenantPublicInfoUseCase);
+
     // ── Admin use cases (all use injected QueryServices, zero src/ imports) ───
     const adminUsers = new AdminUserUseCases(userQueryService);
     const adminTenants = new AdminTenantUseCases(tenantQueryService, userQueryService);
@@ -294,7 +408,7 @@ export class Container {
 
     // ── Admin controllers ─────────────────────────────────────────────────────
     this.instances.set('AdminUserController', new AdminUserController(adminUsers));
-    this.instances.set('TenantController', new AdminTenantController(adminTenants));
+    this.instances.set('AdminTenantController', new AdminTenantController(adminTenants));
     this.instances.set('RoleController', new RoleController(adminRoles));
     this.instances.set('ApplicationsController', new ApplicationsController(adminApplications));
     this.instances.set('ApplicationSyncController', new ApplicationSyncController(appQueryService, adminAppResources));
@@ -303,12 +417,38 @@ export class Container {
     this.instances.set('UtilController', new UtilController());
     this.instances.set('MetadataController', new MetadataController());
 
-    // ── Auth middleware factory ───────────────────────────────────────────────
-    const verifySessionUseCase = new VerifySessionUseCase(
-      sessionRepository,
-      tokenService,
-      auditService
+    // ── Controllers ──────────────────────────────────────────────────────────
+    const authController = new AuthController(
+      loginUseCase,
+      logoutUseCase,
+      refreshTokenUseCase,
+      exchangeCodeUseCase,
+      authorizeUseCase,
+      getSessionContextUseCase
     );
+    const userController = new UserController(
+      registerUserUseCase,
+      updateProfileUseCase,
+      changePasswordUseCase,
+      verifyEmailUseCase
+    );
+    const tenantController = new TenantController(
+      createTenantUseCase,
+      addUserToTenantUseCase,
+      changeUserRoleUseCase,
+      getTenantPublicInfoUseCase
+    );
+    const passwordController = new PasswordController(
+      forgotPasswordUseCase,
+      resetPasswordUseCase
+    );
+
+    this.instances.set('AuthController', authController);
+    this.instances.set('UserController', userController);
+    this.instances.set('TenantController', tenantController);
+    this.instances.set('PasswordController', passwordController);
+
+    // ── Auth middleware factory ───────────────────────────────────────────────
     this.instances.set('RequireAuth', createAuthMiddleware(verifySessionUseCase));
   }
 
