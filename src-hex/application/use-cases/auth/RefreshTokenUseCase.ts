@@ -1,4 +1,3 @@
-import { PrismaClient } from '@prisma/client';
 import * as crypto from 'crypto';
 import { RefreshToken } from '../../../domain/entities/RefreshToken';
 import { AppSession } from '../../../domain/entities/Session';
@@ -14,6 +13,7 @@ import { LoginResult } from '../../dto/output/LoginResult';
 import { IAuditService } from '../../ports/output/IAuditService';
 import { IEventBus } from '../../ports/output/IEventBus';
 import { IHashService } from '../../ports/output/IHashService';
+import { IQueryRepository } from '../../ports/output/IQueryRepository';
 import { ITokenService } from '../../ports/output/ITokenService';
 
 /**
@@ -31,7 +31,7 @@ export class RefreshTokenUseCase {
     private auditService: IAuditService,
     private eventBus: IEventBus,
     private hashService: IHashService,
-    private prisma: PrismaClient,
+    private queryRepository: IQueryRepository,
   ) { }
 
   async execute(input: RefreshTokenInput): Promise<LoginResult> {
@@ -83,9 +83,7 @@ export class RefreshTokenUseCase {
     }
 
     // 4. Load user
-    const user = await this.prisma.user.findUnique({
-      where: { id: refreshToken.userId.value },
-    });
+    const user = await this.queryRepository.findUserById(refreshToken.userId.value);
 
     // 5. Create new AppSession
     const sessionToken = `app_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -95,15 +93,10 @@ export class RefreshTokenUseCase {
     // tenantId chain: input -> JWT claims -> DB lookup -> userId last-resort
     let effectiveTenantId: string | undefined = resolvedInput.tenantId || claims.tenantId;
     if (!effectiveTenantId && user) {
-      const firstMembership = await this.prisma.tenantMember.findFirst({
-        where: {
-          userId: user.id,
-          tenant: resolvedInput.appId
-            ? { tenantApps: { some: { application: { appId: resolvedInput.appId }, isEnabled: true } } }
-            : undefined,
-        },
-        select: { tenantId: true },
-      });
+      const firstMembership = await this.queryRepository.findFirstTenantMembership(
+        user.id,
+        resolvedInput.appId ?? undefined
+      );
       effectiveTenantId = firstMembership?.tenantId ?? undefined;
     }
 
@@ -164,40 +157,20 @@ export class RefreshTokenUseCase {
     let permissions: Array<{ resource: string; action: string }> = [];
 
     if (user) {
-      const tenantMembers = await this.prisma.tenantMember.findMany({
-        where: {
-          userId: user.id,
-          tenant: input.appId
-            ? { tenantApps: { some: { application: { appId: input.appId }, isEnabled: true } } }
-            : undefined,
-        },
-        include: { tenant: true },
-      });
-
-      tenants = tenantMembers.map((tm: any) => ({
-        id: tm.tenant.id,
-        name: tm.tenant.name,
-        slug: tm.tenant.slug,
-        role: tm.role,
-      }));
+      tenants = await this.queryRepository.findTenantMemberships(
+        user.id,
+        input.appId ?? undefined
+      );
 
       const activeTenantId = input.tenantId || session.tenantId.value;
-      const currentTenantMember = tenantMembers.find((tm: any) => tm.tenantId === activeTenantId);
+      const currentTenantMember = tenants.find((t: any) => t.id === activeTenantId);
 
       if (currentTenantMember && input.appId) {
-        const roleRecord = await this.prisma.role.findFirst({
-          where: { tenantId: activeTenantId, name: currentTenantMember.role },
-        });
-        if (roleRecord) {
-          const application = await this.prisma.application.findUnique({ where: { appId: input.appId } });
-          if (application) {
-            const rolePermissions = await this.prisma.permission.findMany({
-              where: { roleId: roleRecord.id, applicationId: application.id },
-              select: { resource: true, action: true },
-            });
-            permissions = rolePermissions.map((p: any) => ({ resource: p.resource, action: p.action }));
-          }
-        }
+        permissions = await this.queryRepository.findRolePermissions(
+          activeTenantId,
+          currentTenantMember.role,
+          input.appId
+        );
       }
     }
 

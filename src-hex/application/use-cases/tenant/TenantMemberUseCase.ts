@@ -1,14 +1,14 @@
+import { TenantAccessDeniedError } from '../../../domain/errors/TenantAccessDeniedError';
+import { UserNotFoundError } from '../../../domain/errors/UserNotFoundError';
+import { UserAddedToTenantEvent } from '../../../domain/events/TenantEvents';
 import { ITenantRepository } from '../../../domain/repositories/ITenantRepository';
 import { IUserRepository } from '../../../domain/repositories/IUserRepository';
-import { IAuditService } from '../../ports/output/IAuditService';
-import { IEventBus } from '../../ports/output/IEventBus';
+import { RoleName } from '../../../domain/value-objects/RoleName';
 import { TenantId } from '../../../domain/value-objects/TenantId';
 import { UserId } from '../../../domain/value-objects/UserId';
-import { RoleName } from '../../../domain/value-objects/RoleName';
-import { UserNotFoundError } from '../../../domain/errors/UserNotFoundError';
-import { TenantAccessDeniedError } from '../../../domain/errors/TenantAccessDeniedError';
-import { UserAddedToTenantEvent } from '../../../domain/events/TenantEvents';
-import { PrismaClient } from '@prisma/client';
+import { IAuditService } from '../../ports/output/IAuditService';
+import { IEventBus } from '../../ports/output/IEventBus';
+import { IQueryRepository } from '../../ports/output/IQueryRepository';
 
 export interface AddUserToTenantInput {
   tenantId: string;
@@ -34,10 +34,10 @@ export class AddUserToTenantUseCase {
   constructor(
     private tenantRepository: ITenantRepository,
     private userRepository: IUserRepository,
-    private prisma: PrismaClient,
+    private queryRepository: IQueryRepository,
     private auditService: IAuditService,
     private eventBus: IEventBus
-  ) {}
+  ) { }
 
   async execute(input: AddUserToTenantInput): Promise<void> {
     // 1. Verify tenant exists
@@ -48,21 +48,12 @@ export class AddUserToTenantUseCase {
     const user = await this.userRepository.findById(UserId.create(input.userId));
     if (!user) throw new UserNotFoundError(input.userId);
 
-    // 3. Persist the membership in Prisma (source of truth for DB)
-    await this.prisma.tenantMember.upsert({
-      where: {
-        tenantId_userId: { tenantId: input.tenantId, userId: input.userId },
-      },
-      create: {
-        tenantId: input.tenantId,
-        userId: input.userId,
-        role: input.role,
-        createdAt: new Date(),
-      },
-      update: {
-        role: input.role,
-      },
-    });
+    // 3. Persist the membership via query repository (source of truth for DB)
+    await this.queryRepository.upsertTenantMember(
+      input.tenantId,
+      input.userId,
+      input.role
+    );
 
     // 4. Update domain entity (immutable pattern via withTenantMembership)
     const updatedUser = user.withTenantMembership({
@@ -99,10 +90,10 @@ export class ChangeUserRoleUseCase {
   constructor(
     private tenantRepository: ITenantRepository,
     private userRepository: IUserRepository,
-    private prisma: PrismaClient,
+    private queryRepository: IQueryRepository,
     private auditService: IAuditService,
     private eventBus: IEventBus
-  ) {}
+  ) { }
 
   async execute(input: ChangeUserRoleInput): Promise<void> {
     // 1. Verify tenant
@@ -113,13 +104,12 @@ export class ChangeUserRoleUseCase {
     const user = await this.userRepository.findById(UserId.create(input.userId));
     if (!user) throw new UserNotFoundError(input.userId);
 
-    // 3. Persist role change
-    await this.prisma.tenantMember.update({
-      where: {
-        tenantId_userId: { tenantId: input.tenantId, userId: input.userId },
-      },
-      data: { role: input.newRole },
-    });
+    // 3. Persist role change via query repository
+    await this.queryRepository.updateTenantMemberRole(
+      input.tenantId,
+      input.userId,
+      input.newRole
+    );
 
     // 4. Reflect role change in domain (withTenantMembership replaces if already present)
     const updatedUser = user.withTenantMembership({

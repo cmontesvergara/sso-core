@@ -1,48 +1,48 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import { SessionEnrichmentService } from '../../../application/services/SessionEnrichmentService';
+import { AuthorizeUseCase } from '../../../application/use-cases/auth/AuthorizeUseCase';
+import { ExchangeCodeUseCase } from '../../../application/use-cases/auth/ExchangeCodeUseCase';
+import { GetSessionContextUseCase } from '../../../application/use-cases/auth/GetSessionContextUseCase';
+import { VerifySessionUseCase } from '../../../application/use-cases/auth/VerifySessionUseCase';
+import { GetTenantPublicInfoUseCase } from '../../../application/use-cases/tenant/GetTenantPublicInfoUseCase';
+import { AddUserToTenantUseCase, ChangeUserRoleUseCase } from '../../../application/use-cases/tenant/TenantMemberUseCase';
+import { ForgotPasswordUseCase, ResetPasswordUseCase } from '../../../application/use-cases/user/PasswordResetUseCase';
+import { ChangePasswordUseCase, UpdateUserProfileUseCase } from '../../../application/use-cases/user/UpdateUserUseCase';
+import { VerifyEmailUseCase } from '../../../application/use-cases/user/VerifyEmailUseCase';
 import { Container } from '../../config/Container';
 import { AuthController } from '../controllers/AuthController';
-import { UserController } from '../controllers/UserController';
-import { TenantController } from '../controllers/TenantController';
 import { PasswordController } from '../controllers/PasswordController';
-import { VerifySessionUseCase } from '../../../application/use-cases/auth/VerifySessionUseCase';
-import { GetSessionContextUseCase } from '../../../application/use-cases/auth/GetSessionContextUseCase';
-import { ExchangeCodeUseCase } from '../../../application/use-cases/auth/ExchangeCodeUseCase';
-import { AuthorizeUseCase } from '../../../application/use-cases/auth/AuthorizeUseCase';
-import { SessionEnrichmentService } from '../../../application/services/SessionEnrichmentService';
-import { UpdateUserProfileUseCase, ChangePasswordUseCase } from '../../../application/use-cases/user/UpdateUserUseCase';
-import { VerifyEmailUseCase } from '../../../application/use-cases/user/VerifyEmailUseCase';
-import { ForgotPasswordUseCase, ResetPasswordUseCase } from '../../../application/use-cases/user/PasswordResetUseCase';
-import { AddUserToTenantUseCase, ChangeUserRoleUseCase } from '../../../application/use-cases/tenant/TenantMemberUseCase';
-import { GetTenantPublicInfoUseCase } from '../../../application/use-cases/tenant/GetTenantPublicInfoUseCase';
+import { TenantController } from '../controllers/TenantController';
+import { UserController } from '../controllers/UserController';
 
-import { RoleController } from '../controllers/RoleController';
+import { AdminTenantController } from '../controllers/AdminTenantController';
+import { AdminUserController } from '../controllers/AdminUserController';
 import { ApplicationsController } from '../controllers/ApplicationsController';
+import { ApplicationSyncController } from '../controllers/ApplicationSyncController';
 import { AppResourceController } from '../controllers/AppResourceController';
 import { MetadataController } from '../controllers/MetadataController';
-import { ApplicationSyncController } from '../controllers/ApplicationSyncController';
+import { RoleController } from '../controllers/RoleController';
 import { StatsController } from '../controllers/StatsController';
 import { UtilController } from '../controllers/UtilController';
-import { AdminUserController } from '../controllers/AdminUserController';
-import { AdminTenantController } from '../controllers/AdminTenantController';
 
-import { createRoleRouter } from './role.routes';
-import { createApplicationsRouter } from './applications.routes';
-import { createAppResourceRouter } from './appResource.routes';
-import { createMetadataRouter } from './metadata.routes';
-import { createApplicationSyncRouter } from './applicationSync.routes';
-import { createStatsRouter } from './stats.routes';
-import { createUtilRouter } from './util.routes';
-import { createAdminUserRouter } from './adminUser.routes';
-import { createAdminTenantRouter } from './adminTenant.routes';
 import { createAuthMiddleware } from '../middleware/AuthMiddleware';
 import {
+  validateAuthorize,
+  validateExchange,
   validateLogin,
   validateRefresh,
-  validateExchange,
-  validateAuthorize,
   validateRegister,
 } from '../middleware/ValidationMiddleware';
+import { createAdminTenantRouter } from './adminTenant.routes';
+import { createAdminUserRouter } from './adminUser.routes';
+import { createApplicationsRouter } from './applications.routes';
+import { createApplicationSyncRouter } from './applicationSync.routes';
+import { createAppResourceRouter } from './appResource.routes';
+import { createMetadataRouter } from './metadata.routes';
+import { createRoleRouter } from './role.routes';
+import { createStatsRouter } from './stats.routes';
+import { createUtilRouter } from './util.routes';
 
 /**
  * createRouter
@@ -68,8 +68,7 @@ export function createRouter(container: Container): Router {
     container.get('IAuditService'),
     container.get('IEventBus'),
     container.get('IHashService'),
-    container.get('PrismaClient'),
-    container.get<SessionEnrichmentService>('SessionEnrichmentService')
+    container.get('IQueryRepository')
   );
 
   const authorizeUseCase = new AuthorizeUseCase(
@@ -90,7 +89,7 @@ export function createRouter(container: Container): Router {
 
   const getSessionContextUseCase = new GetSessionContextUseCase(
     container.get('ISessionRepository'),
-    container.get('PrismaClient'),
+    container.get('IQueryRepository'),
     container.get('ITokenService'),
     container.get<SessionEnrichmentService>('SessionEnrichmentService'),
     container.get('IAuditService')
@@ -114,7 +113,7 @@ export function createRouter(container: Container): Router {
   const addUserToTenantUseCase = new AddUserToTenantUseCase(
     container.get('ITenantRepository'),
     container.get('IUserRepository'),
-    container.get('PrismaClient'),
+    container.get('IQueryRepository'),
     container.get('IAuditService'),
     container.get('IEventBus')
   );
@@ -122,7 +121,7 @@ export function createRouter(container: Container): Router {
   const changeUserRoleUseCase = new ChangeUserRoleUseCase(
     container.get('ITenantRepository'),
     container.get('IUserRepository'),
-    container.get('PrismaClient'),
+    container.get('IQueryRepository'),
     container.get('IAuditService'),
     container.get('IEventBus')
   );
@@ -173,15 +172,15 @@ export function createRouter(container: Container): Router {
     resetPasswordUseCase
   );
 
-  const roleController            = container.get<RoleController>('RoleController');
-  const applicationsController    = container.get<ApplicationsController>('ApplicationsController');
-  const appResourceController     = container.get<AppResourceController>('AppResourceController');
-  const metadataController        = container.get<MetadataController>('MetadataController');
+  const roleController = container.get<RoleController>('RoleController');
+  const applicationsController = container.get<ApplicationsController>('ApplicationsController');
+  const appResourceController = container.get<AppResourceController>('AppResourceController');
+  const metadataController = container.get<MetadataController>('MetadataController');
   const applicationSyncController = container.get<ApplicationSyncController>('ApplicationSyncController');
-  const statsController           = container.get<StatsController>('StatsController');
-  const utilController            = container.get<UtilController>('UtilController');
-  const userLegacyController      = container.get<AdminUserController>('AdminUserController');
-  const tenantLegacyController    = container.get<AdminTenantController>('TenantController');
+  const statsController = container.get<StatsController>('StatsController');
+  const utilController = container.get<UtilController>('UtilController');
+  const userLegacyController = container.get<AdminUserController>('AdminUserController');
+  const tenantLegacyController = container.get<AdminTenantController>('TenantController');
 
   // ── Auth middleware ───────────────────────────────────────────────────────
   const requireAuth = createAuthMiddleware(verifySessionUseCase);
@@ -204,27 +203,27 @@ export function createRouter(container: Container): Router {
   });
 
   // ── Public routes (no auth required) ─────────────────────────────────────────
-  router.post('/auth/login',           validateLogin,    authController.login);
-  router.post('/auth/refresh',          validateRefresh,  authController.refresh);
-  router.post('/auth/exchange',         validateExchange, authController.exchange);
-  router.post('/auth/session',          authController.session);
-  router.post('/auth/forgot-password',  passwordController.forgotPassword);
-  router.post('/auth/reset-password',   passwordController.resetPassword);
-  router.post('/users/register',        validateRegister, userController.register);
-  router.post('/users/verify-email',    userController.verifyEmail);
+  router.post('/auth/login', validateLogin, authController.login);
+  router.post('/auth/refresh', validateRefresh, authController.refresh);
+  router.post('/auth/exchange', validateExchange, authController.exchange);
+  router.post('/auth/session', authController.session);
+  router.post('/auth/forgot-password', passwordController.forgotPassword);
+  router.post('/auth/reset-password', passwordController.resetPassword);
+  router.post('/users/register', validateRegister, userController.register);
+  router.post('/users/verify-email', userController.verifyEmail);
   router.post('/users/send-verification', sendVerificationLimiter, userController.sendVerification);
   router.get('/tenants/:tenantId/info', tenantInfoLimiter, tenantController.getPublicInfo);
 
   // ── Protected routes ──────────────────────────────────────────────────────
-  router.post('/auth/logout',           requireAuth, authController.logout);
-  router.post('/auth/authorize',        requireAuth, validateAuthorize, authController.authorize);
+  router.post('/auth/logout', requireAuth, authController.logout);
+  router.post('/auth/authorize', requireAuth, validateAuthorize, authController.authorize);
 
-  router.patch('/users/profile',        requireAuth, userController.updateProfile);
+  router.patch('/users/profile', requireAuth, userController.updateProfile);
   router.post('/users/change-password', requireAuth, userController.changePassword);
 
-  router.post('/tenants',               requireAuth, tenantController.createTenant);
-  router.post('/tenants/:tenantId/members',                requireAuth, tenantController.addMember);
-  router.patch('/tenants/:tenantId/members/:userId/role',  requireAuth, tenantController.changeRole);
+  router.post('/tenants', requireAuth, tenantController.createTenant);
+  router.post('/tenants/:tenantId/members', requireAuth, tenantController.addMember);
+  router.patch('/tenants/:tenantId/members/:userId/role', requireAuth, tenantController.changeRole);
 
   // ── Migrated v1 routes (Legacy integrations) ───────────────────────────────
   router.use('/role', createRoleRouter(roleController, requireAuth));
@@ -234,7 +233,7 @@ export function createRouter(container: Container): Router {
   router.use('/applications', createApplicationSyncRouter(applicationSyncController, requireAuth));
   router.use('/stats', createStatsRouter(statsController, requireAuth));
   router.use('/util', createUtilRouter(utilController, requireAuth));
-  
+
   // Expose remaining legacy endpoints under different paths or same paths
   router.use('/user', createAdminUserRouter(userLegacyController, requireAuth));
   router.use('/tenant', createAdminTenantRouter(tenantLegacyController, requireAuth));

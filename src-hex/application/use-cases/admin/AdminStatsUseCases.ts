@@ -1,28 +1,13 @@
-import { PrismaClient } from '@prisma/client';
+import { IStatsQueryService } from '../../ports/output/IStatsQueryService';
 
 /**
- * AdminStatsUseCases — global platform statistics (no src/ dependency).
+ * AdminStatsUseCases — global platform statistics.
+ * Uses IStatsQueryService to keep the application layer independent of the ORM.
  */
 export class AdminStatsUseCases {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly statsQueryService: IStatsQueryService) { }
 
   async getGlobalStats() {
-    const [totalUsers, activeUsers, totalTenants, totalApplications, totalSessions] =
-      await Promise.all([
-        this.prisma.user.count(),
-        this.prisma.user.count({ where: { userStatus: 'ACTIVE' } }),
-        this.prisma.tenant.count(),
-        this.prisma.application.count({ where: { isActive: true } }),
-        this.prisma.appSession.count({
-          where: { expiresAt: { gt: new Date() } },
-        }),
-      ]);
-
-    return {
-      users: { total: totalUsers, active: activeUsers },
-      tenants:      { total: totalTenants },
-      applications: { total: totalApplications },
-      sessions:     { active: totalSessions },
-    };
+    return this.statsQueryService.getGlobalStats();
   }
 }

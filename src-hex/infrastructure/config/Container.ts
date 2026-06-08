@@ -1,21 +1,29 @@
 import { PrismaClient } from '@prisma/client';
-import Redis from 'ioredis';
 import * as fs from 'fs';
+import Redis from 'ioredis';
 import * as path from 'path';
 
 // Infrastructure — config
 import { createRedisClient } from './RedisClient';
 
 // Infrastructure — persistence/prisma
-import { PrismaUserRepository } from '../persistence/prisma/PrismaUserRepository';
-import { PrismaSessionRepository } from '../persistence/prisma/PrismaSessionRepository';
-import { PrismaRefreshTokenRepository } from '../persistence/prisma/PrismaRefreshTokenRepository';
-import { PrismaTenantRepository } from '../persistence/prisma/PrismaTenantRepository';
+import { PrismaApplicationQueryService } from '../persistence/prisma/PrismaApplicationQueryService';
 import { PrismaApplicationRepository } from '../persistence/prisma/PrismaApplicationRepository';
+import { PrismaAppResourceQueryService } from '../persistence/prisma/PrismaAppResourceQueryService';
 import { PrismaAuthCodeRepository } from '../persistence/prisma/PrismaAuthCodeRepository';
-import { PrismaRoleRepository } from '../persistence/prisma/PrismaRoleRepository';
+import { PrismaAuthEventsQueryService } from '../persistence/prisma/PrismaAuthEventsQueryService';
 import { PrismaEmailVerificationRepository } from '../persistence/prisma/PrismaEmailVerificationRepository';
 import { PrismaOtpRepository } from '../persistence/prisma/PrismaOtpRepository';
+import { PrismaQueryRepository } from '../persistence/prisma/PrismaQueryRepository';
+import { PrismaRefreshTokenRepository } from '../persistence/prisma/PrismaRefreshTokenRepository';
+import { PrismaRoleQueryService } from '../persistence/prisma/PrismaRoleQueryService';
+import { PrismaRoleRepository } from '../persistence/prisma/PrismaRoleRepository';
+import { PrismaSessionRepository } from '../persistence/prisma/PrismaSessionRepository';
+import { PrismaStatsQueryService } from '../persistence/prisma/PrismaStatsQueryService';
+import { PrismaTenantQueryService } from '../persistence/prisma/PrismaTenantQueryService';
+import { PrismaTenantRepository } from '../persistence/prisma/PrismaTenantRepository';
+import { PrismaUserQueryService } from '../persistence/prisma/PrismaUserQueryService';
+import { PrismaUserRepository } from '../persistence/prisma/PrismaUserRepository';
 
 // Infrastructure — persistence/redis
 import { RedisCacheService } from '../persistence/redis/RedisCacheService';
@@ -23,26 +31,26 @@ import { RedisKeyFactory } from '../persistence/redis/RedisKeyFactoryService';
 import { TenantVersionService } from '../persistence/redis/TenantVersionService';
 
 // Infrastructure — persistence/cached
-import { UserCachedRepository } from '../persistence/cached/UserCachedRepository';
-import { SessionCachedRepository } from '../persistence/cached/SessionCachedRepository';
-import { TenantCachedRepository } from '../persistence/cached/TenantCachedRepository';
 import { ApplicationCachedRepository } from '../persistence/cached/ApplicationCachedRepository';
-import { RoleCachedRepository } from '../persistence/cached/RoleCachedRepository';
-import { RefreshTokenCachedRepository } from '../persistence/cached/RefreshTokenCachedRepository';
 import { AuthCodeCachedRepository } from '../persistence/cached/AuthCodeCachedRepository';
 import { EmailVerificationCachedRepository } from '../persistence/cached/EmailVerificationCachedRepository';
 import { OtpCachedRepository } from '../persistence/cached/OtpCachedRepository';
+import { RefreshTokenCachedRepository } from '../persistence/cached/RefreshTokenCachedRepository';
+import { RoleCachedRepository } from '../persistence/cached/RoleCachedRepository';
+import { SessionCachedRepository } from '../persistence/cached/SessionCachedRepository';
+import { TenantCachedRepository } from '../persistence/cached/TenantCachedRepository';
+import { UserCachedRepository } from '../persistence/cached/UserCachedRepository';
 
 // Infrastructure — security
-import { JwtTokenService } from '../security/JwtTokenService';
 import { Argon2PasswordHasher } from '../security/Argon2PasswordHasher';
 import { HmacSha256HashService } from '../security/HmacHashService';
 import { JwksProvider } from '../security/JwksProvider';
+import { JwtTokenService } from '../security/JwtTokenService';
 
 // Infrastructure — external-services
-import { InMemoryEventBus } from '../external-services/events/InMemoryEventBus';
 import { PrismaAuditService } from '../external-services/audit/PrismaAuditService';
 import { ResendEmailService } from '../external-services/email/ResendEmailService';
+import { InMemoryEventBus } from '../external-services/events/InMemoryEventBus';
 
 // Application — services
 import { SessionEnrichmentService } from '../../application/services/SessionEnrichmentService';
@@ -51,29 +59,29 @@ import { SessionEnrichmentService } from '../../application/services/SessionEnri
 import { LoginUseCase } from '../../application/use-cases/auth/LoginUseCase';
 import { LogoutUseCase } from '../../application/use-cases/auth/LogoutUseCase';
 import { RefreshTokenUseCase } from '../../application/use-cases/auth/RefreshTokenUseCase';
-import { RegisterUserUseCase } from '../../application/use-cases/user/RegisterUserUseCase';
 import { CreateAppSessionUseCase } from '../../application/use-cases/session/CreateAppSessionUseCase';
 import { CreateTenantUseCase } from '../../application/use-cases/tenant/CreateTenantUseCase';
+import { RegisterUserUseCase } from '../../application/use-cases/user/RegisterUserUseCase';
 
 // Application — admin use cases
-import { AdminUserUseCases } from '../../application/use-cases/admin/AdminUserUseCases';
-import { AdminTenantUseCases } from '../../application/use-cases/admin/AdminTenantUseCases';
 import { AdminApplicationUseCases } from '../../application/use-cases/admin/AdminApplicationUseCases';
+import { AdminAppResourceUseCases } from '../../application/use-cases/admin/AdminAppResourceUseCases';
 import { AdminRoleUseCases } from '../../application/use-cases/admin/AdminRoleUseCases';
 import { AdminStatsUseCases } from '../../application/use-cases/admin/AdminStatsUseCases';
+import { AdminTenantUseCases } from '../../application/use-cases/admin/AdminTenantUseCases';
+import { AdminUserUseCases } from '../../application/use-cases/admin/AdminUserUseCases';
 import { AuthEventsUseCases } from '../../application/use-cases/admin/AuthEventsUseCases';
-import { AdminAppResourceUseCases } from '../../application/use-cases/admin/AdminAppResourceUseCases';
 
 // Infrastructure — controllers (admin)
-import { AdminUserController } from '../web/controllers/AdminUserController';
 import { AdminTenantController } from '../web/controllers/AdminTenantController';
-import { RoleController } from '../web/controllers/RoleController';
+import { AdminUserController } from '../web/controllers/AdminUserController';
 import { ApplicationsController } from '../web/controllers/ApplicationsController';
-import { StatsController } from '../web/controllers/StatsController';
-import { AppResourceController } from '../web/controllers/AppResourceController';
-import { UtilController } from '../web/controllers/UtilController';
 import { ApplicationSyncController } from '../web/controllers/ApplicationSyncController';
+import { AppResourceController } from '../web/controllers/AppResourceController';
 import { MetadataController } from '../web/controllers/MetadataController';
+import { RoleController } from '../web/controllers/RoleController';
+import { StatsController } from '../web/controllers/StatsController';
+import { UtilController } from '../web/controllers/UtilController';
 
 // Infrastructure — auth middleware
 import { VerifySessionUseCase } from '../../application/use-cases/auth/VerifySessionUseCase';
@@ -174,6 +182,15 @@ export class Container {
       anyCache(), strCache(), keyFactory
     );
 
+    const queryRepository = new PrismaQueryRepository(this.prisma);
+    const userQueryService = new PrismaUserQueryService(this.prisma);
+    const tenantQueryService = new PrismaTenantQueryService(this.prisma);
+    const appQueryService = new PrismaApplicationQueryService(this.prisma);
+    const roleQueryService = new PrismaRoleQueryService(this.prisma);
+    const statsQueryService = new PrismaStatsQueryService(this.prisma);
+    const authEventsQueryService = new PrismaAuthEventsQueryService(this.prisma);
+    const appResourceQueryService = new PrismaAppResourceQueryService(this.prisma);
+
     // ── Application services ─────────────────────────────────────────────────
     const sessionEnrichmentService = new SessionEnrichmentService(this.prisma);
 
@@ -202,7 +219,7 @@ export class Container {
       auditService,
       eventBus,
       hashService,
-      this.prisma
+      queryRepository
     );
 
     const registerUserUseCase = new RegisterUserUseCase(
@@ -252,6 +269,7 @@ export class Container {
     this.instances.set('IRoleRepository', roleRepository);
     this.instances.set('IEmailVerificationRepository', emailVerificationRepository);
     this.instances.set('IOtpRepository', otpRepository);
+    this.instances.set('IQueryRepository', queryRepository);
 
     this.instances.set('SessionEnrichmentService', sessionEnrichmentService);
 
@@ -262,14 +280,14 @@ export class Container {
     this.instances.set('CreateAppSessionUseCase', createAppSessionUseCase);
     this.instances.set('CreateTenantUseCase', createTenantUseCase);
 
-    // ── Admin use cases (all use injected PrismaClient, zero src/ imports) ───
-    const adminUsers = new AdminUserUseCases(this.prisma);
-    const adminTenants = new AdminTenantUseCases(this.prisma);
-    const adminApplications = new AdminApplicationUseCases(this.prisma);
-    const adminRoles = new AdminRoleUseCases(this.prisma);
-    const adminStats = new AdminStatsUseCases(this.prisma);
-    const authEvents = new AuthEventsUseCases(this.prisma);
-    const adminAppResources = new AdminAppResourceUseCases(this.prisma);
+    // ── Admin use cases (all use injected QueryServices, zero src/ imports) ───
+    const adminUsers = new AdminUserUseCases(userQueryService);
+    const adminTenants = new AdminTenantUseCases(tenantQueryService, userQueryService);
+    const adminApplications = new AdminApplicationUseCases(appQueryService);
+    const adminRoles = new AdminRoleUseCases(roleQueryService);
+    const adminStats = new AdminStatsUseCases(statsQueryService);
+    const authEvents = new AuthEventsUseCases(authEventsQueryService, userQueryService);
+    const adminAppResources = new AdminAppResourceUseCases(appResourceQueryService);
 
     this.instances.set('AdminUserUseCases', adminUsers);
     this.instances.set('AdminTenantUseCases', adminTenants);
@@ -284,7 +302,7 @@ export class Container {
     this.instances.set('TenantController', new AdminTenantController(adminTenants));
     this.instances.set('RoleController', new RoleController(adminRoles));
     this.instances.set('ApplicationsController', new ApplicationsController(adminApplications));
-    this.instances.set('ApplicationSyncController', new ApplicationSyncController(this.prisma, adminAppResources));
+    this.instances.set('ApplicationSyncController', new ApplicationSyncController(appQueryService, adminAppResources));
     this.instances.set('StatsController', new StatsController(adminStats, authEvents));
     this.instances.set('AppResourceController', new AppResourceController(adminAppResources));
     this.instances.set('UtilController', new UtilController());

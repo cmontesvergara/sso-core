@@ -1,9 +1,9 @@
 import { ISessionRepository } from '../../../domain/repositories/ISessionRepository';
-import { ITokenService } from '../../ports/output/ITokenService';
-import { PrismaClient } from '@prisma/client';
 import { SessionId } from '../../../domain/value-objects/SessionId';
-import { SessionEnrichmentService } from '../../services/SessionEnrichmentService';
 import { IAuditService } from '../../ports/output/IAuditService';
+import { IQueryRepository } from '../../ports/output/IQueryRepository';
+import { ITokenService } from '../../ports/output/ITokenService';
+import { SessionEnrichmentService } from '../../services/SessionEnrichmentService';
 
 export interface GetSessionContextInput {
   sessionId: string;
@@ -27,11 +27,11 @@ export interface GetSessionContextInput {
 export class GetSessionContextUseCase {
   constructor(
     private sessionRepository: ISessionRepository,
-    private prisma: PrismaClient,
+    private queryRepository: IQueryRepository,
     private tokenService: ITokenService,
     private sessionEnrichmentService: SessionEnrichmentService,
     private auditService: IAuditService
-  ) {}
+  ) { }
 
   async execute(input: GetSessionContextInput): Promise<any> {
     if (!input.sessionId) {
@@ -73,40 +73,18 @@ export class GetSessionContextUseCase {
     const enrichedSession = await this.sessionEnrichmentService.enrich(session);
     const tokens = await this.tokenService.generateTokens(enrichedSession);
 
-    // ── 3. Load user from Prisma (already injected, no src/ needed) ──────────────
-    const user = await this.prisma.user.findUnique({
-      where: { id: session.userId.value },
-    });
+    // ── 3. Load user via query repository ────────────────────────────────────────
+    const user = await this.queryRepository.findUserById(session.userId.value);
 
     if (!user) {
       throw new Error('User not found');
     }
 
     // ── 4. Tenant memberships ─────────────────────────────────────────────────────
-    const tenantMembers = await this.prisma.tenantMember.findMany({
-      where: {
-        userId: user.id,
-        tenant: input.appId
-          ? {
-              tenantApps: {
-                some: {
-                  application: { appId: input.appId },
-                  isEnabled: true,
-                },
-              },
-            }
-          : undefined,
-      },
-      include: { tenant: true },
-    });
-
-    const tenants = tenantMembers.map((tm: any) => ({
-      id: tm.tenant.id,
-      name: tm.tenant.name,
-      domain: tm.tenant.domain,
-      slug: tm.tenant.slug,
-      role: tm.role,
-    }));
+    const tenants = await this.queryRepository.findTenantMemberships(
+      user.id,
+      input.appId ?? undefined
+    );
 
     // ── 5. Resolve current tenant ─────────────────────────────────────────────────
     const activeTenantId = (session as any).tenantId?.value;
@@ -116,24 +94,11 @@ export class GetSessionContextUseCase {
     let permissions: Array<{ resource: string; action: string }> = [];
 
     if (currentTenant && input.appId) {
-      const roleRecord = await this.prisma.role.findFirst({
-        where: { tenantId: currentTenant.id, name: currentTenant.role },
-      });
-      if (roleRecord) {
-        const application = await this.prisma.application.findUnique({
-          where: { appId: input.appId },
-        });
-        if (application) {
-          const rolePermissions = await this.prisma.permission.findMany({
-            where: { roleId: roleRecord.id, applicationId: application.id },
-            select: { resource: true, action: true },
-          });
-          permissions = rolePermissions.map((p: any) => ({
-            resource: p.resource,
-            action: p.action,
-          }));
-        }
-      }
+      permissions = await this.queryRepository.findRolePermissions(
+        currentTenant.id,
+        currentTenant.role,
+        input.appId
+      );
     }
 
     return {

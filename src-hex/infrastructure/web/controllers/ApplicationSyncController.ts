@@ -1,6 +1,6 @@
 import axios from 'axios';
-import { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { NextFunction, Request, Response } from 'express';
+import { IApplicationQueryService } from '../../../application/ports/output/IApplicationQueryService';
 import { AdminAppResourceUseCases } from '../../../application/use-cases/admin/AdminAppResourceUseCases';
 
 /**
@@ -12,16 +12,16 @@ import { AdminAppResourceUseCases } from '../../../application/use-cases/admin/A
  */
 export class ApplicationSyncController {
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly appQueryService: IApplicationQueryService,
     private readonly appResources: AdminAppResourceUseCases,
-  ) {}
+  ) { }
 
   /** POST /api/v1/applications/sync/:appId */
   postRoute1 = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { appId } = req.params;
 
-      const application = await this.prisma.application.findUnique({ where: { appId } });
+      const application = await this.appQueryService.getApplicationByAppId(appId);
       if (!application) throw Object.assign(new Error('Application not found'), { statusCode: 404, code: 'APP_NOT_FOUND' });
 
       const backendUrl: string | undefined = (application as any).backendUrl;

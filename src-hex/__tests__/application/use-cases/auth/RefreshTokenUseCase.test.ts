@@ -67,28 +67,26 @@ const eventBus = {
   subscribe: jest.fn(),
 };
 
-const mockPrisma = {
-  user: {
-    findUnique: jest.fn().mockResolvedValue({
-      id: 'user-123',
-      firstName: 'Test',
-      lastName: 'User',
-      systemRole: 'user',
-    }),
-  },
-  tenantMember: {
-    findMany: jest.fn().mockResolvedValue([]),
-    findFirst: jest.fn().mockResolvedValue({
-      tenantId: 'tenant-456',
-      role: 'admin',
-    }),
-  },
-  role: {
-    findFirst: jest.fn().mockResolvedValue(null),
-  },
-  application: {
-    findUnique: jest.fn().mockResolvedValue(null),
-  },
+const mockQueryRepository = {
+  findUserById: jest.fn().mockResolvedValue({
+    id: 'user-123',
+    firstName: 'Test',
+    lastName: 'User',
+    fullName: 'Test User',
+    nuid: 'N123',
+    email: 'test@bigso.co',
+    userStatus: 'active',
+    systemRole: 'user',
+  }),
+  findFirstTenantMembership: jest.fn().mockResolvedValue({
+    tenantId: 'tenant-456',
+    role: 'admin',
+  }),
+  findTenantMemberships: jest.fn().mockResolvedValue([]),
+  findRolePermissions: jest.fn().mockResolvedValue([]),
+  findApplicationByAppId: jest.fn().mockResolvedValue(null),
+  upsertTenantMember: jest.fn().mockResolvedValue(undefined),
+  updateTenantMemberRole: jest.fn().mockResolvedValue(undefined),
 };
 
 describe('RefreshTokenUseCase', () => {
@@ -103,7 +101,7 @@ describe('RefreshTokenUseCase', () => {
       auditService as any,
       eventBus as any,
       { hash: (v: string) => v, verify: (v: string, h: string) => v === h },
-      mockPrisma as any
+      mockQueryRepository as any
     );
   });
 
@@ -120,15 +118,15 @@ describe('RefreshTokenUseCase', () => {
 
   it('should reject token not found in refresh token table', async () => {
     refreshTokenRepository.findByHash.mockResolvedValueOnce(null);
-    
+
     await expect(
-      refreshTokenUseCase.execute({ 
-        refreshToken: 'unknown-token', 
-        tenantId: 't', 
-        appId: 'a' 
+      refreshTokenUseCase.execute({
+        refreshToken: 'unknown-token',
+        tenantId: 't',
+        appId: 'a'
       })
     ).rejects.toThrow(InvalidCredentialsError);
-    
+
     expect(auditService.log).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'REFRESH_FAILURE',
@@ -146,7 +144,7 @@ describe('RefreshTokenUseCase', () => {
       isActive: () => false,
       hasBeenRotated: () => false,
     });
-    
+
     await expect(
       refreshTokenUseCase.execute({ refreshToken: 'hashed-token-abc', tenantId: 't', appId: 'a' })
     ).rejects.toThrow('Token has been revoked');
@@ -189,7 +187,7 @@ describe('RefreshTokenUseCase', () => {
       tenantId: 'tenant-456',
       appId: 'crm',
     });
-    
+
     expect(auditService.log).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'TOKEN_REFRESH',

@@ -1,60 +1,36 @@
-import { PrismaClient } from '@prisma/client';
+import { IRoleQueryService } from '../../ports/output/IRoleQueryService';
 
 /**
  * AdminRoleUseCases
  *
  * CRUD operations for roles and their permissions within tenants.
- * systemRole authorization is removed (field deprecated) — auth is done
- * solely by the hex AuthMiddleware (requireAuth).
+ * Uses IRoleQueryService to keep the application layer independent of the ORM.
  */
 export class AdminRoleUseCases {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly roleQueryService: IRoleQueryService) { }
 
   async createRole(data: { name: string; tenantId: string }, createdBy: string) {
-    const existing = await this.prisma.role.findFirst({
-      where: { name: data.name, tenantId: data.tenantId },
-    });
-    if (existing) throw new Error(`Role '${data.name}' already exists in this tenant`);
-
-    return this.prisma.role.create({
-      data: {
-        name:     data.name,
-        tenantId: data.tenantId,
-      },
-    });
+    return this.roleQueryService.createRole(data, createdBy);
   }
 
   async getTenantRoles(tenantId: string) {
-    return this.prisma.role.findMany({
-      where: { tenantId },
-      include: { permissions: true },
-    });
+    return this.roleQueryService.getTenantRoles(tenantId);
   }
 
   async getAllRoles(tenantId?: string) {
-    return this.prisma.role.findMany({
-      where: tenantId ? { tenantId } : undefined,
-      include: { permissions: true },
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.roleQueryService.getAllRoles(tenantId);
   }
 
   async getRoleById(roleId: string) {
-    const role = await this.prisma.role.findUnique({
-      where: { id: roleId },
-      include: { permissions: true },
-    });
-    if (!role) throw new Error('Role not found');
-    return role;
+    return this.roleQueryService.getRoleById(roleId);
   }
 
   async updateRole(roleId: string, data: { name?: string; description?: string }) {
-    return this.prisma.role.update({ where: { id: roleId }, data });
+    return this.roleQueryService.updateRole(roleId, data);
   }
 
   async deleteRole(roleId: string) {
-    await this.prisma.permission.deleteMany({ where: { roleId } });
-    return this.prisma.role.delete({ where: { id: roleId } });
+    return this.roleQueryService.deleteRole(roleId);
   }
 
   // ── PERMISSIONS ───────────────────────────────────────────────────────────
@@ -64,29 +40,20 @@ export class AdminRoleUseCases {
     resource: string;
     action: string;
   }) {
-    const existing = await this.prisma.permission.findFirst({
-      where: { roleId, applicationId: data.applicationId, resource: data.resource, action: data.action },
-    });
-    if (existing) throw new Error('Permission already assigned to this role');
-
-    return this.prisma.permission.create({
-      data: { roleId, applicationId: data.applicationId, resource: data.resource, action: data.action },
-    });
+    return this.roleQueryService.addPermission(roleId, data);
   }
 
   async getRolePermissions(roleId: string) {
-    return this.prisma.permission.findMany({ where: { roleId } });
+    return this.roleQueryService.getRolePermissions(roleId);
   }
 
   async removePermission(permissionId: string) {
-    return this.prisma.permission.delete({ where: { id: permissionId } });
+    return this.roleQueryService.removePermission(permissionId);
   }
 
   async removePermissionByResourceAction(
     roleId: string, applicationId: string, resource: string, action: string
   ) {
-    return this.prisma.permission.deleteMany({
-      where: { roleId, applicationId, resource, action },
-    });
+    return this.roleQueryService.removePermissionByResourceAction(roleId, applicationId, resource, action);
   }
 }

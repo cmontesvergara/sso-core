@@ -1,22 +1,20 @@
 import crypto from 'crypto';
 import { RefreshToken } from '../../../domain/entities/RefreshToken';
 import { AppSession } from '../../../domain/entities/Session';
+import { InvalidAuthCodeError } from '../../../domain/errors/InvalidAuthCodeError';
+import { UserNotFoundError } from '../../../domain/errors/UserNotFoundError';
 import { IAuthCodeRepository } from '../../../domain/repositories/IAuthCodeRepository';
 import { IRefreshTokenRepository } from '../../../domain/repositories/IRefreshTokenRepository';
 import { ISessionRepository } from '../../../domain/repositories/ISessionRepository';
 import { IUserRepository } from '../../../domain/repositories/IUserRepository';
 import { RefreshTokenId } from '../../../domain/value-objects/Ids';
 import { SessionId } from '../../../domain/value-objects/SessionId';
+import { LoginResult } from '../../dto/output/LoginResult';
 import { IAuditService } from '../../ports/output/IAuditService';
 import { IEventBus } from '../../ports/output/IEventBus';
 import { IHashService } from '../../ports/output/IHashService';
+import { IQueryRepository } from '../../ports/output/IQueryRepository';
 import { ITokenService } from '../../ports/output/ITokenService';
-import { SessionEnrichmentService } from '../../services/SessionEnrichmentService';
-
-import { PrismaClient } from '@prisma/client';
-import { InvalidAuthCodeError } from '../../../domain/errors/InvalidAuthCodeError';
-import { UserNotFoundError } from '../../../domain/errors/UserNotFoundError';
-import { LoginResult } from '../../dto/output/LoginResult';
 
 export interface ExchangeCodeInput {
   code: string;
@@ -39,8 +37,7 @@ export class ExchangeCodeUseCase {
     private auditService: IAuditService,
     private eventBus: IEventBus,
     private hashService: IHashService,
-    private prisma: PrismaClient,
-    private sessionEnrichmentService: SessionEnrichmentService,
+    private queryRepository: IQueryRepository,
   ) { }
 
   async execute(input: ExchangeCodeInput): Promise<LoginResult> {
@@ -73,12 +70,9 @@ export class ExchangeCodeUseCase {
     await this.authCodeRepository.update(usedCode);
 
     // 7. Create app session — also fetch the app's audience claim from the DB
-    const appRecord = await this.prisma.application.findUnique({
-      where: { appId: input.appId },
-      select: { audience: true, id: true, url: true, backendUrl: true },
-    });
-    const appAudience  = appRecord?.audience   ?? undefined;
-    const appUrl       = appRecord?.url        ?? undefined;
+    const appRecord = await this.queryRepository.findApplicationByAppId(input.appId);
+    const appAudience = appRecord?.audience ?? undefined;
+    const appUrl = appRecord?.url ?? undefined;
     const appBackendUrl = appRecord?.backendUrl ?? undefined;
 
     const sessionToken = `app_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -118,54 +112,21 @@ export class ExchangeCodeUseCase {
     await this.refreshTokenRepository.save(refreshTokenEntity);
 
     // 9. Fetch enrichment data (tenant memberships + permissions)
-    const prisma = this.prisma;
-
-    // Fetch tenant memberships with tenant details
-    const tenantMembers = await prisma.tenantMember.findMany({
-      where: {
-        userId: authCode.userId.value,
-        tenant: {
-          tenantApps: {
-            some: {
-              application: { appId: input.appId },
-              isEnabled: true,
-            },
-          },
-        },
-      },
-      include: { tenant: true },
-    });
-
-    const tenants = tenantMembers.map((tm: any) => ({
-      id: tm.tenant.id,
-      name: tm.tenant.name,
-      slug: tm.tenant.slug,
-      role: tm.role,
-    }));
+    const tenants = await this.queryRepository.findTenantMemberships(
+      authCode.userId.value,
+      input.appId
+    );
 
     // Generate permissions for the current tenant
     let permissions: Array<{ resource: string; action: string }> = [];
-    const currentTenantMember = tenantMembers.find((tm: any) => tm.tenantId === authCode.tenantId.value);
+    const currentTenantMember = tenants.find((t: any) => t.id === authCode.tenantId.value);
 
     if (currentTenantMember) {
-      const roleRecord = await prisma.role.findFirst({
-        where: {
-          tenantId: authCode.tenantId.value,
-          name: currentTenantMember.role,
-        },
-      });
-
-      if (roleRecord) {
-        // Use already-fetched appRecord.id to avoid a second DB query
-        const applicationId = appRecord?.id;
-        if (applicationId) {
-          const rolePermissions = await this.prisma.permission.findMany({
-            where: { roleId: roleRecord.id, applicationId },
-            select: { resource: true, action: true },
-          });
-          permissions = rolePermissions.map((p: any) => ({ resource: p.resource, action: p.action }));
-        }
-      }
+      permissions = await this.queryRepository.findRolePermissions(
+        authCode.tenantId.value,
+        currentTenantMember.role,
+        input.appId
+      );
     }
 
     // 10. Audit
