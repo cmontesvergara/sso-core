@@ -109,7 +109,7 @@ function buildApp() {
   router.patch('/users/profile',            requireAuth, userController.updateProfile);
   router.post('/users/change-password',     requireAuth, userController.changePassword);
 
-  app.use('/api/v3', router);
+  app.use('/api/v2', router);
   app.use(errorHandlerMiddleware);
 
   return app;
@@ -119,14 +119,14 @@ const app = buildApp();
 
 // ── Test suites ─────────────────────────────────────────────────────────────────
 
-describe('POST /api/v3/auth/login', () => {
+describe('POST /api/v2/auth/login', () => {
   beforeEach(() => jest.resetAllMocks());
 
   it('200 — returns tokens on valid credentials', async () => {
     mockLoginUseCase.execute.mockResolvedValue(loginResult);
 
     const res = await request(app)
-      .post('/api/v3/auth/login')
+      .post('/api/v2/auth/login')
       .send({ email: 'test@bigso.co', password: 'StrongPass123!' });
 
     expect(res.status).toBe(200);
@@ -138,7 +138,7 @@ describe('POST /api/v3/auth/login', () => {
     mockLoginUseCase.execute.mockResolvedValue(loginResult);
 
     const res = await request(app)
-      .post('/api/v3/auth/login')
+      .post('/api/v2/auth/login')
       .send({ nuid: 'N123456', password: 'StrongPass123!' });
 
     expect(res.status).toBe(200);
@@ -152,7 +152,7 @@ describe('POST /api/v3/auth/login', () => {
     mockLoginUseCase.execute.mockRejectedValueOnce(new InvalidCredentialsError());
 
     const res = await request(app)
-      .post('/api/v3/auth/login')
+      .post('/api/v2/auth/login')
       .send({ email: 'bad@bigso.co', password: 'wrong' });
 
     expect(res.status).toBe(401);
@@ -163,21 +163,21 @@ describe('POST /api/v3/auth/login', () => {
     mockLoginUseCase.execute.mockRejectedValueOnce(new InvalidCredentialsError());
 
     const res = await request(app)
-      .post('/api/v3/auth/login')
+      .post('/api/v2/auth/login')
       .send({});
 
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
 });
 
-describe('POST /api/v3/auth/refresh', () => {
+describe('POST /api/v2/auth/refresh', () => {
   beforeEach(() => jest.resetAllMocks());
 
   it('200 — returns new tokens on valid refresh token', async () => {
     mockRefreshUseCase.execute.mockResolvedValue(loginResult);
 
     const res = await request(app)
-      .post('/api/v3/auth/refresh')
+      .post('/api/v2/auth/refresh')
       .send({ refreshToken: 'valid.refresh.token', tenantId: 't-1', appId: 'crm' });
 
     expect(res.status).toBe(200);
@@ -185,7 +185,7 @@ describe('POST /api/v3/auth/refresh', () => {
   });
 });
 
-describe('POST /api/v3/users/register', () => {
+describe('POST /api/v2/users/register', () => {
   const registerResult = {
     id: 'user-1',
     email: 'new@bigso.co',
@@ -205,7 +205,7 @@ describe('POST /api/v3/users/register', () => {
 
   it('201 — creates user and returns profile', async () => {
     const res = await request(app)
-      .post('/api/v3/users/register')
+      .post('/api/v2/users/register')
       .send({ email: 'new@bigso.co', password: 'StrongPass123!', firstName: 'Ana', lastName: 'García' });
 
     expect(res.status).toBe(201);
@@ -217,7 +217,7 @@ describe('POST /api/v3/users/register', () => {
     mockRegisterUseCase.execute.mockRejectedValueOnce(new UserAlreadyExistsError('new@bigso.co'));
 
     const res = await request(app)
-      .post('/api/v3/users/register')
+      .post('/api/v2/users/register')
       .send({ email: 'new@bigso.co', password: 'StrongPass123!', firstName: 'Ana', lastName: 'García' });
 
     expect(res.status).toBe(409);
@@ -225,33 +225,33 @@ describe('POST /api/v3/users/register', () => {
   });
 });
 
-describe('POST /api/v3/auth/forgot-password', () => {
+describe('POST /api/v2/auth/forgot-password', () => {
   beforeEach(() => jest.resetAllMocks());
 
   it('204 — always returns 204 (anti-enumeration)', async () => {
     const res = await request(app)
-      .post('/api/v3/auth/forgot-password')
+      .post('/api/v2/auth/forgot-password')
       .send({ email: 'any@email.com' });
 
     expect(res.status).toBe(204);
   });
 });
 
-describe('POST /api/v3/auth/reset-password', () => {
+describe('POST /api/v2/auth/reset-password', () => {
   beforeEach(() => jest.resetAllMocks());
 
   it('204 — returns 204 on valid reset', async () => {
     const res = await request(app)
-      .post('/api/v3/auth/reset-password')
+      .post('/api/v2/auth/reset-password')
       .send({ token: 'RESET_valid-token', newPassword: 'NewPass123!' });
 
     expect(res.status).toBe(204);
   });
 });
 
-describe('GET /api/v3/health (404 — not in this router)', () => {
+describe('GET /api/v2/health (404 — not in this router)', () => {
   it('404 — unknown route returns not found JSON', async () => {
-    const res = await request(app).get('/api/v3/unknown-route');
+    const res = await request(app).get('/api/v2/unknown-route');
     // Express default 404
     expect(res.status).toBe(404);
   });
@@ -265,7 +265,7 @@ describe('Protected routes — require auth header', () => {
     mockVerifySessionUC.execute.mockRejectedValueOnce(new InvalidCredentialsError());
 
     const res = await request(app)
-      .patch('/api/v3/users/profile')
+      .patch('/api/v2/users/profile')
       .send({ firstName: 'Carlos' });
 
     expect(res.status).toBe(401);
@@ -276,7 +276,7 @@ describe('Protected routes — require auth header', () => {
     mockUpdateProfileUC.execute.mockResolvedValue({ success: true, userId: 'user-1' });
 
     const res = await request(app)
-      .patch('/api/v3/users/profile')
+      .patch('/api/v2/users/profile')
       .set('Authorization', `Bearer ${MOCK_ACCESS_TOKEN}`)
       .send({ firstName: 'Carlos' });
 

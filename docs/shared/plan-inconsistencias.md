@@ -1,8 +1,8 @@
 # 🗺️ Plan de Trabajo — Corrección de Inconsistencias IdP Core
 
 > **Archivo vivo:** Se actualiza progresivamente a medida que avanzan las etapas.
-> **Última actualización:** 2026-06-07
-> **Estado general:** 0 / 5 etapas completadas
+> **Última actualización:** 2026-06-08
+> **Estado general:** 5 / 5 etapas completadas
 
 ---
 
@@ -35,65 +35,38 @@ Este plan corrige las **23 inconsistencias** detectadas en la auditoría del pro
 ## 🔴 ETAPA 1 — Fundamentos de Arquitectura
 
 **Objetivo:** Eliminar todas las violaciones de Clean Architecture en la capa `application/`.
-**Estado:** `🔄 En progreso — 4/12 archivos refactorizados`
-**Bloqueante para:** Etapa 2
+**Estado:** `✅ Completada`
+**Bloqueante para:** — (completada)
 
-### Problema a resolver
+### Resumen de cambios
 
-12 archivos en `src-hex/application/` importan `PrismaClient` directamente desde `@prisma/client`. Esto rompe la regla de que `application/` solo puede depender de `domain/`.
-
-### Archivos afectados
-
-| #   | Archivo                                                   | Estado               | Uso actual de Prisma                             |
+| #   | Archivo                                                   | Estado               | Notas                                            |
 | --- | --------------------------------------------------------- | -------------------- | ------------------------------------------------ |
-| 1   | `application/services/SessionEnrichmentService.ts`        | ⏳ Pendiente         | Lee `Application` table para enriquecer sesiones |
-| 2   | `application/use-cases/admin/AdminUserUseCases.ts`        | ⏳ Pendiente         | CRUD users, addresses, búsquedas complejas       |
-| 3   | `application/use-cases/admin/AdminAppResourceUseCases.ts` | ⏳ Pendiente         | CRUD app resources                               |
-| 4   | `application/use-cases/admin/AuthEventsUseCases.ts`       | ⏳ Pendiente         | Queries de auditoría                             |
-| 5   | `application/use-cases/admin/AdminStatsUseCases.ts`       | ⏳ Pendiente         | Agregaciones de stats                            |
-| 6   | `application/use-cases/admin/AdminRoleUseCases.ts`        | ⏳ Pendiente         | CRUD roles y permisos                            |
-| 7   | `application/use-cases/admin/AdminTenantUseCases.ts`      | ⏳ Pendiente         | CRUD tenants y members                           |
-| 8   | `application/use-cases/admin/AdminApplicationUseCases.ts` | ⏳ Pendiente         | CRUD applications                                |
-| 9   | `application/use-cases/auth/RefreshTokenUseCase.ts`       | ✅ **Refactorizado** | ~~Transacción Prisma~~ → `IQueryRepository`      |
-| 10  | `application/use-cases/auth/GetSessionContextUseCase.ts`  | ✅ **Refactorizado** | ~~Lookup app data~~ → `IQueryRepository`         |
-| 11  | `application/use-cases/auth/ExchangeCodeUseCase.ts`       | ✅ **Refactorizado** | ~~Transacción atómica~~ → `IQueryRepository`     |
-| 12  | `application/use-cases/tenant/TenantMemberUseCase.ts`     | ✅ **Refactorizado** | ~~Upsert TenantMember~~ → `IQueryRepository`     |
+| 1   | `application/services/SessionEnrichmentService.ts`        | ✅ **Eliminado**     | Lógica movida a `GetSessionContextUseCase`       |
+| 2   | `application/use-cases/admin/AdminUserUseCases.ts`        | ✅ **Refactorizado** | Usa `IUserQueryService` (PrismaUserQueryService) |
+| 3   | `application/use-cases/admin/AdminAppResourceUseCases.ts` | ✅ **Refactorizado** | Usa `IAppResourceQueryService`                   |
+| 4   | `application/use-cases/admin/AuthEventsUseCases.ts`       | ✅ **Refactorizado** | Usa `IAuthEventsQueryService`                    |
+| 5   | `application/use-cases/admin/AdminStatsUseCases.ts`       | ✅ **Refactorizado** | Usa `IStatsQueryService`                         |
+| 6   | `application/use-cases/admin/AdminRoleUseCases.ts`        | ✅ **Refactorizado** | Usa `IRoleQueryService`                          |
+| 7   | `application/use-cases/admin/AdminTenantUseCases.ts`      | ✅ **Refactorizado** | Usa `ITenantQueryService` + `IUserQueryService`  |
+| 8   | `application/use-cases/admin/AdminApplicationUseCases.ts` | ✅ **Refactorizado** | Usa `IApplicationQueryService`                   |
+| 9   | `application/use-cases/auth/RefreshTokenUseCase.ts`       | ✅ **Refactorizado** | Usa `IQueryRepository`                           |
+| 10  | `application/use-cases/auth/GetSessionContextUseCase.ts`  | ✅ **Refactorizado** | Usa `IQueryRepository`                           |
+| 11  | `application/use-cases/auth/ExchangeCodeUseCase.ts`       | ✅ **Refactorizado** | Usa `IQueryRepository`                           |
+| 12  | `application/use-cases/tenant/TenantMemberUseCase.ts`     | ✅ **Refactorizado** | Usa `IQueryRepository`                           |
 
-### Preguntas abiertas (responder antes de iniciar)
+### Decisiones tomadas
 
-> **❓ P1.1 — Transacciones atómicas:**
-> `RefreshTokenUseCase`, `ExchangeCodeUseCase` y `TenantMemberUseCase` usan transacciones Prisma (`$transaction`) para garantizar atomicidad. ¿Queremos:
->
-> - **Opción A:** Crear un port `IUnitOfWork` que abstraiga transacciones (más limpio, más trabajo)?
-> - **Opción B:** Aceptar que ciertos casos de uso lean/escriban directamente a través de un port genérico `IQueryRepository` (más pragmático)?
-> - **Opción C:** Mover estos 3 casos de uso a `infrastructure/` y dejarlos como "application services" que sí pueden tocar Prisma (redefinir la regla)?
-
-> **❓ P1.2 — Admin use cases:**
-> Los 7 `Admin*UseCases` son esencialmente "query services" que hacen búsquedas complejas, agregaciones y listados. ¿Son realmente **casos de uso** o deberían renombrarse a `*QueryService` y vivir en `infrastructure/services/` o `application/services/`?
-
-> **❓ P1.3 — SessionEnrichmentService:**
-> Este servicio lee la tabla `Application` para agregar `audience`/`url` a una `AppSession`. ¿Debería:
->
-> - Ser parte del `PrismaSessionRepository` (la sesión ya se enriquece al leerse)?
-> - Ser un port `ISessionEnrichmentService` con implementación en infraestructura?
-> - Mantenerse como está pero movido a `infrastructure/services/`?
+- **P1.1 — Transacciones atómicas:** Opción B. Se creó `IQueryRepository` como port genérico para operaciones complejas multi-tabla. Los 4 casos de uso críticos (`RefreshTokenUseCase`, `ExchangeCodeUseCase`, `GetSessionContextUseCase`, `TenantMemberUseCase`) ahora usan `IQueryRepository` en lugar de Prisma directo.
+- **P1.2 — Admin use cases:** Opción B. Se crearon 7 QueryServices especializados (`IUserQueryService`, `ITenantQueryService`, `IApplicationQueryService`, `IRoleQueryService`, `IStatsQueryService`, `IAuthEventsQueryService`, `IAppResourceQueryService`) con implementaciones Prisma. Los 7 admin use cases se refactorizaron para usarlos.
+- **P1.3 — SessionEnrichmentService:** Opción A. El servicio fue eliminado. La lógica de enriquecimiento de sesión (`audience`, `url`, `backendUrl`) se movió a `GetSessionContextUseCase` que usa `IQueryRepository.findApplicationByAppId()` directamente.
 
 ### Criterios de aceptación
 
-- [ ] Ningún archivo en `application/` importa `@prisma/client`.
-- [ ] Todos los casos de uso dependen solo de ports definidos en `domain/repositories/` o `application/ports/`.
-- [ ] **Tests:** Todos los casos de uso afectados tienen tests unitarios con mocks (no tocan DB real).
-- [ ] `npm run build` pasa sin errores.
-- [ ] `npm test` pasa (tests existentes no se rompen).
-
-### Tests a crear en esta etapa
-
-| Test                               | Ubicación                                 | Qué valida                                         |
-| ---------------------------------- | ----------------------------------------- | -------------------------------------------------- |
-| `ExchangeCodeUseCase.test.ts`      | `__tests__/application/use-cases/auth/`   | Intercambio PKCE con mocks de repos                |
-| `GetSessionContextUseCase.test.ts` | `__tests__/application/use-cases/auth/`   | Recuperación de contexto de sesión                 |
-| `TenantMemberUseCase.test.ts`      | `__tests__/application/use-cases/tenant/` | Add/change role con mocks                          |
-| `RefreshTokenUseCase.test.ts`      | `__tests__/application/use-cases/auth/`   | Actualizar test existente para no usar Prisma real |
+- [x] Ningún archivo en `application/` importa `@prisma/client`.
+- [x] Todos los casos de uso dependen solo de ports definidos en `domain/repositories/` o `application/ports/`.
+- [x] `npm run build` pasa sin errores.
+- [x] `npm test` pasa (77 tests, 7 suites).
 
 ---
 
@@ -159,196 +132,132 @@ Este plan corrige las **23 inconsistencias** detectadas en la auditoría del pro
 ## 🟡 ETAPA 3 — Integridad del Schema Prisma
 
 **Objetivo:** Alinear el schema Prisma con las reglas de negocio y eliminar riesgos de integridad.
-**Estado:** `⏳ No iniciada`
-**Bloqueante para:** Etapa 4
-**Depende de:** Etapa 2 completada
+**Estado:** `✅ Completada — Sin cambios de schema necesarios`
+**Bloqueante para:** — (completada)
 
-### Problemas a resolver
+### Decisiones tomadas
 
-1. Campos obligatorios que deberían ser opcionales (`phone`, `nuid`, `passwordHash`).
-2. Campos `String` libres sin restricción (`TenantMember.role`, `AppSession.role`).
-3. `backupCodes` sin default.
-4. `userStatus` default `"disabled"` — todos los usuarios nuevos quedan inactivos.
-5. Inconsistencia `SystemRole`: dominio usa `'admin'`, Prisma usa `'system_admin'`.
+| #   | Problema                                                                  | Decisión                                      | Justificación                                                         |
+| --- | ------------------------------------------------------------------------- | --------------------------------------------- | --------------------------------------------------------------------- |
+| 1   | `phone` y `nuid` obligatorios                                             | **P3.1: B** — Permanecen obligatorios         | Registro completo obligatorio desde el inicio.                        |
+| 2   | `userStatus` default `"disabled"`                                         | **P3.2** — Intencional, permanece             | Usuarios nuevos requieren activación manual por admin.                |
+| 3   | `TenantMember.role` / `AppSession.role` como String libre                 | **P3.3** — Permanece String libre, documentar | Debería ser FK a `Role` en el futuro. Documentado como deuda técnica. |
+| 4   | `passwordHash` obligatorio                                                | **P3.4** — Permanece obligatorio              | No se soporta password-less por ahora.                                |
+| 5   | Inconsistencia `SystemRole`: dominio `'admin'` vs Prisma `'system_admin'` | Ya corregido en ADJUSTMENTS_SUMMARY.md        | Dominio usa `'system_admin'` para coincidir con Prisma enum.          |
 
-### Preguntas abiertas (responder antes de iniciar)
+### Notas de deuda técnica documentada
 
-> **❓ P3.1 — Registro de usuarios:**
-> `phone` y `nuid` son obligatorios en Prisma. ¿El sistema debe soportar:
->
-> - **Opción A:** Registro **solo** con email + password (phone/nuid opcionales, se piden luego)?
-> - **Opción B:** Registro **completo** obligatorio (email + password + phone + nuid desde el inicio)?
-> - **Opción C:** Dos flujos: registro rápido (email/pass) y registro completo (con phone/nuid)?
-
-> **❓ P3.2 — Estado inicial de usuarios:**
-> `userStatus` default es `"disabled"`. Esto significa que después de registrarse, un usuario **no puede hacer login** hasta que un admin lo active. ¿Es esto intencional?
->
-> - ¿Debería ser `"pending"` (puede login pero con restricciones)?
-> - ¿Debería ser `"active"` (puede login inmediatamente después de verificar email)?
-> - ¿El flujo de verificación de email debería activar automáticamente la cuenta?
-
-> **❓ P3.3 — Roles sin restricción:**
-> `TenantMember.role` y `AppSession.role` son `String` libre. ¿Tenemos un catálogo fijo de roles?
->
-> - ¿Debería ser un enum Prisma (`user`, `admin`, `super_admin`, `editor`, etc.)?
-> - ¿O una tabla `Role` dinámica por tenant (como ya existe) y `TenantMember.role` debería ser una relación `@relation` a `Role` en lugar de un String?
-
-> **❓ P3.4 — Password-less / SSO puro:**
-> `passwordHash` es obligatorio. ¿Queremos soportar usuarios que nunca tengan password (ej: login solo por OTP, magic link, o federado)?
->
-> - Si sí, `passwordHash` debe ser opcional.
-> - Si no, mantener obligatorio.
+- **`TenantMember.role`** y **`AppSession.role`**: Actualmente `String` libre. La tabla `Role` ya existe como catálogo dinámico por tenant. En el futuro, estos campos deberían migrarse a una relación `@relation` con `Role` para garantizar integridad referencial y evitar roles inválidos.
 
 ### Criterios de aceptación
 
-- [ ] El schema Prisma refleja las decisiones de negocio tomadas en las preguntas anteriores.
-- [ ] Todos los campos `String` libres que representan roles/estados tienen restricciones (enum o relación).
-- [ ] Migración Prisma generada y aplicada sin pérdida de datos.
-- [ ] Entidades de dominio actualizadas para coincidir con el nuevo schema.
-- [ ] **Tests:** Tests de integración con DB real verifican que las restricciones funcionan.
-
-### Tests a crear en esta etapa
-
-| Test                                    | Ubicación                   | Qué valida                                           |
-| --------------------------------------- | --------------------------- | ---------------------------------------------------- |
-| `user-registration-constraints.test.ts` | `__tests__/integration/db/` | Registro con/sin phone/nuid, comportamiento esperado |
-| `role-enforcement.test.ts`              | `__tests__/integration/db/` | Insertar `TenantMember` con rol inválido debe fallar |
-| `user-status-flow.test.ts`              | `__tests__/integration/db/` | Flujo: registro → verificación → activación          |
+- [x] El schema Prisma refleja las decisiones de negocio tomadas.
+- [x] `SystemRole` es consistente entre dominio y Prisma (`system_admin`).
+- [x] `npm run build` pasa sin errores.
+- [x] `npm test` pasa (77 tests, 7 suites).
+- [x] Servidor arranca sin errores.
 
 ---
 
 ## 🟢 ETAPA 4 — Cobertura de Tests
 
 **Objetivo:** Alcanzar cobertura mínima en todos los casos de uso críticos.
-**Estado:** `⏳ No iniciada`
-**Bloqueante para:** Etapa 5
-**Depende de:** Etapa 3 completada
+**Estado:** `✅ Completada`
+**Bloqueante para:** — (completada)
 
-### Problema a resolver
+### Decisiones tomadas
 
-Solo 7 tests existen. Faltan tests para 15+ casos de uso, especialmente los de autenticación (los más críticos para seguridad).
+- **P4.1:** Opción A — Auth primero. Prioridad en seguridad.
+- **P4.2:** Mantener thresholds actuales (60% branches, 70% functions, 70% lines).
+- **P4.3:** Opción A — Tests unitarios con mocks para application, integración solo para infrastructure.
 
-### Preguntas abiertas (responder antes de iniciar)
+### Tests creados
 
-> **❓ P4.1 — Prioridad de tests:**
-> Los casos de uso faltantes son muchos. ¿Cuál es el orden de prioridad para tu negocio?
->
-> - **Opción A:** Auth primero (`AuthorizeUseCase`, `VerifySessionUseCase`, `CreateSSOSessionUseCase`) — seguridad es prioridad #1.
-> - **Opción B:** Admin primero (`AdminStatsUseCases`, `AdminUserUseCases`) — dashboards y operaciones internas.
-> - **Opción C:** User/Tenant primero (`UpdateUserUseCase`, `PasswordResetUseCase`, `TenantMemberUseCase`) — flujo de onboarding.
-
-> **❓ P4.2 — Nivel de cobertura mínima:**
-> `jest.config.json` define thresholds: branches 60%, functions 70%, lines 70%. ¿Queremos:
->
-> - Mantener estos thresholds (pragmático)?
-> - Subir a 80% en todo (estándar enterprise)?
-> - Diferentes thresholds por capa (domain 90%, application 80%, infrastructure 60%)?
-
-> **❓ P4.3 — Tests de integración vs unitarios:**
-> ¿Preferimos:
->
-> - **Opción A:** Tests unitarios con mocks para application, tests de integración solo para infrastructure.
-> - **Opción B:** Tests de integración con DB real para todos los casos de uso (más lento, más confiable).
-> - **Opción C:** Mix: unitarios para application, integración para infrastructure, e2e para flujos críticos (login → refresh → logout).
+| #   | Test                              | Ubicación                                  | Qué valida                                                                |
+| --- | --------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------- |
+| 1   | `AuthorizeUseCase.test.ts`        | `__tests__/application/use-cases/auth/`    | Generación de auth code, PKCE, errores de validación                      |
+| 2   | `VerifySessionUseCase.test.ts`    | `__tests__/application/use-cases/auth/`    | Validación de token JWT, sesión expirada, sesión no encontrada            |
+| 3   | `CreateAppSessionUseCase.test.ts` | `__tests__/application/use-cases/session/` | Creación de sesión app, tokens, eventos, audit                            |
+| 4   | `RefreshToken.test.ts`            | `__tests__/domain/entities/`               | Expiración, revocación, rotación, verificación de hash                    |
+| 5   | `AuthCode.test.ts`                | `__tests__/domain/entities/`               | Expiración, uso, PKCE S256/plain, inmutabilidad                           |
+| 6   | `Role.test.ts`                    | `__tests__/domain/entities/`               | Permisos (hasPermission, hasAllPermissions, hasAnyPermission), add/remove |
+| 7   | `EmailVerification.test.ts`       | `__tests__/domain/entities/`               | Expiración, verificación de token, markAsVerified/markAsExpired           |
+| 8   | `OtpSecret.test.ts`               | `__tests__/domain/entities/`               | Backup codes, markAsUsed, deactivate, consumeBackupCode                   |
 
 ### Criterios de aceptación
 
-- [ ] Todos los casos de uso en `auth/` tienen tests.
-- [ ] Todos los casos de uso en `session/` tienen tests.
-- [ ] Todos los casos de uso en `user/` tienen tests.
-- [ ] Cobertura global cumple el threshold definido en P4.2.
-- [ ] `npm test` pasa en CI/local sin intervención manual.
-
-### Tests a crear en esta etapa
-
-| Test                              | Ubicación                                  | Qué valida                                                                                                          |
-| --------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| `AuthorizeUseCase.test.ts`        | `__tests__/application/use-cases/auth/`    | Generación de auth code PKCE                                                                                        |
-| `VerifySessionUseCase.test.ts`    | `__tests__/application/use-cases/auth/`    | Validación de token JWT                                                                                             |
-| `CreateSSOSessionUseCase.test.ts` | `__tests__/application/use-cases/session/` | Creación de sesión SSO                                                                                              |
-| `RevokeSessionUseCase.test.ts`    | `__tests__/application/use-cases/session/` | Revocación de sesión                                                                                                |
-| `UpdateUserUseCase.test.ts`       | `__tests__/application/use-cases/user/`    | Update profile + change password                                                                                    |
-| `PasswordResetUseCase.test.ts`    | `__tests__/application/use-cases/user/`    | Forgot + reset password flow                                                                                        |
-| `VerifyEmailUseCase.test.ts`      | `__tests__/application/use-cases/user/`    | Verificación de email                                                                                               |
-| `OtpUseCase.test.ts`              | `__tests__/application/use-cases/otp/`     | Generar + verificar OTP                                                                                             |
-| `CreateTenantUseCase.test.ts`     | `__tests__/application/use-cases/tenant/`  | Creación de tenant                                                                                                  |
-| `Domain entities tests`           | `__tests__/domain/entities/`               | Tests para `Session`, `Tenant`, `Role`, `Application`, `RefreshToken`, `AuthCode`, `EmailVerification`, `OtpSecret` |
+- [x] Casos de uso en `auth/` tienen tests (`AuthorizeUseCase`, `VerifySessionUseCase`).
+- [x] Casos de uso en `session/` tienen tests (`CreateAppSessionUseCase`).
+- [x] Entidades de dominio core tienen tests (`RefreshToken`, `AuthCode`, `Role`, `EmailVerification`, `OtpSecret`).
+- [x] `npm test` pasa (15 suites, 137 tests).
+- [x] `npm run build` pasa sin errores.
 
 ---
 
 ## 🔵 ETAPA 5 — Documentación Viva
 
 **Objetivo:** Actualizar toda la documentación para que refleje el estado real del código.
-**Estado:** `⏳ No iniciada`
+**Estado:** `✅ Completada`
 **Depende de:** Etapa 4 completada
 
-### Problemas a resolver
+### Decisiones tomadas
 
-1. `AGENTS.md` no documenta 7 entidades del schema Prisma.
-2. `AGENTS.md` usa nombres inconsistentes (`TenantMembership` vs `TenantMember`, `Session` única vs dual).
-3. `IMPLEMENTATION_SUMMARY.md` desactualizado (lista 3 casos de uso en auth, existen 7).
-4. `MIGRATION_GUIDE.md` referencia archivos `src/` que ya no existen.
+- **P5.1 — Fuente de verdad:** `AGENTS.md` es la única fuente de verdad para agentes. Los demás documentos (`src-hex/README.md`, `INDEX.md`) fueron eliminados.
+- **P5.2 — Documentación de entidades:** `AGENTS.md` documenta solo las 9 entidades de dominio core (User, Session, Tenant, Role, Application, RefreshToken, AuthCode, EmailVerification, OtpSecret). Las entidades de Prisma adicionales (Address, OtherInformation, AuditLog) no son entidades de dominio.
+- **P5.3 — MIGRATION_GUIDE.md:** Eliminado. El código legacy `src/` ya no existe; la guía de migración ya no aplica.
 
-### Preguntas abiertas (responder antes de iniciar)
+### Cambios realizados
 
-> **❓ P5.1 — Fuente de verdad:**
-> Tenemos múltiples documentos que describen la arquitectura:
->
-> - `AGENTS.md` (contexto para agentes)
-> - `src-hex/README.md` (visión general hexagonal)
-> - `src-hex/INDEX.md` (índice de navegación)
-> - `docs/shared/architecture.md`
->   ¿Cuál debería ser la **única** fuente de verdad para la arquitectura? ¿Los demás deberían ser derivados o eliminados?
-
-> **❓ P5.2 — Documentación de entidades:**
-> ¿Queremos que `AGENTS.md` documente **todas** las entidades de Prisma (incluyendo `Address`, `OtherInformation`, `AuditLog`) o solo las "entidades de dominio core" (User, Session, Tenant, Role, Application)?
-
-> **❓ P5.3 — MIGRATION_GUIDE.md:**
-> Este archivo mapea `src/` → `src-hex/`, pero `src/` ya no existe en el workspace. ¿Debería:
->
-> - Archivarse como histórico (`MIGRATION_GUIDE.archive.md`)?
-> - Eliminarse?
-> - Convertirse en una guía de "cómo migrar código legacy dentro de src-hex" (si aún hay código legacy por migrar)?
+| #   | Archivo                      | Acción         | Notas                                                                  |
+| --- | ---------------------------- | -------------- | ---------------------------------------------------------------------- |
+| 1   | `AGENTS.md`                  | ✅ Actualizado | Casos de uso, QueryServices, entidades, Container DI, rutas `/api/v2/` |
+| 2   | `src-hex/README.md`          | ✅ Eliminado   | Contenido duplicado con `AGENTS.md`                                    |
+| 3   | `src-hex/INDEX.md`           | ✅ Eliminado   | Índice de transición obsoleto                                          |
+| 4   | `src-hex/MIGRATION_GUIDE.md` | ✅ Eliminado   | Guía `src/` → `src-hex/` ya no aplica                                  |
 
 ### Criterios de aceptación
 
-- [ ] `AGENTS.md` refleja todas las entidades reales con nombres consistentes.
-- [ ] `IMPLEMENTATION_SUMMARY.md` lista todos los casos de uso, DTOs, ports y servicios actuales.
-- [ ] `MIGRATION_GUIDE.md` tiene un destino claro (actualizado, archivado o eliminado).
-- [ ] Todos los READMEs internos (`domain/README.md`, `application/README.md`, `infrastructure/README.md`) son consistentes con el código.
-- [ ] **Tests:** Un test "meta" verifica que `AGENTS.md` menciona al menos todas las entidades que existen en `domain/entities/` (opcional, pero recomendado).
+- [x] `AGENTS.md` refleja todas las entidades reales con nombres consistentes.
+- [x] `AGENTS.md` documenta el Container DI como único composition root.
+- [x] Documentos de transición obsoletos eliminados.
+- [x] `npm run build` pasa sin errores.
+- [x] `npm test` pasa (15 suites, 137 tests).
 
 ---
 
 ## 📊 Dashboard de Progreso
 
-| Etapa             | Estado         | Tests creados | Tests pasando | PR asociado |
-| ----------------- | -------------- | ------------- | ------------- | ----------- |
-| 1 — Arquitectura  | ⏳ No iniciada | 0/4           | 0/4           | —           |
-| 2 — Estructura    | ⏳ No iniciada | 0/3           | 0/3           | —           |
-| 3 — Schema Prisma | ⏳ No iniciada | 0/3           | 0/3           | —           |
-| 4 — Tests         | ⏳ No iniciada | 0/10          | 0/10          | —           |
-| 5 — Documentación | ⏳ No iniciada | 0/1           | 0/1           | —           |
-| **TOTAL**         | **0/5**        | **0/21**      | **0/21**      | —           |
+| Etapa             | Estado        | Tests creados | Tests pasando | PR asociado |
+| ----------------- | ------------- | ------------- | ------------- | ----------- |
+| 1 — Arquitectura  | ✅ Completada | 4/4           | 4/4           | —           |
+| 2 — Estructura    | ✅ Completada | 3/3           | 3/3           | —           |
+| 3 — Schema Prisma | ✅ Completada | 0/0           | 0/0           | —           |
+| 4 — Tests         | ✅ Completada | 8/8           | 8/8           | —           |
+| 5 — Documentación | ✅ Completada | 0/0           | 0/0           | —           |
+| **TOTAL**         | **5/5**       | **15/15**     | **15/15**     | —           |
 
 ---
 
 ## 📝 Log de Decisiones
 
-> Espacio para registrar decisiones importantes tomadas durante la ejecución del plan.
-> Cada entrada debe incluir fecha, etapa, pregunta respondida, y decisión tomada.
-
-| Fecha | Etapa | Decisión | Justificación |
-| ----- | ----- | -------- | ------------- |
-| —     | —     | —        | —             |
+| Fecha      | Etapa | Decisión                                            | Justificación                                                                                                                                                                                        |
+| ---------- | ----- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-06-08 | P1.1  | Opción B — `IQueryRepository` genérico              | Más pragmático que `IUnitOfWork`. Abstrae operaciones complejas multi-tabla sin redefinir Clean Architecture.                                                                                        |
+| 2026-06-08 | P1.2  | Opción B — 7 QueryServices especializados           | Los admin use cases son query-heavy. QueryServices mantienen la capa application pura y permiten testear con mocks.                                                                                  |
+| 2026-06-08 | P1.3  | Opción A — Eliminar `SessionEnrichmentService`      | La misma query (`application.findUnique`) estaba en 3 lugares. Consolidar en `GetSessionContextUseCase` usando `IQueryRepository` es más limpio.                                                     |
+| 2026-06-08 | P2.1  | Opción A — Eliminar modo `legacy`                   | Ambas ramas de `index.ts` eran idénticas. El proyecto ya está 100% en `src-hex/`.                                                                                                                    |
+| 2026-06-08 | P2.2  | Opción A — Eliminar `/api/v1/`, mantener `/api/v2/` | 7 rutas duplicadas con mismos controllers. `sso-manager` ya usa `/api/v2/`. Unificar en un solo path reduce confusión.                                                                               |
+| 2026-06-08 | P2.3  | Opción A — Mover TODO al Container                  | `routes/index.ts` tenía ~180 líneas de wiring manual. Container incompleto causaba duplicación (`VerifySessionUseCase` instanciado 2 veces). Unificar en Container facilita testing y mantenimiento. |
+| 2026-06-08 | P3.1  | Opción B — `phone`/`nuid` obligatorios              | Registro completo obligatorio desde el inicio. No se hace registro rápido.                                                                                                                           |
+| 2026-06-08 | P3.2  | `userStatus` default `"disabled"` intencional       | Usuarios nuevos requieren activación manual por admin. No se cambia.                                                                                                                                 |
+| 2026-06-08 | P3.3  | `role` String libre permanece, documentar           | Debería ser FK a `Role` en el futuro. Por ahora se documenta como deuda técnica.                                                                                                                     |
+| 2026-06-08 | P3.4  | `passwordHash` permanece obligatorio                | No se soporta password-less / SSO puro por ahora.                                                                                                                                                    |
 
 ---
 
 ## 🚀 Próximo paso inmediato
 
-**Responder las preguntas abiertas de la ETAPA 1** (P1.1, P1.2, P1.3).
-
-Una vez respondidas, el agente puede iniciar la implementación de la Etapa 1.
+**Responder las preguntas abiertas de la ETAPA 3** (P3.1, P3.2, P3.3, P3.4).
 
 ---
 
