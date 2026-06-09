@@ -53,7 +53,10 @@ export class RefreshTokenUseCase {
 
     // 2. Look up refresh token record
     const tokenHash = this.hashService.hash(input.refreshToken);
+    console.log('[RefreshTokenUseCase] DEBUG — refreshToken received (first 20 chars):', input.refreshToken.substring(0, 20) + '...');
+    console.log('[RefreshTokenUseCase] DEBUG — computed tokenHash:', tokenHash);
     const refreshToken = await this.refreshTokenRepository.findByHash(tokenHash);
+    console.log('[RefreshTokenUseCase] DEBUG — refreshToken found in DB:', !!refreshToken);
 
     if (!refreshToken) {
       // Token not found - reject (legacy V2 tokens no longer supported)
@@ -61,7 +64,7 @@ export class RefreshTokenUseCase {
         type: 'REFRESH_FAILURE',
         ip: input.ip,
         userAgent: input.userAgent,
-        metadata: { reason: 'Token not found in refresh token table', userId: claims.sub },
+        metadata: { reason: 'Token not found in refresh token table', userId: claims.sub, computedHash: tokenHash },
       });
       throw new InvalidCredentialsError('Token not recognized. Please login again.');
     }
