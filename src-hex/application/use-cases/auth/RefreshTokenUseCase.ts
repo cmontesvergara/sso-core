@@ -13,6 +13,7 @@ import { LoginResult } from '../../dto/output/LoginResult';
 import { IAuditService } from '../../ports/output/IAuditService';
 import { IEventBus } from '../../ports/output/IEventBus';
 import { IHashService } from '../../ports/output/IHashService';
+import { ILogger } from '../../ports/output/ILogger';
 import { IQueryRepository } from '../../ports/output/IQueryRepository';
 import { ITokenService } from '../../ports/output/ITokenService';
 
@@ -32,6 +33,7 @@ export class RefreshTokenUseCase {
     private eventBus: IEventBus,
     private hashService: IHashService,
     private queryRepository: IQueryRepository,
+    private logger: ILogger,
   ) { }
 
   async execute(input: RefreshTokenInput): Promise<LoginResult> {
@@ -53,13 +55,19 @@ export class RefreshTokenUseCase {
 
     // 2. Look up refresh token record
     const tokenHash = this.hashService.hash(input.refreshToken);
-    console.log('[RefreshTokenUseCase] DEBUG — refreshToken received (first 20 chars):', input.refreshToken.substring(0, 20) + '...');
-    console.log('[RefreshTokenUseCase] DEBUG — computed tokenHash:', tokenHash);
+    this.logger.info('Refresh attempt', {
+      userId: claims.sub,
+      tenantId: resolvedTenantId,
+      appId: resolvedAppId,
+      tokenPrefix: input.refreshToken.substring(0, 20),
+      computedHash: tokenHash,
+    });
     const refreshToken = await this.refreshTokenRepository.findByHash(tokenHash);
-    console.log('[RefreshTokenUseCase] DEBUG — refreshToken found in DB:', !!refreshToken);
+    this.logger.info('Refresh token lookup result', { found: !!refreshToken, hash: tokenHash });
 
     if (!refreshToken) {
       // Token not found - reject (legacy V2 tokens no longer supported)
+      this.logger.warn('Refresh token not found in DB', { userId: claims.sub, hash: tokenHash });
       await this.auditService.log({
         type: 'REFRESH_FAILURE',
         ip: input.ip,
@@ -195,7 +203,7 @@ export class RefreshTokenUseCase {
     const matchedTenant = tenants.find((t: any) => t.id === activeTenantId) ?? tenants[0] ?? null;
 
     if (!matchedTenant) {
-      console.warn('[RefreshTokenUseCase] No matching tenant for id:', activeTenantId, '| available:', tenants.map(t => t.id));
+      this.logger.warn('No matching tenant for refresh', { activeTenantId, available: tenants.map(t => t.id) });
     }
 
     return {

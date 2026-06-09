@@ -13,6 +13,7 @@ import { LoginResult } from '../../dto/output/LoginResult';
 import { IAuditService } from '../../ports/output/IAuditService';
 import { IEventBus } from '../../ports/output/IEventBus';
 import { IHashService } from '../../ports/output/IHashService';
+import { ILogger } from '../../ports/output/ILogger';
 import { IQueryRepository } from '../../ports/output/IQueryRepository';
 import { ITokenService } from '../../ports/output/ITokenService';
 
@@ -38,6 +39,7 @@ export class ExchangeCodeUseCase {
     private eventBus: IEventBus,
     private hashService: IHashService,
     private queryRepository: IQueryRepository,
+    private logger: ILogger,
   ) { }
 
   async execute(input: ExchangeCodeInput): Promise<LoginResult> {
@@ -100,6 +102,7 @@ export class ExchangeCodeUseCase {
 
     // 8. Generate and save tokens
     const tokens = await this.tokenService.generateTokens(session);
+    this.logger.info('Tokens generated for exchange', { userId: authCode.userId.value, sessionId: sessionToken, tenantId: authCode.tenantId.value });
 
     const tokenHash = this.hashService.hash(tokens.refreshToken);
     const refreshTokenEntity = new RefreshToken(
@@ -110,6 +113,7 @@ export class ExchangeCodeUseCase {
       new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) // 7 days
     );
     await this.refreshTokenRepository.save(refreshTokenEntity);
+    this.logger.info('Refresh token saved to DB', { userId: authCode.userId.value, hash: tokenHash });
 
     // 9. Fetch enrichment data (tenant memberships + permissions)
     const tenants = await this.queryRepository.findTenantMemberships(

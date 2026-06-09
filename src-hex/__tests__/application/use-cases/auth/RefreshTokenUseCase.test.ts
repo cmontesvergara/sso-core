@@ -89,6 +89,13 @@ const mockQueryRepository = {
   updateTenantMemberRole: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockLogger = {
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+};
+
 describe('RefreshTokenUseCase', () => {
   let refreshTokenUseCase: RefreshTokenUseCase;
 
@@ -101,7 +108,8 @@ describe('RefreshTokenUseCase', () => {
       auditService as any,
       eventBus as any,
       { hash: (v: string) => v, verify: (v: string, h: string) => v === h },
-      mockQueryRepository as any
+      mockQueryRepository as any,
+      mockLogger as any
     );
   });
 

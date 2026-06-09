@@ -51,6 +51,7 @@ import { JwtTokenService } from '../security/JwtTokenService';
 import { PrismaAuditService } from '../external-services/audit/PrismaAuditService';
 import { ResendEmailService } from '../external-services/email/ResendEmailService';
 import { InMemoryEventBus } from '../external-services/events/InMemoryEventBus';
+import { AppLogger } from '../logging/AppLogger';
 
 // Application — use cases (auth)
 import { AuthorizeUseCase } from '../../application/use-cases/auth/AuthorizeUseCase';
@@ -203,6 +204,9 @@ export class Container {
     // ── Application services ─────────────────────────────────────────────────
     // (SessionEnrichmentService eliminado — lógica movida a GetSessionContextUseCase)
 
+    // ── Logger ───────────────────────────────────────────────────────────────
+    const logger = new AppLogger('IdpCore');
+
     // ── Use cases ────────────────────────────────────────────────────────────
     const loginUseCase = new LoginUseCase(
       userRepository,
@@ -212,7 +216,8 @@ export class Container {
       auditService,
       eventBus,
       hashService,
-      passwordHasher
+      passwordHasher,
+      logger
     );
 
     const logoutUseCase = new LogoutUseCase(
@@ -228,7 +233,8 @@ export class Container {
       auditService,
       eventBus,
       hashService,
-      queryRepository
+      queryRepository,
+      logger
     );
 
     const registerUserUseCase = new RegisterUserUseCase(
@@ -271,7 +277,8 @@ export class Container {
       auditService,
       eventBus,
       hashService,
-      queryRepository
+      queryRepository,
+      logger
     );
 
     const authorizeUseCase = new AuthorizeUseCase(
@@ -349,6 +356,7 @@ export class Container {
     this.instances.set('PrismaClient', this.prisma);
     this.instances.set('RedisClient', this.redis);
 
+    this.instances.set('ILogger', logger);
     this.instances.set('IEventBus', eventBus);
     this.instances.set('IAuditService', auditService);
     this.instances.set('IEmailService', emailService);

@@ -1,5 +1,5 @@
-import { LoginUseCase } from '@hex/application/use-cases/auth/LoginUseCase';
 import { LoginInput } from '@hex/application/dto/input/LoginInput';
+import { LoginUseCase } from '@hex/application/use-cases/auth/LoginUseCase';
 import { DeviceFingerprint } from '@hex/domain/value-objects/DeviceFingerprint';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
@@ -114,7 +114,8 @@ describe('LoginUseCase', () => {
       auditService as any,
       eventBus as any,
       hashService as any,
-      passwordHasher as any
+      passwordHasher as any,
+      { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() } as any
     );
   });
 

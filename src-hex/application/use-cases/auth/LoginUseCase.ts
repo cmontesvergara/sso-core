@@ -1,28 +1,29 @@
-import { IUserRepository } from '../../../domain/repositories/IUserRepository';
-import { ISessionRepository } from '../../../domain/repositories/ISessionRepository';
-import { ITokenService } from '../../ports/output/ITokenService';
 import crypto from 'crypto';
-import { IAuditService } from '../../ports/output/IAuditService';
-import { IEventBus } from '../../ports/output/IEventBus';
-import { IHashService } from '../../ports/output/IHashService';
-import { IRefreshTokenRepository } from '../../../domain/repositories/IRefreshTokenRepository';
-import { LoginInput } from '../../dto/input/LoginInput';
-import { LoginResult } from '../../dto/output/LoginResult';
-import { UserLoggedInEvent } from '../../../domain/events/AuthEvents';
-import { User } from '../../../domain/entities/User';
-import { SSOSession } from '../../../domain/entities/Session';
 import { RefreshToken } from '../../../domain/entities/RefreshToken';
-import { SessionId } from '../../../domain/value-objects/SessionId';
-import { RefreshTokenId } from '../../../domain/value-objects/Ids';
-import { TenantId } from '../../../domain/value-objects/TenantId';
-import { DeviceFingerprint } from '../../../domain/value-objects/DeviceFingerprint';
-import { Email } from '../../../domain/value-objects/Email';
-import { NUID } from '../../../domain/value-objects/NUID';
+import { SSOSession } from '../../../domain/entities/Session';
+import { User } from '../../../domain/entities/User';
 import { UserNotFoundError } from '../../../domain/errors/UserNotFoundError';
+import { UserLoggedInEvent } from '../../../domain/events/AuthEvents';
+import { IRefreshTokenRepository } from '../../../domain/repositories/IRefreshTokenRepository';
+import { ISessionRepository } from '../../../domain/repositories/ISessionRepository';
+import { IUserRepository } from '../../../domain/repositories/IUserRepository';
 import {
   AuthenticationService,
   IPasswordHasher,
 } from '../../../domain/services/AuthenticationService';
+import { DeviceFingerprint } from '../../../domain/value-objects/DeviceFingerprint';
+import { Email } from '../../../domain/value-objects/Email';
+import { RefreshTokenId } from '../../../domain/value-objects/Ids';
+import { NUID } from '../../../domain/value-objects/NUID';
+import { SessionId } from '../../../domain/value-objects/SessionId';
+import { TenantId } from '../../../domain/value-objects/TenantId';
+import { LoginInput } from '../../dto/input/LoginInput';
+import { LoginResult } from '../../dto/output/LoginResult';
+import { IAuditService } from '../../ports/output/IAuditService';
+import { IEventBus } from '../../ports/output/IEventBus';
+import { IHashService } from '../../ports/output/IHashService';
+import { ILogger } from '../../ports/output/ILogger';
+import { ITokenService } from '../../ports/output/ITokenService';
 
 /**
  * LoginUseCase
@@ -39,7 +40,8 @@ export class LoginUseCase {
     private auditService: IAuditService,
     private eventBus: IEventBus,
     private hashService: IHashService,
-    passwordHasher: IPasswordHasher
+    passwordHasher: IPasswordHasher,
+    private logger: ILogger,
   ) {
     this.authService = new AuthenticationService(passwordHasher);
   }
@@ -89,6 +91,7 @@ export class LoginUseCase {
 
     // 5. Generate and save tokens
     const tokens = await this.tokenService.generateTokens(session);
+    this.logger.info('Tokens generated for login', { userId: user.id.value, sessionId: session.sessionToken });
 
     const tokenHash = this.hashService.hash(tokens.refreshToken);
     const refreshTokenEntity = new RefreshToken(
@@ -99,6 +102,7 @@ export class LoginUseCase {
       new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
     );
     await this.refreshTokenRepository.save(refreshTokenEntity);
+    this.logger.info('Refresh token saved to DB on login', { userId: user.id.value, hash: tokenHash });
 
     // 6. Publish event
     const eventTenantId = input.tenantId
