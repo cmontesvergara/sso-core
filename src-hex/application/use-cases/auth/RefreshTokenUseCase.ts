@@ -90,8 +90,11 @@ export class RefreshTokenUseCase {
     const now = new Date();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-    // tenantId chain: input -> JWT claims -> DB lookup -> userId last-resort
-    let effectiveTenantId: string | undefined = resolvedInput.tenantId || claims.tenantId;
+    // tenantId chain: JWT claims -> input -> DB lookup -> userId last-resort
+    // Prefer claims.tenantId over input.tenantId because the refresh token JWT
+    // always contains the correct tenant context, whereas input.tenantId may be
+    // empty if the client lost the access token before refreshing.
+    let effectiveTenantId: string | undefined = claims.tenantId || resolvedInput.tenantId;
     if (!effectiveTenantId && user) {
       const firstMembership = await this.queryRepository.findFirstTenantMembership(
         user.id,
