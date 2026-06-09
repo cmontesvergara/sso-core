@@ -208,12 +208,13 @@ Este plan corrige las **23 inconsistencias** detectadas en la auditoría del pro
 
 ### Cambios realizados
 
-| #   | Archivo                      | Acción         | Notas                                                                  |
-| --- | ---------------------------- | -------------- | ---------------------------------------------------------------------- |
-| 1   | `AGENTS.md`                  | ✅ Actualizado | Casos de uso, QueryServices, entidades, Container DI, rutas `/api/v2/` |
-| 2   | `src-hex/README.md`          | ✅ Eliminado   | Contenido duplicado con `AGENTS.md`                                    |
-| 3   | `src-hex/INDEX.md`           | ✅ Eliminado   | Índice de transición obsoleto                                          |
-| 4   | `src-hex/MIGRATION_GUIDE.md` | ✅ Eliminado   | Guía `src/` → `src-hex/` ya no aplica                                  |
+| #   | Archivo                       | Acción         | Notas                                                                  |
+| --- | ----------------------------- | -------------- | ---------------------------------------------------------------------- | --- | --- | ------------------------------ | -------------- | ---------------------------------------------------------------------------------------- |
+| 1   | `AGENTS.md`                   | ✅ Actualizado | Casos de uso, QueryServices, entidades, Container DI, rutas `/api/v2/` |
+| 2   | `src-hex/README.md`           | ✅ Eliminado   | Contenido duplicado con `AGENTS.md`                                    |
+| 3   | `src-hex/INDEX.md`            | ✅ Eliminado   | Índice de transición obsoleto                                          |
+| 4   | `src-hex/MIGRATION_GUIDE.md`  | ✅ Eliminado   | Guía `src/` → `src-hex/` ya no aplica                                  |     | 5   | `docs/shared/api-reference.md` | ✅ Actualizado | Prefijo corregido a `/api/v2`, endpoints faltantes agregados (OTP, metadata, util, sync) |
+| 6   | `docs/shared/api-examples.md` | ✅ Reemplazado | Template VitePress vacío → ejemplos reales con curl y fetch            |
 
 ### Criterios de aceptación
 

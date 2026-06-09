@@ -1,55 +1,42 @@
 ---
-title: "API Reference"
+title: 'API Reference'
 ---
 
 # API Reference
 
-Referencia completa de todos los endpoints del SSO Core. Todos los endpoints usan el prefijo `/api/v1`.
+Referencia completa de todos los endpoints del IdP Core. Todos los endpoints usan el prefijo **`/api/v2`**.
 
 > [!NOTE]
-> Los endpoints protegidos requieren una cookie `sso_session` válida (autenticación SSO) o un header `Authorization: Bearer <token>` (autenticación legacy). Se indica el tipo de autenticación requerida en cada endpoint.
+> Los endpoints protegidos requieren una cookie `sso_session` válida (autenticación SSO). Se indica el tipo de autenticación requerida en cada endpoint.
+
+---
+
+## Índice
+
+- [Autenticación (`/auth`)](#autenticación-auth)
+- [Usuarios (`/users`)](#usuarios-users)
+- [Tenants (`/tenants`)](#tenants-tenants)
+- [Admin — Usuarios (`/user`)](#admin--usuarios-user)
+- [Admin — Tenants (`/tenant`)](#admin--tenants-tenant)
+- [Aplicaciones (`/applications`)](#aplicaciones-applications)
+- [Recursos de App (`/app-resources`)](#recursos-de-app-app-resources)
+- [Roles (`/role`)](#roles-role)
+- [Estadísticas (`/stats`)](#estadísticas-stats)
+- [OTP — 2FA (`/otp`)](#otp--2fa-otp)
+- [Verificación de Email](#verificación-de-email)
+- [Metadata (`/metadata`)](#metadata-metadata)
+- [Utilidades (`/util`)](#utilidades-util)
+- [Errores](#errores)
 
 ---
 
 ## Autenticación (`/auth`)
 
-### POST `/auth/signup`
+### POST `/auth/login`
 
-Registrar un nuevo usuario.
+Iniciar sesión con credenciales. Establece una cookie `sso_session` HttpOnly.
 
-**Rate limit:** 5 peticiones por hora.
-
-**Body:**
-
-```json
-{
-  "email": "user@example.com",
-  "password": "SecurePass123!",
-  "firstName": "Juan",
-  "lastName": "Pérez"
-}
-```
-
-**Respuesta (201):**
-
-```json
-{
-  "success": true,
-  "message": "User created successfully",
-  "user": {
-    "userId": "uuid",
-    "email": "user@example.com"
-  }
-}
-```
-
----
-
-### POST `/auth/signin`
-
-Iniciar sesión. Establece una cookie `sso_session` HttpOnly.
-
-**Rate limit:** 10 peticiones por 15 minutos.
+**Rate limit:** 4 peticiones por 15 minutos.
 
 **Body:**
 
@@ -88,44 +75,13 @@ Iniciar sesión. Establece una cookie `sso_session` HttpOnly.
 ```
 
 > [!IMPORTANT]
-> La cookie `sso_session` se establece automáticamente con las opciones: `httpOnly: true`, `sameSite: lax`, `secure` solo en producción. El dominio de cookie se configura con `COOKIE_DOMAIN` en producción.
-
----
-
-### POST `/auth/signout`
-
-Cerrar sesión (basado en refresh token legacy).
-
-**Body:**
-
-```json
-{
-  "refreshToken": "token-string"
-}
-```
-
----
-
-### POST `/auth/logout`
-
-Cerrar sesión SSO (basado en cookie). Destruye la sesión y limpia la cookie `sso_session`.
-
-**Requires:** Cookie `sso_session`.
-
-**Respuesta (200):**
-
-```json
-{
-  "success": true,
-  "message": "Logged out successfully"
-}
-```
+> La cookie `sso_session` se establece automáticamente con las opciones: `httpOnly: true`, `sameSite: lax`, `secure` solo en producción.
 
 ---
 
 ### POST `/auth/refresh`
 
-Renovar tokens de acceso.
+Renovar tokens de acceso usando un refresh token.
 
 **Rate limit:** 30 peticiones por minuto.
 
@@ -150,80 +106,9 @@ Renovar tokens de acceso.
 
 ---
 
-### POST `/auth/authorize`
+### POST `/auth/exchange`
 
-Generar un authorization code para el flujo SSO. Usado cuando una aplicación redirige al portal SSO para autenticar.
-
-**Requires:** Cookie `sso_session`.
-
-**Body:**
-
-```json
-{
-  "tenantId": "uuid-del-tenant",
-  "appId": "crm",
-  "redirectUri": "https://crm.empire.com/callback"
-}
-```
-
-**Respuesta (200):**
-
-```json
-{
-  "success": true,
-  "authCode": "code-one-time-use",
-  "redirectUri": "https://crm.empire.com/callback?code=code-one-time-use"
-}
-```
-
-**Validaciones:**
-- El usuario debe ser miembro del tenant.
-- La aplicación debe existir y estar activa.
-- La aplicación debe estar habilitada para el tenant.
-- El usuario debe tener acceso a la aplicación en ese tenant.
-
----
-
-### POST `/auth/validate-code`
-
-Validar un authorization code y obtener el contexto del usuario. Llamado por backends de aplicaciones (no por frontends).
-
-**Body:**
-
-```json
-{
-  "authCode": "code-from-query-param",
-  "appId": "crm"
-}
-```
-
-**Respuesta (200):**
-
-```json
-{
-  "success": true,
-  "user": {
-    "userId": "uuid",
-    "email": "user@example.com",
-    "firstName": "Juan",
-    "lastName": "Pérez",
-    "isActive": true
-  },
-  "tenant": {
-    "tenantId": "uuid",
-    "role": "admin"
-  }
-}
-```
-
-> [!WARNING]
-> El código es **de un solo uso** y expira en 5 minutos. Reutilizarlo genera un error.
-
----
-
-### POST `/auth/token`
-
-Intercambiar un authorization code por un token de sesión de aplicación. Similar a un token endpoint de OAuth2.
+Intercambiar un authorization code por tokens de sesión de aplicación (flujo SSO).
 
 **Body:**
 
@@ -258,9 +143,9 @@ Intercambiar un authorization code por un token de sesión de aplicación. Simil
 
 ---
 
-### POST `/auth/verify-session`
+### POST `/auth/session`
 
-Verificar un token de sesión de aplicación. Llamado por backends de apps en cada request para validar la sesión.
+Verificar un token de sesión de aplicación. Llamado por backends de apps en cada request.
 
 **Body:**
 
@@ -306,11 +191,9 @@ Verificar un token de sesión de aplicación. Llamado por backends de apps en ca
 
 ---
 
-## Usuarios (`/user`)
+### POST `/auth/logout`
 
-### GET `/user/profile`
-
-Obtener el perfil del usuario autenticado vía SSO.
+Cerrar sesión SSO. Destruye la sesión y limpia la cookie `sso_session`.
 
 **Requires:** Cookie `sso_session`.
 
@@ -319,37 +202,144 @@ Obtener el perfil del usuario autenticado vía SSO.
 ```json
 {
   "success": true,
+  "message": "Logged out successfully"
+}
+```
+
+---
+
+### POST `/auth/authorize`
+
+Generar un authorization code para el flujo SSO. Usado cuando una aplicación redirige al portal SSO para autenticar.
+
+**Requires:** Cookie `sso_session`.
+
+**Body:**
+
+```json
+{
+  "tenantId": "uuid-del-tenant",
+  "appId": "crm",
+  "redirectUri": "https://crm.empire.com/callback"
+}
+```
+
+**Respuesta (200):**
+
+```json
+{
+  "success": true,
+  "authCode": "code-one-time-use",
+  "redirectUri": "https://crm.empire.com/callback?code=code-one-time-use"
+}
+```
+
+**Validaciones:**
+
+- El usuario debe ser miembro del tenant.
+- La aplicación debe existir y estar activa.
+- La aplicación debe estar habilitada para el tenant.
+- El usuario debe tener acceso a la aplicación en ese tenant.
+
+---
+
+### POST `/auth/forgot-password`
+
+Solicitar reset de password. Envía un email con link de recuperación.
+
+**Body:**
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+---
+
+### POST `/auth/reset-password`
+
+Confirmar reset de password con token recibido por email.
+
+**Body:**
+
+```json
+{
+  "token": "reset-token",
+  "newPassword": "NuevaPass123!"
+}
+```
+
+---
+
+## Usuarios (`/users`)
+
+### POST `/users/register`
+
+Registrar un nuevo usuario.
+
+**Rate limit:** 5 peticiones por hora.
+
+**Body:**
+
+```json
+{
+  "email": "user@example.com",
+  "password": "SecurePass123!",
+  "firstName": "Juan",
+  "lastName": "Pérez"
+}
+```
+
+**Respuesta (201):**
+
+```json
+{
+  "success": true,
+  "message": "User created successfully",
   "user": {
     "userId": "uuid",
-    "email": "user@example.com",
-    "firstName": "Juan",
-    "secondName": null,
-    "lastName": "Pérez",
-    "secondLastName": null,
-    "phone": "+1234567890",
-    "birthDate": null,
-    "gender": null,
-    "nationality": null,
-    "systemRole": "user",
-    "addresses": [
-      {
-        "id": "uuid",
-        "country": "CR",
-        "province": "San José",
-        "city": "Central",
-        "detail": "Calle 1",
-        "postalCode": "10101"
-      }
-    ]
+    "email": "user@example.com"
   }
 }
 ```
 
 ---
 
-### PUT `/user/profile`
+### POST `/users/verify-email`
 
-Actualizar el perfil del usuario autenticado. Soporta actualización de datos personales y direcciones.
+Verificar email con token enviado por correo.
+
+**Body:**
+
+```json
+{
+  "token": "uuid-verification-token"
+}
+```
+
+---
+
+### POST `/users/send-verification`
+
+Reenviar email de verificación.
+
+**Rate limit:** 3 peticiones por 15 minutos.
+
+**Body:**
+
+```json
+{
+  "userId": "uuid",
+  "email": "user@example.com"
+}
+```
+
+---
+
+### PATCH `/users/profile`
+
+Actualizar el perfil del usuario autenticado.
 
 **Requires:** Cookie `sso_session`.
 
@@ -375,53 +365,30 @@ Actualizar el perfil del usuario autenticado. Soporta actualización de datos pe
 
 ---
 
-### GET `/user/tenants`
+### POST `/users/change-password`
 
-Obtener todos los tenants del usuario con sus aplicaciones habilitadas.
+Cambiar password del usuario autenticado.
 
 **Requires:** Cookie `sso_session`.
 
-**Respuesta (200):**
+**Body:**
 
 ```json
 {
-  "success": true,
-  "tenants": [
-    {
-      "tenantId": "uuid",
-      "name": "Mi Empresa",
-      "slug": "mi-empresa",
-      "role": "admin",
-      "apps": [
-        { "appId": "crm", "name": "CRM", "url": "https://crm.empire.com" },
-        { "appId": "admin", "name": "Admin Panel", "url": "https://admin.empire.com" }
-      ]
-    }
-  ]
+  "currentPassword": "ViejaPass123!",
+  "newPassword": "NuevaPass123!"
 }
 ```
 
 ---
 
-### GET `/user/:userId`
+## Tenants (`/tenants`)
 
-Obtener usuario por ID. **Requires:** Bearer token.
+### POST `/tenants`
 
-### PUT `/user/:userId`
+Crear un nuevo tenant.
 
-Actualizar usuario por ID. **Requires:** Bearer token.
-
-### DELETE `/user/:userId`
-
-Eliminar usuario. **Requires:** Bearer token.
-
----
-
-## Tenants (`/tenant`)
-
-### POST `/tenant`
-
-Crear un nuevo tenant. **Requires:** Cookie `sso_session` + System Admin.
+**Requires:** Cookie `sso_session` + System Admin.
 
 **Body:**
 
@@ -435,17 +402,9 @@ Crear un nuevo tenant. **Requires:** Cookie `sso_session` + System Admin.
 
 ---
 
-### GET `/tenant`
+### POST `/tenants/:tenantId/members`
 
-Listar tenants. System Admins ven todos. Usuarios regulares ven solo los suyos.
-
-**Requires:** Cookie `sso_session`.
-
----
-
-### POST `/tenant/:tenantId/members`
-
-Invitar un usuario al tenant.
+Agregar un miembro al tenant.
 
 **Requires:** Cookie `sso_session` + Tenant Admin.
 
@@ -459,122 +418,86 @@ Invitar un usuario al tenant.
 ```
 
 > [!NOTE]
-> Los roles válidos para invitación son: `admin`, `member`, `viewer`.
+> Los roles válidos son: `admin`, `member`, `viewer`.
 
 ---
 
-### GET `/tenant/:tenantId/members`
+### PATCH `/tenants/:tenantId/members/:userId/role`
 
-Listar miembros del tenant. **Requires:** Cookie `sso_session` + Tenant Member.
+Cambiar el rol de un miembro del tenant.
 
----
-
-### PUT `/tenant/:tenantId/members/:memberId`
-
-Cambiar rol de un miembro. **Requires:** Cookie `sso_session` + Tenant Admin.
-
-### DELETE `/tenant/:tenantId/members/:memberId`
-
-Eliminar miembro del tenant. **Requires:** Cookie `sso_session` + Tenant Admin.
-
----
-
-### GET `/tenant/:tenantId/apps`
-
-Listar aplicaciones asignadas al tenant. **Requires:** Cookie `sso_session` + Tenant Member.
-
-### DELETE `/tenant/:tenantId/apps/:applicationId`
-
-Eliminar app del tenant. **Requires:** Cookie `sso_session` + System Admin.
-
----
-
-## Roles (`/role`)
-
-### POST `/role`
-
-Crear un rol personalizado.
-
-**Requires:** Cookie `sso_session`.
+**Requires:** Cookie `sso_session` + Tenant Admin.
 
 **Body:**
 
 ```json
 {
-  "name": "editor",
-  "description": "Puede editar contenido",
-  "tenantId": "uuid-del-tenant"
+  "role": "admin"
 }
 ```
 
 ---
 
-### GET `/role/tenant/:tenantId`
+### GET `/tenants/:tenantId/info`
 
-Listar roles de un tenant. **Requires:** Cookie `sso_session` + Tenant Member.
+Obtener información pública de un tenant (no requiere autenticación).
 
-### GET `/role/:roleId`
-
-Obtener un rol por ID. **Requires:** Cookie `sso_session`.
-
-### PUT `/role/:roleId`
-
-Actualizar un rol. No se pueden modificar roles predeterminados (`admin`, `member`, `viewer`).
-
-### DELETE `/role/:roleId`
-
-Eliminar un rol. No se pueden eliminar roles predeterminados.
+**Rate limit:** 60 peticiones por 5 minutos.
 
 ---
 
-### POST `/role/:roleId/permission`
+## Admin — Usuarios (`/user`)
 
-Agregar un permiso a un rol.
+> [!WARNING]
+> Estas rutas son **legacy/admin** y están montadas bajo `/api/v2/user`. Se mantienen para compatibilidad con herramientas de administración.
 
-**Body:**
+| Método | Endpoint                | Descripción                     | Auth                 |
+| :----- | :---------------------- | :------------------------------ | :------------------- |
+| GET    | `/user/list`            | Listar usuarios                 | Cookie `sso_session` |
+| GET    | `/user/profile`         | Perfil del usuario autenticado  | Cookie `sso_session` |
+| GET    | `/user/tenants`         | Tenants del usuario autenticado | Cookie `sso_session` |
+| PUT    | `/user/profile`         | Actualizar perfil               | Cookie `sso_session` |
+| PUT    | `/user/:userId/status`  | Cambiar estado del usuario      | Cookie `sso_session` |
+| GET    | `/user/:userId/tenants` | Tenants de un usuario           | Cookie `sso_session` |
+| GET    | `/user/:userId`         | Obtener usuario por ID          | Cookie `sso_session` |
+| PUT    | `/user/:userId`         | Actualizar usuario por ID       | Cookie `sso_session` |
+| DELETE | `/user/:userId`         | Eliminar usuario                | Cookie `sso_session` |
 
-```json
-{
-  "applicationId": "uuid-de-aplicacion",
-  "resource": "users",
-  "action": "create"
-}
-```
+---
 
-### GET `/role/:roleId/permission`
+## Admin — Tenants (`/tenant`)
 
-Listar permisos de un rol. Incluye nombre de la aplicación.
+> [!WARNING]
+> Estas rutas son **legacy/admin** y están montadas bajo `/api/v2/tenant`. Se mantienen para compatibilidad con herramientas de administración.
 
-### DELETE `/role/:roleId/permission/:permissionId`
-
-Eliminar permiso por ID.
-
-### DELETE `/role/:roleId/permission`
-
-Eliminar permiso por recurso y acción.
-
-**Body:**
-
-```json
-{
-  "resource": "users",
-  "action": "create"
-}
-```
+| Método | Endpoint                                | Descripción             | Auth                 |
+| :----- | :-------------------------------------- | :---------------------- | :------------------- |
+| POST   | `/tenant`                               | Crear tenant            | Cookie `sso_session` |
+| GET    | `/tenant`                               | Listar tenants          | Cookie `sso_session` |
+| GET    | `/tenant/:tenantId`                     | Obtener tenant por ID   | Cookie `sso_session` |
+| PUT    | `/tenant/:tenantId`                     | Actualizar tenant       | Cookie `sso_session` |
+| DELETE | `/tenant/:tenantId`                     | Eliminar tenant         | Cookie `sso_session` |
+| POST   | `/tenant/:tenantId/members`             | Agregar miembro         | Cookie `sso_session` |
+| GET    | `/tenant/:tenantId/members`             | Listar miembros         | Cookie `sso_session` |
+| PUT    | `/tenant/:tenantId/members/:memberId`   | Cambiar rol de miembro  | Cookie `sso_session` |
+| DELETE | `/tenant/:tenantId/members/:memberId`   | Eliminar miembro        | Cookie `sso_session` |
+| GET    | `/tenant/:tenantId/apps`                | Listar apps del tenant  | Cookie `sso_session` |
+| POST   | `/tenant/:tenantId/apps`                | Agregar app al tenant   | Cookie `sso_session` |
+| DELETE | `/tenant/:tenantId/apps/:applicationId` | Eliminar app del tenant | Cookie `sso_session` |
 
 ---
 
 ## Aplicaciones (`/applications`)
 
-### CRUD (System Admin)
+### CRUD Global (System Admin)
 
-| Método | Endpoint | Descripción |
-| :--- | :--- | :--- |
-| POST | `/applications` | Crear aplicación |
-| GET | `/applications` | Listar todas (query `?active=true`) |
-| GET | `/applications/:id` | Obtener por ID |
-| PUT | `/applications/:id` | Actualizar |
-| DELETE | `/applications/:id` | Soft delete (Super Admin) |
+| Método | Endpoint                       | Descripción                         |
+| :----- | :----------------------------- | :---------------------------------- |
+| POST   | `/applications`                | Crear aplicación                    |
+| GET    | `/applications`                | Listar todas (query `?active=true`) |
+| GET    | `/applications/:applicationId` | Obtener por ID                      |
+| PUT    | `/applications/:applicationId` | Actualizar                          |
+| DELETE | `/applications/:applicationId` | Soft delete                         |
 
 **Body para crear:**
 
@@ -592,35 +515,45 @@ Eliminar permiso por recurso y acción.
 
 ### Tenant App Management
 
-| Método | Endpoint | Descripción |
-| :--- | :--- | :--- |
-| POST | `/applications/tenant/:tenantId/enable` | Habilitar app para tenant |
-| GET | `/applications/tenant/:tenantId` | Listar apps del tenant |
-| DELETE | `/applications/tenant/:tenantId/:applicationId` | Eliminar app del tenant |
+| Método | Endpoint                                        | Descripción               |
+| :----- | :---------------------------------------------- | :------------------------ |
+| GET    | `/applications/tenant/:tenantId`                | Listar apps del tenant    |
+| POST   | `/applications/tenant/:tenantId`                | Habilitar app para tenant |
+| DELETE | `/applications/tenant/:tenantId/:applicationId` | Eliminar app del tenant   |
 
 ---
 
 ### User App Access
 
-| Método | Endpoint | Descripción |
-| :--- | :--- | :--- |
-| POST | `/applications/tenant/:tId/:appId/grant` | Dar acceso a un usuario |
-| POST | `/applications/tenant/:tId/:appId/grant-bulk` | Dar acceso masivo |
-| DELETE | `/applications/tenant/:tId/:appId/revoke/:userId` | Revocar acceso |
-| GET | `/applications/tenant/:tId/:appId/users` | Listar usuarios con acceso |
-| GET | `/applications/user/:tenantId` | Apps del usuario autenticado |
+| Método | Endpoint                                                       | Descripción                  |
+| :----- | :------------------------------------------------------------- | :--------------------------- |
+| POST   | `/applications/tenant/:tenantId/:applicationId/grant`          | Dar acceso a un usuario      |
+| POST   | `/applications/tenant/:tenantId/:applicationId/users`          | Alias de `grant`             |
+| POST   | `/applications/tenant/:tenantId/:applicationId/users/bulk`     | Dar acceso masivo            |
+| DELETE | `/applications/tenant/:tenantId/:applicationId/revoke/:userId` | Revocar acceso               |
+| DELETE | `/applications/tenant/:tenantId/:applicationId/users/:userId`  | Alias de `revoke`            |
+| GET    | `/applications/tenant/:tenantId/:applicationId/users`          | Listar usuarios con acceso   |
+| GET    | `/applications/user/:tenantId/my-apps`                         | Apps del usuario autenticado |
 
 ---
 
-## App Resources (`/app-resources`)
+### Sync de Recursos
 
-### POST `/app-resources`
+| Método | Endpoint                              | Descripción                       |
+| :----- | :------------------------------------ | :-------------------------------- |
+| POST   | `/applications/:appId/sync-resources` | Sincronizar recursos desde la app |
 
-Registrar recursos de una aplicación. Típicamente llamado durante el deployment.
+---
 
-**Requires:** Cookie `sso_session`.
+## Recursos de App (`/app-resources`)
 
-**Body:**
+| Método | Endpoint                                    | Descripción                          |
+| :----- | :------------------------------------------ | :----------------------------------- |
+| POST   | `/app-resources`                            | Registrar recursos de una aplicación |
+| GET    | `/app-resources/:appId`                     | Obtener recursos de una app          |
+| GET    | `/app-resources/tenant/:tenantId/available` | Recursos disponibles para un tenant  |
+
+**Body para registrar:**
 
 ```json
 {
@@ -642,26 +575,67 @@ Registrar recursos de una aplicación. Típicamente llamado durante el deploymen
 }
 ```
 
-### GET `/app-resources/:appId`
+---
 
-Obtener los recursos de una aplicación.
+## Roles (`/role`)
 
-### GET `/app-resources/tenant/:tenantId/available`
+| Método | Endpoint                                 | Descripción                           |
+| :----- | :--------------------------------------- | :------------------------------------ |
+| GET    | `/role`                                  | Listar todos los roles                |
+| POST   | `/role`                                  | Crear rol personalizado               |
+| GET    | `/role/tenant/:tenantId`                 | Listar roles de un tenant             |
+| GET    | `/role/:roleId`                          | Obtener rol por ID                    |
+| PUT    | `/role/:roleId`                          | Actualizar rol                        |
+| DELETE | `/role/:roleId`                          | Eliminar rol                          |
+| POST   | `/role/:roleId/permission`               | Agregar permiso a rol                 |
+| GET    | `/role/:roleId/permission`               | Listar permisos de un rol             |
+| DELETE | `/role/:roleId/permission/:permissionId` | Eliminar permiso por ID               |
+| DELETE | `/role/:roleId/permission`               | Eliminar permiso por recurso y acción |
 
-Obtener los recursos disponibles para las apps habilitadas en un tenant.
+**Body para crear rol:**
+
+```json
+{
+  "name": "editor",
+  "description": "Puede editar contenido",
+  "tenantId": "uuid-del-tenant"
+}
+```
+
+**Body para agregar permiso:**
+
+```json
+{
+  "applicationId": "uuid-de-aplicacion",
+  "resource": "users",
+  "action": "create"
+}
+```
+
+> [!NOTE]
+> No se pueden modificar ni eliminar roles predeterminados (`admin`, `member`, `viewer`).
 
 ---
 
-## OTP — Autenticación de dos factores (`/otp`)
+## Estadísticas (`/stats`)
 
-| Método | Endpoint | Descripción |
-| :--- | :--- | :--- |
-| POST | `/otp/generate` | Generar secreto y QR code |
-| POST | `/otp/verify` | Verificar token y activar 2FA |
-| POST | `/otp/validate` | Validar OTP durante login (con tempToken) |
-| POST | `/otp/backup-code` | Usar código de respaldo |
-| POST | `/otp/disable` | Desactivar 2FA |
-| GET | `/otp/status/:userId` | Verificar si 2FA está activo |
+| Método | Endpoint             | Descripción                          |
+| :----- | :------------------- | :----------------------------------- |
+| GET    | `/stats`             | Estadísticas generales del sistema   |
+| GET    | `/stats/auth-events` | Eventos de autenticación (auditoría) |
+
+---
+
+## OTP — 2FA (`/otp`)
+
+| Método | Endpoint              | Descripción                                 |
+| :----- | :-------------------- | :------------------------------------------ |
+| POST   | `/otp/generate`       | Generar secreto y QR code                   |
+| POST   | `/otp/verify`         | Verificar token y activar 2FA               |
+| POST   | `/otp/validate`       | Validar OTP durante login (con `tempToken`) |
+| POST   | `/otp/backup-code`    | Usar código de respaldo                     |
+| POST   | `/otp/disable`        | Desactivar 2FA                              |
+| GET    | `/otp/status/:userId` | Verificar si 2FA está activo                |
 
 ### POST `/otp/generate`
 
@@ -686,8 +660,6 @@ Obtener los recursos disponibles para las apps habilitadas en un tenant.
 ```
 
 ### POST `/otp/validate`
-
-Validar el token OTP usando el token temporal del signin.
 
 **Body:**
 
@@ -714,32 +686,38 @@ Validar el token OTP usando el token temporal del signin.
 
 ---
 
-## Email Verification (`/email-verification`)
+## Verificación de Email
 
-### POST `/email-verification/send`
+Los endpoints de verificación de email están bajo `/users`:
 
-Enviar email de verificación.
+- `POST /users/verify-email` — Verificar token de email.
+- `POST /users/send-verification` — Reenviar email de verificación.
 
-**Body:**
+---
 
-```json
-{
-  "userId": "uuid",
-  "email": "user@example.com"
-}
-```
+## Metadata (`/metadata`)
 
-### POST `/email-verification/verify`
+> [!NOTE]
+> Endpoints para gestionar metadata adicional de usuarios (información extra flexible).
 
-Verificar token de email.
+| Método | Endpoint            | Descripción               |
+| :----- | :------------------ | :------------------------ |
+| POST   | `/metadata/:userId` | Crear/actualizar metadata |
+| GET    | `/metadata/:userId` | Obtener metadata          |
+| PUT    | `/metadata/:userId` | Actualizar metadata       |
 
-**Body:**
+---
 
-```json
-{
-  "token": "uuid-verification-token"
-}
-```
+## Utilidades (`/util`)
+
+> [!NOTE]
+> Endpoints públicos para obtener enums y listas de referencia.
+
+| Método | Endpoint                       | Descripción            |
+| :----- | :----------------------------- | :--------------------- |
+| GET    | `/util/enums/genders`          | Listar géneros         |
+| GET    | `/util/enums/countries`        | Listar países          |
+| GET    | `/util/enums/marital_statuses` | Listar estados civiles |
 
 ---
 
@@ -758,16 +736,16 @@ Todos los endpoints retornan errores en el siguiente formato:
 
 ### Códigos comunes
 
-| Código HTTP | Error Code | Descripción |
-| :--- | :--- | :--- |
-| 400 | `VALIDATION_ERROR` | Datos de entrada inválidos |
-| 400 | `INVALID_INPUT` | Campos requeridos faltantes |
-| 401 | `UNAUTHORIZED` | No autenticado |
-| 401 | `INVALID_REFRESH` | Refresh token inválido |
-| 403 | `FORBIDDEN` | Sin permisos suficientes |
-| 403 | `TENANT_ACCESS_DENIED` | Sin acceso al tenant |
-| 403 | `APP_ACCESS_DENIED` | Sin acceso a la aplicación |
-| 404 | `NOT_FOUND` | Recurso no encontrado |
-| 409 | `APP_ID_EXISTS` | ID de app ya existe |
-| 409 | `ALREADY_ENABLED` | App ya habilitada |
-| 429 | — | Rate limit excedido |
+| Código HTTP | Error Code             | Descripción                 |
+| :---------- | :--------------------- | :-------------------------- |
+| 400         | `VALIDATION_ERROR`     | Datos de entrada inválidos  |
+| 400         | `INVALID_INPUT`        | Campos requeridos faltantes |
+| 401         | `UNAUTHORIZED`         | No autenticado              |
+| 401         | `INVALID_REFRESH`      | Refresh token inválido      |
+| 403         | `FORBIDDEN`            | Sin permisos suficientes    |
+| 403         | `TENANT_ACCESS_DENIED` | Sin acceso al tenant        |
+| 403         | `APP_ACCESS_DENIED`    | Sin acceso a la aplicación  |
+| 404         | `NOT_FOUND`            | Recurso no encontrado       |
+| 409         | `APP_ID_EXISTS`        | ID de app ya existe         |
+| 409         | `ALREADY_ENABLED`      | App ya habilitada           |
+| 429         | —                      | Rate limit excedido         |
