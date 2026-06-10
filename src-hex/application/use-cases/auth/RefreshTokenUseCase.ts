@@ -133,17 +133,17 @@ export class RefreshTokenUseCase {
     );
     await this.sessionRepository.save(session);
 
-    // 6. Rotate refresh token
+    // 6. Generate tokens FIRST (need the new refresh token to hash it)
+    const tokens = await this.tokenService.generateTokens(session);
+
+    // 7. Rotate refresh token — hash the actual JWT refresh token, not the sessionToken
     const newRefreshToken = refreshToken.createRotation(
       RefreshTokenId.create(crypto.randomUUID()),
-      this.hashService.hash(sessionToken),
+      this.hashService.hash(tokens.refreshToken),
       new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     );
     await this.refreshTokenRepository.save(newRefreshToken);
     await this.refreshTokenRepository.update(refreshToken.revoke());
-
-    // 7. Generate tokens
-    const tokens = await this.tokenService.generateTokens(session);
 
     // 8. Publish event - TokenRefreshedEvent takes (userId, sessionId, tokenFamily)
     await this.eventBus.publish(
