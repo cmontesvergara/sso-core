@@ -118,6 +118,15 @@ export class RefreshTokenUseCase {
       ? TenantId.create(effectiveTenantId)
       : TenantId.create(refreshToken.userId.value);
 
+    // Preserve the original application's audience claims so the refreshed
+    // token has the same JWT audience as the first token issued for this app.
+    const appRecord = await this.queryRepository.findApplicationByAppId(
+      resolvedInput.appId || 'default'
+    );
+    const appAudience = appRecord?.audience ?? undefined;
+    const appUrl = appRecord?.url ?? undefined;
+    const appBackendUrl = appRecord?.backendUrl ?? undefined;
+
     const session = new AppSession(
       SessionId.create(sessionToken),
       sessionToken,
@@ -129,7 +138,11 @@ export class RefreshTokenUseCase {
       null,
       expiresAt,
       now,
-      now
+      now,
+      undefined,
+      appAudience,
+      appUrl,
+      appBackendUrl
     );
     await this.sessionRepository.save(session);
 

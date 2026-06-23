@@ -124,6 +124,31 @@ describe('RefreshTokenUseCase', () => {
     expect(result.accessToken).toBe('new.access.token');
   });
 
+  it('should preserve application audience when refreshing', async () => {
+    mockQueryRepository.findApplicationByAppId.mockResolvedValueOnce({
+      id: 'app-crm',
+      audience: 'https://api.ordamy.com',
+      url: 'https://crm.bigso.co',
+      backendUrl: 'https://api.crm.bigso.co',
+    });
+
+    await refreshTokenUseCase.execute({
+      refreshToken: 'hashed-token-abc',
+      tenantId: 'tenant-456',
+      appId: 'crm',
+    });
+
+    expect(mockQueryRepository.findApplicationByAppId).toHaveBeenCalledWith('crm');
+    expect(tokenService.generateTokens).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appId: 'crm',
+        audience: 'https://api.ordamy.com',
+        url: 'https://crm.bigso.co',
+        backendUrl: 'https://api.crm.bigso.co',
+      })
+    );
+  });
+
   it('should reject token not found in refresh token table', async () => {
     refreshTokenRepository.findByHash.mockResolvedValueOnce(null);
 
