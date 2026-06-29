@@ -74,16 +74,18 @@ export async function createHexServer(container: Container): Promise<Express> {
   );
 
   // ── Infrastructure routes (public, no auth) ───────────────────────────────
-  app.get('/health', (_req: Request, res: Response) => {
+  const healthHandler = (_req: Request, res: Response) => {
     res.json({ status: 'OK', mode: 'hexagonal', timestamp: new Date().toISOString() });
-  });
+  };
 
-  app.get('/ready', (_req: Request, res: Response) => {
-    res.json({ status: 'OK', mode: 'hexagonal', timestamp: new Date().toISOString() });
-  });
+  app.get('/health', healthHandler);
+  app.get('/idp/health', healthHandler);
+
+  app.get('/ready', healthHandler);
+  app.get('/idp/ready', healthHandler);
 
   // JWKS endpoint — publicly accessible, no CORS restriction
-  app.get('/.well-known/jwks.json', (_req: Request, res: Response) => {
+  const jwksHandler = (_req: Request, res: Response) => {
     try {
       const jwksString = container.get<any>('JwksProvider').getJwksString();
       res.setHeader('Content-Type', 'application/json');
@@ -93,10 +95,15 @@ export async function createHexServer(container: Container): Promise<Express> {
     } catch (err: any) {
       res.status(500).json({ error: 'JWKS not initialized', message: err.message });
     }
-  });
+  };
+
+  app.get('/.well-known/jwks.json', jwksHandler);
+  app.get('/idp/.well-known/jwks.json', jwksHandler);
 
   // ── API v2/v3 (hexagonal auth + app core) ────────────────────────────────
-  app.use('/api/v2', createRouter(container));
+  const apiRouter = createRouter(container);
+  app.use('/api/v2', apiRouter);
+  app.use('/idp/v1', apiRouter);
 
   // ── 404 ──────────────────────────────────────────────────────────────────
   app.use((req: Request, res: Response) => {
